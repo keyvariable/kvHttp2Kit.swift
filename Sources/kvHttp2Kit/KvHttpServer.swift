@@ -34,7 +34,7 @@ import NIOSSL
 
 
 
-public protocol KvHttpServerDelegate : class {
+public protocol KvHttpServerDelegate : AnyObject {
 
     func httpServerDidStart(_ httpServer: KvHttpServer)
 
@@ -48,7 +48,7 @@ public protocol KvHttpServerDelegate : class {
 
 
 
-public protocol KvHttpChannelHandlerDelegate : class {
+public protocol KvHttpChannelHandlerDelegate : AnyObject {
 
     func httpChannelHandler(_ httpChannelHandler: KvHttpServer.ChannelHandler, didReceive requestPart: KvHttpServer.ChannelHandler.RequestPart)
 
@@ -245,9 +245,8 @@ extension KvHttpServer {
         try KvThreadKit.locking(mutationLock) {
             guard !isStarted else { return }
 
-            let tlsConfiguration = TLSConfiguration.forServer(certificateChain: configuration.ssl.certificateChain.map { .certificate($0) },
-                                                              privateKey: .privateKey(configuration.ssl.privateKey),
-                                                              applicationProtocols: NIOHTTP2SupportedALPNProtocols)
+            let tlsConfiguration = TLSConfiguration.makeServerConfiguration(certificateChain: configuration.ssl.certificateChain.map { .certificate($0) },
+                                                                            privateKey: .privateKey(configuration.ssl.privateKey))
             // Configure the SSL context that is used by all SSL handlers.
             let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
 
