@@ -20,7 +20,7 @@ The same as [SwiftNIO](https://github.com/apple/swift-nio).
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/keyvariable/kvHttp2Kit-Swift", from: "0.1.0"),
+    .package(url: "https://github.com/keyvariable/kvHttp2Kit-Swift", from: "0.2.0"),
 ]
 ```
 
