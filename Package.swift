@@ -21,6 +21,7 @@ import PackageDescription
 
 let package = Package(
     name: "kvHttp2Kit-Swift",
+    platforms: [ .iOS(.v11), ],
     products: [
         .library(name: "kvHttp2Kit", targets: [ "kvHttp2Kit" ]),
     ],
@@ -28,7 +29,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.13.0"),
         .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.9.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
-        .package(url: "https://github.com/keyvariable/kvKit-Swift.git", from: "1.0.0"),
+        .package(url: "https://github.com/keyvariable/kvKit-Swift.git", from: "3.0.0"),
     ],
     targets: [
         .target(name: "kvHttp2Kit",
