@@ -131,29 +131,49 @@ extension KvHttpServer {
         public var host: String
         public var port: Int
 
+        /// Empty value means `.Defaults.protocols` will be applied.
+        public var protocols: Protocols
+
         public var ssl: SSL
 
 
-
-        public init(host: String = Defaults.host, port: Int, ssl: SSL) {
+        public init(host: String = Defaults.host, port: Int, protocols: Protocols? = nil, ssl: SSL) {
             self.host = host
             self.port = port
+            self.protocols = protocols ?? Defaults.protocols
             self.ssl = ssl
         }
 
 
-
-        // MARK: Defaults
+        // MARK: .Defaults
 
         public struct Defaults {
 
             public static let host: String = "::1"
 
+            public static let protocols: Protocols = [ .http_1_1, .http_2_0 ]
+
         }
 
 
+        // MARK: .Protocols
 
-        // MARK: SSL
+        public struct Protocols : OptionSet {
+
+            public static let http_1_1 = Protocols(rawValue: 1 << 1)
+            public static let http_2_0 = Protocols(rawValue: 1 << 2)
+
+
+            public let rawValue: UInt
+
+            public init(rawValue: UInt) {
+                self.rawValue = rawValue
+            }
+
+        }
+
+
+        // MARK: .SSL
 
         public struct SSL {
 
@@ -168,6 +188,11 @@ extension KvHttpServer {
             }
 
         }
+
+
+        // MARK: Operations
+
+        var effectiveProtocols: Protocols { !protocols.isEmpty ? protocols : Defaults.protocols }
 
     }
 
@@ -245,6 +270,7 @@ extension KvHttpServer {
         try KvThreadKit.locking(mutationLock) {
             guard !isStarted else { return }
 
+            let protocols = configuration.effectiveProtocols
             let tlsConfiguration = TLSConfiguration.makeServerConfiguration(certificateChain: configuration.ssl.certificateChain.map { .certificate($0) },
                                                                             privateKey: .privateKey(configuration.ssl.privateKey))
             // Configure the SSL context that is used by all SSL handlers.
@@ -257,20 +283,51 @@ extension KvHttpServer {
                 .serverChannelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
 
                 .childChannelInitializer({ [weak self] channel in
-                    channel.pipeline.addHandler(NIOSSLServerHandler(context: sslContext)).flatMap { [weak self] in
-                        channel.configureHTTP2Pipeline(mode: .server) { [weak self] streamChannel in
-                            streamChannel.pipeline.addHandler(HTTP2FramePayloadToHTTP1ServerCodec()).flatMap { [weak self] in
-                                streamChannel.pipeline.addHandler(InternalChannelHandler(self))
-                            }.flatMap { [weak self] in
-                                streamChannel.pipeline.addHandler(ErrorHandler(self))
+                    channel.pipeline.addHandler(NIOSSLServerHandler(context: sslContext))
+                        .flatMap { [weak self] in
+
+                            func ConfigureHttp2(_ server: KvHttpServer?, channel: Channel) -> EventLoopFuture<Void> {
+                                let errorHandler = ErrorHandler(server)
+
+                                return channel.configureHTTP2Pipeline(mode: .server) { streamChannel in
+                                    streamChannel.pipeline.addHandler(HTTP2FramePayloadToHTTP1ServerCodec())
+                                        .flatMap {
+                                            streamChannel.pipeline.addHandlers([
+                                                InternalChannelHandlerHttp2(server),
+                                                errorHandler,
+                                            ])
+                                        }
+                                }
+                                .flatMap { _ in channel.pipeline.addHandler(errorHandler) }
+                            }
+
+
+                            func ConfigureHttp1(_ server: KvHttpServer?, channel: Channel) -> EventLoopFuture<Void> {
+                                channel.pipeline.configureHTTPServerPipeline().flatMap { _ in
+                                    channel.pipeline.addHandlers([
+                                        InternalChannelHandlerHttp1(server),
+                                        ErrorHandler(server),
+                                    ])
+                                }
+                            }
+
+
+                            switch protocols {
+                            case .http_1_1:
+                                return ConfigureHttp1(self, channel: channel)
+                            case .http_2_0:
+                                return ConfigureHttp2(self, channel: channel)
+                            case [ .http_1_1, .http_2_0 ]:
+                                return channel.configureHTTP2SecureUpgrade(
+                                    h2ChannelConfigurator: { [weak self] channel in ConfigureHttp2(self, channel: channel) },
+                                    http1ChannelConfigurator: { [weak self] channel in ConfigureHttp1(self, channel: channel) }
+                                )
+                            default:
+                                return ConfigureHttp1(self, channel: channel)
                             }
                         }
-                    }.flatMap { [weak self] (_: HTTP2StreamMultiplexer) in
-                        channel.pipeline.addHandler(ErrorHandler(self))
-                    }
                 })
 
-                // Enable TCP_NODELAY and SO_REUSEADDR for the accepted Channels
                 .childChannelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
                 .childChannelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
                 .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 1)
@@ -346,46 +403,65 @@ extension KvHttpServer {
 
 
 
+    // MARK: .InternalChannelHandler
+
     fileprivate class InternalChannelHandler : ChannelHandler, ChannelInboundHandler {
 
-        override func submit(_ response: Response) throws {
-            guard let context = context else { throw KvError.inconsistency("channel handler has no context") }
-
-            context.eventLoop.execute { [weak self] in
-                context.channel.getOption(HTTP2StreamChannelOptions.streamID).flatMap({ [weak self] (streamID) -> EventLoopFuture<Void> in
-
-                    func DataBuffer(_ data: Data) -> ByteBuffer {
-                        var buffer = context.channel.allocator.buffer(capacity: data.count)
-
-                        buffer.writeBytes(data)
-
-                        return buffer
-                    }
+        let httpVersion: HTTPVersion
 
 
-                    guard let channelHandler = self else { return context.close() }
 
-                    let (contentType, contentLength, buffer): (String, UInt64, ByteBuffer) = {
-                        switch response {
-                        case .json(let data):
-                            return ("application/json; charset=utf-8", numericCast(data.count), DataBuffer(data))
-                        }
-                    }()
+        init(_ httpServer: KvHttpServer?, httpVersion: HTTPVersion) {
+            self.httpVersion = httpVersion
+
+            super.init(httpServer)
+        }
 
 
-                    let headers: HTTPHeaders = [ "Content-Type": contentType,
-                                                 "Content-Length": String(contentLength),
-                                                 "x-stream-id": String(Int(streamID)), ]
 
-                    context.channel.write(channelHandler.wrapOutboundOut(HTTPServerResponsePart.head(HTTPResponseHead(version: .init(major: 2, minor: 0), status: .ok, headers: headers))), promise: nil)
-                    context.channel.write(channelHandler.wrapOutboundOut(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
+        // MARK: Operations
 
-                    return context.channel.writeAndFlush(channelHandler.wrapOutboundOut(HTTPServerResponsePart.end(nil)))
+        fileprivate func channelWrite(_ channel: Channel, response: Response, http2StreamID: String?) -> EventLoopFuture<Void> {
 
-                }).whenComplete { _ in
-                    context.close(promise: nil)
-                }
+            func DataBuffer(_ data: Data) -> ByteBuffer {
+                var buffer = channel.allocator.buffer(capacity: data.count)
+
+                buffer.writeBytes(data)
+
+                return buffer
             }
+
+
+            let (contentType, contentLength, buffer): (String, UInt64, ByteBuffer) = {
+                switch response {
+                case .json(let data):
+                    return ("application/json; charset=utf-8", numericCast(data.count), DataBuffer(data))
+                }
+            }()
+
+            var headers: HTTPHeaders = [ "Content-Type": contentType,
+                                         "Content-Length": String(contentLength), ]
+            if let http2StreamID = http2StreamID {
+                headers.add(name: "x-stream-id", value: http2StreamID)
+            }
+
+            channel.write(wrapOutboundOut(HTTPServerResponsePart.head(HTTPResponseHead(version: httpVersion, status: .ok, headers: headers))), promise: nil)
+            channel.write(wrapOutboundOut(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
+
+            return channel.writeAndFlush(wrapOutboundOut(HTTPServerResponsePart.end(nil)))
+        }
+
+
+
+        // MARK: .Options
+
+        struct Options : OptionSet {
+
+            static let writesStreamID = Options(rawValue: 1 << 0)
+
+
+            let rawValue: UInt
+
         }
 
 
@@ -423,6 +499,56 @@ extension KvHttpServer {
             assert(self.context == context)
 
             delegate?.httpChannelHandler(self, didCatch: error)
+        }
+
+    }
+
+
+
+    // MARK: .InternalChannelHandlerHttp1
+
+    fileprivate class InternalChannelHandlerHttp1 : InternalChannelHandler {
+
+        init(_ httpServer: KvHttpServer?) {
+            super.init(httpServer, httpVersion: .init(major: 1, minor: 1))
+        }
+
+
+        override func submit(_ response: Response) throws {
+            guard let context = context else { throw KvError.inconsistency("channel handler has no context") }
+
+            context.eventLoop.execute { [weak self] in
+                self?
+                    .channelWrite(context.channel, response: response, http2StreamID: nil)
+                    .whenComplete { _ in context.close(promise: nil) }
+            }
+        }
+
+    }
+
+
+    // MARK: .InternalChannelHandlerHttp2
+
+    fileprivate class InternalChannelHandlerHttp2 : InternalChannelHandler {
+
+        init(_ httpServer: KvHttpServer?) {
+            super.init(httpServer, httpVersion: .init(major: 2, minor: 0))
+        }
+
+
+        override func submit(_ response: Response) throws {
+            guard let context = context else { throw KvError.inconsistency("channel handler has no context") }
+
+            context.eventLoop.execute { [weak self] in
+                let channel = context.channel
+
+                channel.getOption(HTTP2StreamChannelOptions.streamID)
+                    .flatMap { [weak self] (streamID) -> EventLoopFuture<Void> in
+                        self?.channelWrite(channel, response: response, http2StreamID: String(Int(streamID)))
+                        ?? context.eventLoop.makeSucceededVoidFuture()
+                    }
+                    .whenComplete { _ in context.close(promise: nil) }
+            }
         }
 
     }
