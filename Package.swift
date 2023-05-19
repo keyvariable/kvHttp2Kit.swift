@@ -19,6 +19,17 @@
 
 import PackageDescription
 
+
+let targets: [Target] = [
+    .target(name: "kvHttp2Kit",
+            dependencies: [ .product(name: "kvKit", package: "kvKit-Swift"),
+                            .product(name: "NIO", package: "swift-nio"),
+                            .product(name: "NIOHTTP1", package: "swift-nio"),
+                            .product(name: "NIOHTTP2", package: "swift-nio-http2"),
+                            .product(name: "NIOSSL", package: "swift-nio-ssl") ]),
+    .testTarget(name: "kvHttp2KitTests", dependencies: [ "kvHttp2Kit" ]),
+]
+
 let package = Package(
     name: "kvHttp2Kit-Swift",
     platforms: [ .iOS(.v11), ],
@@ -31,13 +42,5 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
         .package(url: "https://github.com/keyvariable/kvKit-Swift.git", from: "3.0.0"),
     ],
-    targets: [
-        .target(name: "kvHttp2Kit",
-                dependencies: [ .product(name: "kvKit", package: "kvKit-Swift"),
-                                .product(name: "NIO", package: "swift-nio"),
-                                .product(name: "NIOHTTP1", package: "swift-nio"),
-                                .product(name: "NIOHTTP2", package: "swift-nio-http2"),
-                                .product(name: "NIOSSL", package: "swift-nio-ssl") ]),
-        .testTarget(name: "kvHttp2KitTests", dependencies: [ "kvHttp2Kit" ]),
-    ]
+    targets: targets
 )
