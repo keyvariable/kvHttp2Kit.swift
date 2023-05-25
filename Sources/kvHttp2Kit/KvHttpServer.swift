@@ -136,12 +136,19 @@ extension KvHttpServer {
 
         public var ssl: SSL
 
+        public var connection: Connection
 
-        public init(host: String = Defaults.host, port: Int, protocols: Protocols? = nil, ssl: SSL) {
+
+        public init(host: String = Defaults.host,
+                    port: Int, protocols: Protocols? = nil,
+                    ssl: SSL,
+                    connection: Connection? = nil)
+        {
             self.host = host
             self.port = port
             self.protocols = protocols ?? Defaults.protocols
             self.ssl = ssl
+            self.connection = connection ?? Connection()
         }
 
 
@@ -152,6 +159,10 @@ extension KvHttpServer {
             public static let host: String = "::1"
 
             public static let protocols: Protocols = [ .http_1_1, .http_2_0 ]
+
+            /// In seconds.
+            public static let connectionIdleTimeInterval: TimeInterval = 4.0
+            public static let connectionRequestLimit: UInt = 128
 
         }
 
@@ -181,10 +192,27 @@ extension KvHttpServer {
             public var certificateChain: [NIOSSLCertificate]
 
 
-
             public init(privateKey: NIOSSLPrivateKey, certificateChain: [NIOSSLCertificate]) {
                 self.privateKey = privateKey
                 self.certificateChain = certificateChain
+            }
+
+        }
+
+
+        // MARK: .Connection
+
+        public struct Connection {
+
+            public var idleTimeInterval: TimeInterval
+            public var requestLimit: UInt
+
+
+            public init(idleTimeInterval: TimeInterval = Defaults.connectionIdleTimeInterval,
+                        requestLimit: UInt = Defaults.connectionRequestLimit)
+            {
+                self.idleTimeInterval = idleTimeInterval
+                self.requestLimit = requestLimit
             }
 
         }
@@ -257,11 +285,11 @@ extension KvHttpServer {
 
 
             func errorCaught(context: ChannelHandlerContext, error: Error) {
-                guard let server = server else {
-                    return NSLog("[KvHttpServer] Error: \(error)")
-                }
+                guard let server = server else { return NSLog("[KvHttpServer] Error: \(error)") }
 
                 server.delegate?.httpServer(server, didCatch: error)
+
+                context.close(promise: nil)
             }
 
         }
@@ -286,6 +314,15 @@ extension KvHttpServer {
                     channel.pipeline.addHandler(NIOSSLServerHandler(context: sslContext))
                         .flatMap { [weak self] in
 
+                            func MakeChanelHandler<T : KvHttpServerInternalChannelHandlerInit>(_ type: T.Type, _ server: KvHttpServer?) -> T {
+                                let channelHandler = T(server)
+
+                                server?.delegate?.httpServer(server!, didStart: channelHandler)
+
+                                return channelHandler
+                            }
+
+
                             func ConfigureHttp2(_ server: KvHttpServer?, channel: Channel) -> EventLoopFuture<Void> {
                                 let errorHandler = ErrorHandler(server)
 
@@ -293,7 +330,7 @@ extension KvHttpServer {
                                     streamChannel.pipeline.addHandler(HTTP2FramePayloadToHTTP1ServerCodec())
                                         .flatMap {
                                             streamChannel.pipeline.addHandlers([
-                                                InternalChannelHandlerHttp2(server),
+                                                MakeChanelHandler(InternalChannelHandlerHttp2.self, server),
                                                 errorHandler,
                                             ])
                                         }
@@ -305,7 +342,7 @@ extension KvHttpServer {
                             func ConfigureHttp1(_ server: KvHttpServer?, channel: Channel) -> EventLoopFuture<Void> {
                                 channel.pipeline.configureHTTPServerPipeline().flatMap { _ in
                                     channel.pipeline.addHandlers([
-                                        InternalChannelHandlerHttp1(server),
+                                        MakeChanelHandler(InternalChannelHandlerHttp1.self, server),
                                         ErrorHandler(server),
                                     ])
                                 }
@@ -366,7 +403,17 @@ extension KvHttpServer {
 
 
 
-// MARK: : .ChannelHandler
+// MARK: KvHttpServerInternalChannelHandler
+
+fileprivate protocol KvHttpServerInternalChannelHandlerInit : KvHttpServer.ChannelHandler {
+
+    init(_ httpServer: KvHttpServer?)
+
+}
+
+
+
+// MARK: .ChannelHandler
 
 extension KvHttpServer {
 
@@ -375,39 +422,79 @@ extension KvHttpServer {
         public typealias RequestPart = HTTPServerRequestPart
 
 
+        public weak var delegate: KvHttpChannelHandlerDelegate? {
+            get { locking { _delegate } }
+            set { locking { _delegate = newValue } }
+        }
 
-        public weak var delegate: KvHttpChannelHandlerDelegate?
+        public fileprivate(set) weak var httpServer: KvHttpServer? {
+            get { locking { _httpServer } }
+            set { locking { _httpServer = newValue } }
+        }
 
-        public fileprivate(set) weak var httpServer: KvHttpServer!
+        public var userInfo: Any? {
+            get { locking { _userInfo } }
+            set { locking { _userInfo = newValue } }
+        }
 
-
-        public var userInfo: Any?
-
-
-
-        fileprivate init(_ httpServer: KvHttpServer?) {
-            self.httpServer = httpServer
-
-            httpServer?.delegate?.httpServer(httpServer!, didStart: self)
+        public var requestLimit: UInt {
+            get { locking { _requestLimit } }
+            set { locking { _requestLimit = newValue } }
         }
 
 
+        fileprivate init(_ httpServer: KvHttpServer?) {
+            _httpServer = httpServer
+            _requestLimit = httpServer?.configuration.connection.requestLimit ?? 0
+        }
 
-        fileprivate weak var context: ChannelHandlerContext?
+
+        private let mutationLock = NSRecursiveLock()
+
+        /// - Warning: Access to this property must be protected with .mutationLock.
+        private weak var _delegate: KvHttpChannelHandlerDelegate?
+        /// - Warning: Access to this property must be protected with .mutationLock.
+        private weak var _httpServer: KvHttpServer?
+        /// - Warning: Access to this property must be protected with .mutationLock.
+        private var _userInfo: Any?
+        /// - Warning: Access to this property must be protected with .mutationLock.
+        private var _requestLimit: UInt
 
 
+        // MARK: Operations
 
         public func submit(_ response: Response) throws { throw KvError.inconsistency("implementation for \(#function) is missing") }
+
+
+        // MARK: Locking
+
+        fileprivate func locking<R>(_ body: () throws -> R) rethrows -> R { try KvThreadKit.locking(mutationLock, body: body) }
+
+        fileprivate func lock() { mutationLock.lock() }
+
+        fileprivate func unlock() { mutationLock.unlock() }
 
     }
 
 
 
-    // MARK: .InternalChannelHandler
+    // MARK: .InternalChannelHandlerBase
 
-    fileprivate class InternalChannelHandler : ChannelHandler, ChannelInboundHandler {
+    /// - Note: Fileprivate additions to public ``ChannelHandler`` class.
+    fileprivate class InternalChannelHandlerBase : ChannelHandler, ChannelInboundHandler {
 
         let httpVersion: HTTPVersion
+
+
+        weak var context: ChannelHandlerContext? {
+            didSet {
+                guard context !== oldValue, context != nil else { return }
+
+                if locking({ _activeRequestCount <= 0 }) {
+                    startIdleTimeoutTask()
+                }
+            }
+        }
 
 
 
@@ -419,9 +506,53 @@ extension KvHttpServer {
 
 
 
+        /// - Warning: Access must be protected by ``ChannelHandler``'s locking methods.
+        private var _activeRequestCount: UInt = 0 {
+            didSet {
+                switch (_activeRequestCount > 0, oldValue > 0) {
+                case (true, false):
+                    startIdleTimeoutTask()
+                case (false, true):
+                    locking {
+                        _idleTimeoutTask = nil
+                    }
+                case (true, true), (false, false):
+                    break
+                }
+            }
+        }
+
+
+        /// - Warning: Access must be protected by ``ChannelHandler``'s locking methods.
+        private var _isIdleTimerFired = false
+
+        /// - Warning: Access must be protected by ``ChannelHandler``'s locking methods.
+        private var _idleTimeoutTask: Scheduled<Void>? {
+            willSet { locking { _idleTimeoutTask?.cancel() } }
+        }
+
+
+
         // MARK: Operations
 
-        fileprivate func channelWrite(_ channel: Channel, response: Response, http2StreamID: String?) -> EventLoopFuture<Void> {
+        func process(request: InboundIn) {
+            locking {
+                _activeRequestCount += 1
+            }
+
+            delegate?.httpChannelHandler(self, didReceive: request)
+        }
+
+
+        /// Override it to mutate head part of the response.
+        func willWrite(head: inout HTTPResponseHead) { }
+
+
+        func channelWrite(response: Response, http2StreamID: String?) {
+            guard let context = context else { return KvDebug.pause("Channel handler has no context") }
+
+            let channel = context.channel
+
 
             func DataBuffer(_ data: Data) -> ByteBuffer {
                 var buffer = channel.allocator.buffer(capacity: data.count)
@@ -432,23 +563,92 @@ extension KvHttpServer {
             }
 
 
-            let (contentType, contentLength, buffer): (String, UInt64, ByteBuffer) = {
+            let (contentType, contentLength, buffer): (String?, UInt64?, ByteBuffer?) = {
                 switch response {
                 case .json(let data):
                     return ("application/json; charset=utf-8", numericCast(data.count), DataBuffer(data))
                 }
             }()
 
-            var headers: HTTPHeaders = [ "Content-Type": contentType,
-                                         "Content-Length": String(contentLength), ]
-            if let http2StreamID = http2StreamID {
-                headers.add(name: "x-stream-id", value: http2StreamID)
+            let headers: HTTPHeaders = {
+                var headers = HTTPHeaders()
+
+                if let contentType = contentType {
+                    headers.replaceOrAdd(name: "Content-Type", value: contentType)
+                }
+                if let contentLength = contentLength {
+                    headers.replaceOrAdd(name: "Content-Length", value: String(contentLength))
+                }
+
+                if let http2StreamID = http2StreamID {
+                    headers.add(name: "x-stream-id", value: http2StreamID)
+                }
+
+                return headers
+            }()
+
+            let head: HTTPResponseHead = {
+                var head = HTTPResponseHead(version: httpVersion, status: .ok, headers: headers)
+                willWrite(head: &head)
+                return head
+            }()
+            channel.write(wrapOutboundOut(HTTPServerResponsePart.head(head)), promise: nil)
+
+            if let buffer = buffer {
+                channel.write(wrapOutboundOut(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
             }
 
-            channel.write(wrapOutboundOut(HTTPServerResponsePart.head(HTTPResponseHead(version: httpVersion, status: .ok, headers: headers))), promise: nil)
-            channel.write(wrapOutboundOut(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
+            channel
+                .writeAndFlush(wrapOutboundOut(HTTPServerResponsePart.end(nil)))
+                .whenComplete { _ in
+                    self.locking {
+                        self._activeRequestCount -= 1
+                        self.requestLimit = self.requestLimit > 0 ? self.requestLimit - 1 : 0
+                    }
 
-            return channel.writeAndFlush(wrapOutboundOut(HTTPServerResponsePart.end(nil)))
+                    let needsClose: Bool = self.locking {
+                        // Connections are closed when there are no received request.
+                        guard self._activeRequestCount <= 0 else { return false }
+
+                        return (!head.isKeepAlive
+                                || self.context == nil
+                                || self._isIdleTimerFired
+                                || self.requestLimit <= 0)
+                    }
+
+                    guard needsClose else { return }
+
+                    context.close(promise: nil)
+                }
+        }
+
+
+        private func startIdleTimeoutTask() {
+            locking {
+                guard !_isIdleTimerFired,
+                      let context = context,
+                      let idleTimeInterval = httpServer?.configuration.connection.idleTimeInterval
+                else { return }
+
+                _idleTimeoutTask = context.eventLoop.scheduleTask(in: .nanoseconds(.init(idleTimeInterval * 1e9))) { [weak self] in
+                    self?.handleIdleTimeout()
+                }
+            }
+        }
+
+
+        private func handleIdleTimeout() {
+            do {
+                lock()
+                defer { unlock() }
+
+                _idleTimeoutTask = nil
+                _isIdleTimerFired = true
+
+                guard _activeRequestCount <= 0 else { return }
+            }
+
+            context?.close(promise: nil)
         }
 
 
@@ -490,7 +690,7 @@ extension KvHttpServer {
         func channelRead(context: ChannelHandlerContext, data: NIOAny) {
             assert(self.context == context)
 
-            delegate?.httpChannelHandler(self, didReceive: unwrapInboundIn(data))
+            process(request: unwrapInboundIn(data))
         }
 
 
@@ -499,6 +699,8 @@ extension KvHttpServer {
             assert(self.context == context)
 
             delegate?.httpChannelHandler(self, didCatch: error)
+
+            context.close(promise: nil)
         }
 
     }
@@ -507,20 +709,79 @@ extension KvHttpServer {
 
     // MARK: .InternalChannelHandlerHttp1
 
-    fileprivate class InternalChannelHandlerHttp1 : InternalChannelHandler {
+    fileprivate class InternalChannelHandlerHttp1 : InternalChannelHandlerBase, KvHttpServerInternalChannelHandlerInit {
 
-        init(_ httpServer: KvHttpServer?) {
-            super.init(httpServer, httpVersion: .init(major: 1, minor: 1))
+        required init(_ httpServer: KvHttpServer?) {
+            super.init(httpServer, httpVersion: .http1_1)
+        }
+
+
+        /// - Note: Assuming there is no request pooling.
+        /// - Warning: Access must be protected by ``ChannelHandler``'s locking methods.
+        private var _requestHead: HTTPRequestHead?
+
+
+        // MARK: Opertions
+
+        override func process(request: InboundIn) {
+            if case .head(let head) = request {
+                locking {
+                    _requestHead = head
+                }
+            }
+
+            super.process(request: request)
+        }
+
+
+        override func willWrite(head: inout HTTPResponseHead) {
+            defer { super.willWrite(head: &head) }
+
+            let requestHead: HTTPRequestHead
+            do {
+                lock()
+                defer { unlock() }
+
+                switch _requestHead {
+                case .none:
+                    return
+                case .some(let wrapped):
+                    requestHead = wrapped
+                }
+
+                _requestHead = nil
+            }
+
+
+            struct Constants { static let connectionValues: Set = [ "keep-alive", "close" ] }
+
+
+            let hasConnectionHeaders = requestHead.headers[canonicalForm: "connection"]
+                .lazy.map { $0.lowercased() }
+                .contains(where: Constants.connectionValues.contains(_:))
+
+            guard !hasConnectionHeaders else { return }
+
+            switch (requestHead.isKeepAlive, requestHead.version) {
+            case (true, .http1_0):
+                // In HTTP 1.0 connections are closed by default.
+                // So when request has `keep-alive`, it should be mirrored in response.
+                head.headers.add(name: "Connection", value: "keep-alive")
+            case (false, .http1_1):
+                // In HTTP 1.1 connections are not closed by default.
+                // So when request has `close`, it should be mirrored in response.
+                head.headers.add(name: "Connection", value: "close")
+            default:
+                break
+            }
         }
 
 
         override func submit(_ response: Response) throws {
-            guard let context = context else { throw KvError.inconsistency("channel handler has no context") }
+            guard let context = context else { throw KvError.inconsistency("Channel handler has no context") }
 
             context.eventLoop.execute { [weak self] in
-                self?
-                    .channelWrite(context.channel, response: response, http2StreamID: nil)
-                    .whenComplete { _ in context.close(promise: nil) }
+                self?.channelWrite(response: response, http2StreamID: nil)
             }
         }
 
@@ -529,25 +790,31 @@ extension KvHttpServer {
 
     // MARK: .InternalChannelHandlerHttp2
 
-    fileprivate class InternalChannelHandlerHttp2 : InternalChannelHandler {
+    fileprivate class InternalChannelHandlerHttp2 : InternalChannelHandlerBase, KvHttpServerInternalChannelHandlerInit {
 
-        init(_ httpServer: KvHttpServer?) {
-            super.init(httpServer, httpVersion: .init(major: 2, minor: 0))
+        required init(_ httpServer: KvHttpServer?) {
+            super.init(httpServer, httpVersion: .http2)
         }
 
 
+        // MARK: Opertions
+
         override func submit(_ response: Response) throws {
-            guard let context = context else { throw KvError.inconsistency("channel handler has no context") }
+            guard let context = context else { throw KvError.inconsistency("Channel handler has no context") }
 
             context.eventLoop.execute { [weak self] in
                 let channel = context.channel
 
                 channel.getOption(HTTP2StreamChannelOptions.streamID)
-                    .flatMap { [weak self] (streamID) -> EventLoopFuture<Void> in
-                        self?.channelWrite(channel, response: response, http2StreamID: String(Int(streamID)))
-                        ?? context.eventLoop.makeSucceededVoidFuture()
+                    .whenComplete { [weak self] result in
+                        guard case .success(let streamID) = result else {
+                            KvDebug.pause("Failed to get HTTP/2.0 stream ID channel option")
+                            context.close(promise: nil)
+                            return
+                        }
+
+                        self?.channelWrite(response: response, http2StreamID: String(Int(streamID)))
                     }
-                    .whenComplete { _ in context.close(promise: nil) }
             }
         }
 
