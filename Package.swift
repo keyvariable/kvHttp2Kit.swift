@@ -22,7 +22,7 @@ import PackageDescription
 
 let targets: [Target] = [
     .target(name: "kvHttp2Kit",
-            dependencies: [ .product(name: "kvKit", package: "kvKit-Swift"),
+            dependencies: [ .product(name: "kvKit", package: "kvKit.swift"),
                             .product(name: "NIO", package: "swift-nio"),
                             .product(name: "NIOHTTP1", package: "swift-nio"),
                             .product(name: "NIOHTTP2", package: "swift-nio-http2"),
@@ -40,7 +40,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.13.0"),
         .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.9.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
-        .package(url: "https://github.com/keyvariable/kvKit-Swift.git", from: "3.0.0"),
+        .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.0.0"),
     ],
     targets: targets
 )
