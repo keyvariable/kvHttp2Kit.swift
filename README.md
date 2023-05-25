@@ -1,4 +1,4 @@
-# kvHttp2Kit-Swift
+# kvHttp2Kit.swift
 
 ![Swift 5.2](https://img.shields.io/badge/swift-5.2-green.svg)
 ![Linux](https://img.shields.io/badge/os-linux-green.svg)
@@ -20,7 +20,7 @@ The same as [SwiftNIO](https://github.com/apple/swift-nio).
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/keyvariable/kvHttp2Kit-Swift", from: "0.2.0"),
+    .package(url: "https://github.com/keyvariable/kvHttp2Kit.swift", from: "0.2.0"),
 ]
 ```
 
@@ -28,7 +28,7 @@ dependencies: [
 
 ```swift
 dependencies: [
-    .product(name: "kvHttp2Kit", package: "kvHttp2Kit-Swift"),
+    .product(name: "kvHttp2Kit", package: "kvHttp2Kit.swift"),
 ]
 ```
 

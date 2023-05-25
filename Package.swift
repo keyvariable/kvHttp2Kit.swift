@@ -31,7 +31,7 @@ let targets: [Target] = [
 ]
 
 let package = Package(
-    name: "kvHttp2Kit-Swift",
+    name: "kvHttp2Kit.swift",
     platforms: [ .iOS(.v11), ],
     products: [
         .library(name: "kvHttp2Kit", targets: [ "kvHttp2Kit" ]),
