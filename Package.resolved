@@ -1,43 +1,41 @@
 {
-  "object": {
-    "pins": [
-      {
-        "package": "kvKit.swift",
-        "repositoryURL": "https://github.com/keyvariable/kvKit.swift.git",
-        "state": {
-          "branch": null,
-          "revision": "d8095d6f9ce8c96d66d857cf836ed3190e7c3533",
-          "version": "4.0.0"
-        }
-      },
-      {
-        "package": "swift-nio",
-        "repositoryURL": "https://github.com/apple/swift-nio.git",
-        "state": {
-          "branch": null,
-          "revision": "124119f0bb12384cef35aa041d7c3a686108722d",
-          "version": "2.40.0"
-        }
-      },
-      {
-        "package": "swift-nio-http2",
-        "repositoryURL": "https://github.com/apple/swift-nio-http2.git",
-        "state": {
-          "branch": null,
-          "revision": "108ac15087ea9b79abb6f6742699cf31de0e8772",
-          "version": "1.22.0"
-        }
-      },
-      {
-        "package": "swift-nio-ssl",
-        "repositoryURL": "https://github.com/apple/swift-nio-ssl.git",
-        "state": {
-          "branch": null,
-          "revision": "c30c680c78c99afdabf84805a83c8745387c4ac7",
-          "version": "2.20.2"
-        }
+  "pins" : [
+    {
+      "identity" : "kvkit.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/keyvariable/kvKit.swift.git",
+      "state" : {
+        "revision" : "d8095d6f9ce8c96d66d857cf836ed3190e7c3533",
+        "version" : "4.0.0"
       }
-    ]
-  },
-  "version": 1
+    },
+    {
+      "identity" : "swift-nio",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-nio.git",
+      "state" : {
+        "revision" : "124119f0bb12384cef35aa041d7c3a686108722d",
+        "version" : "2.40.0"
+      }
+    },
+    {
+      "identity" : "swift-nio-http2",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-nio-http2.git",
+      "state" : {
+        "revision" : "108ac15087ea9b79abb6f6742699cf31de0e8772",
+        "version" : "1.22.0"
+      }
+    },
+    {
+      "identity" : "swift-nio-ssl",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-nio-ssl.git",
+      "state" : {
+        "revision" : "c30c680c78c99afdabf84805a83c8745387c4ac7",
+        "version" : "2.20.2"
+      }
+    }
+  ],
+  "version" : 2
 }
