@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  KvHttpRequestHandler.swift
-//  kvHttp2Kit
+//  kvServerKit
 //
 //  Created by Svyatoslav Popov on 30.05.2023.
 //
@@ -37,12 +37,12 @@ public protocol KvHttpRequestHandler : AnyObject {
     /// It's invoked when server receives bytes from the client related with the request.
     /// This method can be invoked multiple times for each received part of the request body.
     /// When all the request body bytes are passed to request handler, ``httpClientDidReceiveEnd(_:)`` method is invoked.
-    func httpClient(_ httpClient: KvHttpServer.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer)
+    func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer)
 
     /// It's invoked when the request is completely received (including it's body bytes) and is ready to be handled.
-    func httpClientDidReceiveEnd(_ httpClient: KvHttpServer.Client) async -> KvHttpResponse?
+    func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider?
 
     /// - Note: The client will continue to process requests.
-    func httpClient(_ httpClient: KvHttpServer.Client, didCatch error: Error)
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error)
     
 }

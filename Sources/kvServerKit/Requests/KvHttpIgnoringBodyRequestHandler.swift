@@ -15,46 +15,39 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvHttpJsonRequestHandler.swift
-//  kvHttp2Kit
+//  KvHttpIgnoringBodyRequestHandler.swift
+//  kvServerKit
 //
-//  Created by Svyatoslav Popov on 31.05.2023.
+//  Created by Svyatoslav Popov on 28.06.2023.
 //
 
-import Foundation
-
-
-
-/// Collects body data and then decodes it as JSON.
+/// Ignores all the request body bytes.
 ///
-/// - Note: Requests having no body are ignored and `nil` response are returned.
-open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
+/// Note that the body limits are applied.
+public class KvHttpIgnoringBodyRequestHandler : KvHttpRequestHandler {
 
     public typealias BodyLimits = KvHttpRequest.BodyLimits
 
-    public typealias ResponseBlock = (Result<T, Error>) -> KvHttpResponse?
+    public typealias ResponseBlock = () async -> KvHttpResponseProvider?
 
 
-    @inlinable public var bodyLimits: BodyLimits { underlying.bodyLimits }
 
+    public let bodyLimits: BodyLimits
 
-    /// - Parameter responseBlock: Block passed with result of decoding collected request body data and returning response to be send to a client.
-    @inlinable
-    public init(bodyLimits: BodyLimits, responseBlock: @escaping ResponseBlock) {
-        underlying = .init(bodyLimits: bodyLimits, responseBlock: { data in
-            guard let data = data else { return nil }
-
-            let result = Result {
-                try JSONDecoder().decode(T.self, from: data)
-            }
-
-            return responseBlock(result)
-        })
-    }
 
 
     @usableFromInline
-    internal let underlying: KvHttpCollectingBodyRequestHandler
+    let responseBlock: () async -> KvHttpResponseProvider?
+
+
+
+    /// - Parameter responseBlock: Block passed with collected request body data if available and returning response to be send to a client.
+    @inlinable
+    public init(bodyLimits: BodyLimits, responseBlock: @escaping ResponseBlock) {
+        self.bodyLimits = bodyLimits
+        self.responseBlock = responseBlock
+    }
+
 
 
     // MARK: : KvHttpRequestHandler
@@ -67,9 +60,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
 
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpServer.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) {
-        underlying.httpClient(httpClient, didReceiveBodyBytes: bytes)
-    }
+    public func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) { }
 
 
     /// Invokes the receiver's `.responseBlock` passed with the colleted body data and returns the result.
@@ -78,8 +69,8 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpServer.Client) async -> KvHttpResponse? {
-        await underlying.httpClientDidReceiveEnd(httpClient)
+    public func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
+        await responseBlock()
     }
 
 
@@ -87,7 +78,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpServer.Client, didCatch error: Error) {
+    public func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
         print("\(type(of: self)) did catch error: \(error)")
     }
 

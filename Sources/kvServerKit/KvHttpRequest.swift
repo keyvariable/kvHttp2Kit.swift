@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  KvHttpRequest.swift
-//  kvHttp2Kit
+//  kvServerKit
 //
 //  Created by Svyatoslav Popov on 31.05.2023.
 //

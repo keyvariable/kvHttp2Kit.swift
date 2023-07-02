@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  KvHttpHeadOnlyRequestHandler.swift
-//  kvHttp2Kit
+//  kvServerKit
 //
 //  Created by Svyatoslav Popov on 31.05.2023.
 //
@@ -24,17 +24,33 @@
 /// Simple handler for requests having no body. It just sends response passed to the initializer.
 open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
 
-    /// Value to be sent to a client.
-    public let response: KvHttpResponse?
+    public typealias ResponseBlock = () async -> KvHttpResponseProvider?
+
+
+
+    @usableFromInline
+    let responseBlock: ResponseBlock
+
 
 
     /// - Parameter response: Value to be sent to a client.
     @inlinable
-    public init(response: KvHttpResponse?) {
-        self.response = response
+    public init(responseBlock: @escaping ResponseBlock) {
+        self.responseBlock = responseBlock
     }
 
 
+
+    /// Initializes request handler producing constant response.
+    ///
+    /// - Parameter response: Value to be sent to a client.
+    @inlinable
+    public convenience init(response: KvHttpResponseProvider?) {
+        self.init { response }
+    }
+
+
+    
     // MARK: : KvHttpRequestHandler
 
     /// See ``KvHttpRequestHandler``.
@@ -44,14 +60,14 @@ open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
 
 
     /// See ``KvHttpRequestHandler``.
-    public func httpClient(_ httpClient: KvHttpServer.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) { }
+    public func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) { }
 
 
     /// - Returns: Value of the receiver's `.response` property.
     ///
     /// See ``KvHttpRequestHandler``.
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpServer.Client) async -> KvHttpResponse? {
-        response
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
+        await responseBlock()
     }
 
 
@@ -59,7 +75,7 @@ open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpServer.Client, didCatch error: Error) {
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
         print("\(type(of: self)) did catch error: \(error)")
     }
 

@@ -1,6 +1,6 @@
 //===----------------------------------------------------------------------===//
 //
-//  Copyright (c) 2021 Svyatoslav Popov.
+//  Copyright (c) 2023 Svyatoslav Popov.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
 //  the License. You may obtain a copy of the License at
@@ -15,18 +15,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  XCTestManifests.swift
-//  kvHttp2Kit
+//  KvResponseAccumulator.swift
+//  kvServerKit
 //
-//  Created by Svyatoslav Popov on 16.04.2020.
+//  Created by Svyatoslav Popov on 28.06.2023.
 //
 
-import XCTest
+protocol KvResponseAccumulator : AnyObject {
 
-#if !canImport(ObjectiveC)
-public func allTests() -> [XCTestCaseEntry] {
-    return [
-        testCase(kvHttp2KitTests.allTests),
-    ]
+    func with(_ configuration: KvResponseGroupConfiguration, body: (KvResponseAccumulator) -> Void)
+
+    func insert<HttpResponse>(_ response: HttpResponse) where HttpResponse : KvHttpResponseImplementationProtocol
+
 }
-#endif

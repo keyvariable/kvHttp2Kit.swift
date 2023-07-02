@@ -1,6 +1,6 @@
 //===----------------------------------------------------------------------===//
 //
-//  Copyright (c) 2021 Svyatoslav Popov.
+//  Copyright (c) 2023 Svyatoslav Popov.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
 //  the License. You may obtain a copy of the License at
@@ -15,19 +15,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// LinuxMain.swift
-// kvServerKit
+//  KvHttpRequestIgnoredHeaders.swift
+//  kvServerKit
 //
-// Created by Svyatoslav Popov on 15.04.2020.
+//  Created by Svyatoslav Popov on 19.06.2023.
 //
 
-import XCTest
+public struct KvHttpRequestIgnoredHeaders {
 
-import kvServerKitTests
+    /// Initializer is internal to prevent instantiation from the outside.
+    @usableFromInline
+    init() { }
 
-let tests: [XCTestCaseEntry] = [
-    kvHttpServerTests.allTests(),
-    kvServerTests.allTests(),
-].joined()
-
-XCTMain(tests)
+}

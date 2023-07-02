@@ -15,19 +15,18 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// LinuxMain.swift
-// kvServerKit
+//  XCTestManifests.swift
+//  kvServerKit
 //
-// Created by Svyatoslav Popov on 15.04.2020.
+//  Created by Svyatoslav Popov on 16.04.2020.
 //
 
 import XCTest
 
-import kvServerKitTests
-
-let tests: [XCTestCaseEntry] = [
-    kvHttpServerTests.allTests(),
-    kvServerTests.allTests(),
-].joined()
-
-XCTMain(tests)
+#if !canImport(ObjectiveC)
+public func allTests() -> [XCTestCaseEntry] {
+    return [
+        testCase(kvServerKit.allTests),
+    ]
+}
+#endif
