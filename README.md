@@ -1,6 +1,6 @@
 # kvHttp2Kit.swift
 
-![Swift 5.2](https://img.shields.io/badge/swift-5.2-green.svg)
+![Swift 5.3](https://img.shields.io/badge/swift-5.3-green.svg)
 ![Linux](https://img.shields.io/badge/os-linux-green.svg)
 ![macOS](https://img.shields.io/badge/os-macOS-green.svg)
 
@@ -14,7 +14,7 @@ The same as [SwiftNIO](https://github.com/apple/swift-nio).
 
 ## Getting Started
 
-### Swift Tools 5.2+
+### Swift Tools 5.3+
 
 #### Package Dependencies:
 
