@@ -58,7 +58,7 @@ final class KvHttpServerTests : XCTestCase {
 
             // ##  Root
             for url in [ baseURL, URL(string: "/", relativeTo: baseURL)! ] {
-                try await KvServerTestKit.assertResponse(url, contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Greating.content, message: httpDescription)
+                try await KvServerTestKit.assertResponse(url, contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Greeting.content, message: httpDescription)
             }
 
             // ##  Echo
@@ -118,7 +118,7 @@ final class KvHttpServerTests : XCTestCase {
 
         struct Constants {
 
-            struct Greating {
+            struct Greeting {
 
                 static let path = "/"
                 static var content: String { "Hello! It's a test server on kvServerKit framework" }
@@ -240,8 +240,8 @@ final class KvHttpServerTests : XCTestCase {
             }
 
             switch urlComponents.path {
-            case Constants.Greating.path:
-                return KvHttpRequest.HeadOnlyHandler(response: .string(Constants.Greating.content))
+            case Constants.Greeting.path:
+                return KvHttpRequest.HeadOnlyHandler(response: .string(Constants.Greeting.content))
 
             case Constants.Echo.path:
                 return KvHttpRequest.CollectingBodyHandler(bodyLimits: 262_144 /* 256 KiB */) { body in

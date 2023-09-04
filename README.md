@@ -23,7 +23,7 @@ Some features:
 - structured URL queries;
 - handlers for common request body types;
 - support of Punycode and percent-encoding for URLs;
-- convenient resonse content builder;
+- convenient response content builder;
 - JSON for request and response bodies.
 
 Just declare hierarchical list of responses, *kvServerKit* will do the rest. Responses can be declared in any order.
@@ -34,7 +34,7 @@ One of *declarative API* key features is structured URL query.
 There are modifiers of requests declaring types of URL query item values and optionally custom parsing callbacks.
 If structure of URL query is declared then the resulting values are available as a tuple in the response context.
 
-*Declarative API* allows resonse overloading by URL query.
+*Declarative API* allows response overloading by URL query.
 Any number of responses can be declared at the same routing point: HTTP method, user, host and path.
 In this case single unambiguous response matching an URL query will be returned.
 If there are two or more matching responses then *declarative API* automatically returns 400 (Bad Request) response. 
@@ -43,7 +43,7 @@ If there are two or more matching responses then *declarative API* automatically
 
 Below is an example of a server providing simple responses over secure HTTP/2.0 and HTTP/1.1 at all available IP addresses on 8080 port
 for both `example.com` and `www.example.com` hosts:
-- simple greating text response at root path;
+- simple greeting text response at root path;
 - echo binary response with *POST* request's body at `/echo` path;
 - random boolean text response at `/random/bool` path;
 - random integer text response with structured URL query at `/random/int` path.
@@ -109,27 +109,18 @@ The same as [SwiftNIO](https://github.com/apple/swift-nio).
 
 ## Getting Started
 
-### Swift Tools 5.3+
-
 #### Package Dependencies:
-
 ```swift
-dependencies: [
-    .package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.2.0"),
-]
+dependencies: [ .package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.2.0") ]
 ```
-
 #### Target Dependencies:
-
 ```swift
-dependencies: [
-    .product(name: "kvServerKit", package: "kvServerKit.swift"),
-]
+dependencies: [ .product(name: "kvServerKit", package: "kvServerKit.swift") ]
 ```
-
-### Xcode
-
-Documentation: [Adding Package Dependencies to Your App](https://developer.apple.com/documentation/xcode/adding_package_dependencies_to_your_app).
+#### Import:
+```swift
+import kvServerKit
+```
 
 
 ## Authors

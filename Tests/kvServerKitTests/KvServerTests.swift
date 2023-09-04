@@ -57,13 +57,13 @@ final class KvServerTests : XCTestCase {
                 KvForEach(Self.configurations) { configuration in
                     NetworkGroup(with: configuration) {
                         KvHttpResponse.static {
-                            .string(Self.greating(for: configuration))
+                            .string(Self.greeting(for: configuration))
                         }
                     }
                 }
             }
 
-            static func greating(for configuration: KvHttpChannel.Configuration) -> String {
+            static func greeting(for configuration: KvHttpChannel.Configuration) -> String {
                 "Hello, \(KvServerTestKit.description(of: configuration.http)) client"
             }
 
@@ -73,7 +73,7 @@ final class KvServerTests : XCTestCase {
             for configuration in MultichannelServer.configurations {
                 let baseURL = KvServerTestKit.baseURL(for: configuration)
 
-                try await KvServerTestKit.assertResponse(baseURL, contentType: .text(.plain), expecting: MultichannelServer.greating(for: configuration))
+                try await KvServerTestKit.assertResponse(baseURL, contentType: .text(.plain), expecting: MultichannelServer.greeting(for: configuration))
             }
         }
 
@@ -190,13 +190,13 @@ final class KvServerTests : XCTestCase {
 
             let configuration = KvServerTestKit.insecureHttpConfiguration()
 
-            static var greating: String { "Welcome!" }
+            static var greeting: String { "Welcome!" }
 
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("a") {
                         KvGroup {
-                            KvHttpResponse.static { .string(Self.greating) }
+                            KvHttpResponse.static { .string(Self.greeting) }
                         }
                         .httpMethods(.DELETE)
                         .httpMethods(.GET, .PUT)
@@ -210,7 +210,7 @@ final class KvServerTests : XCTestCase {
         }
 
         try await Self.withRunningServer(of: ModifiedResponseGroupServer.self, context: { KvServerTestKit.baseURL(for: $0.configuration) }) { baseURL in
-            try await KvServerTestKit.assertResponse(baseURL, path: "a/b/c/d/e", contentType: .text(.plain), expecting: ModifiedResponseGroupServer.greating)
+            try await KvServerTestKit.assertResponse(baseURL, path: "a/b/c/d/e", contentType: .text(.plain), expecting: ModifiedResponseGroupServer.greeting)
         }
     }
 
@@ -493,7 +493,7 @@ final class KvServerTests : XCTestCase {
 
             let configuration = KvServerTestKit.insecureHttpConfiguration()
 
-            static let greating = "cascade"
+            static let greeting = "cascade"
 
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
@@ -503,14 +503,14 @@ final class KvServerTests : XCTestCase {
 
             private var httpsServer: some KvResponseGroup {
                 NetworkGroup(with: KvServerTestKit.secureHttpConfiguration()) {
-                    KvHttpResponse.static { .string(Self.greating) }
+                    KvHttpResponse.static { .string(Self.greeting) }
                 }
             }
 
         }
 
         try await Self.withRunningServer(of: CascadeNetworkModifierServer.self, context: { KvServerTestKit.baseURL(for: $0.configuration) }) { baseURL in
-            try await KvServerTestKit.assertResponse(baseURL, contentType: .text(.plain), expecting: CascadeNetworkModifierServer.greating)
+            try await KvServerTestKit.assertResponse(baseURL, contentType: .text(.plain), expecting: CascadeNetworkModifierServer.greeting)
         }
     }
 
