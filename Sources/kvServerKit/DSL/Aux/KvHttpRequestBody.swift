@@ -368,7 +368,7 @@ extension KvHttpRequestRequiredBody {
     ///         .requestBody(.json(of: DateComponents.self))
     ///         .content {
     ///             guard let date = $0.requestBody.date else { return .badRequest }
-    ///             return .string(date.formatted(.iso8601))
+    ///             return .string(ISO8601DateFormatter().string(from: date))
     ///         }
     ///
     public static func json<T : Decodable>(of type: T.Type) -> KvHttpRequestRequiredBody<T> { KvHttpRequestJsonBody<T>() }

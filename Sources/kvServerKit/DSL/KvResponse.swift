@@ -27,15 +27,28 @@
 ///
 /// This type can be used to create properties and custom types of serponses.
 ///
-/// Below is an example of a current server time HTTP response type having format parameter:
+/// Below is an example of a current server time HTTP response type having *format* parameter:
 ///
-///     struct CurrentDateResponse<F> : KvResponse
-///     where F : FormatStyle, F.FormatInput == Date
-///     {
-///         let format: F
+///     struct CurrentDateResponse : KvResponse {
+///         enum Format { case iso8601, rfc3339 }
+///
+///         init(format: Format) {
+///             switch {
+///             case .iso8601:
+///                 formatter = ISO8601DateFormatter()
+///             case .rfc3339:
+///                 let rfc3339Formatter = DateFormatter()
+///                 rfc3339Formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
+///                 rfc3339Formatter.locale = Locale(identifier: "en_US_POSIX")
+///                 rfc3339Formatter.timeZone = TimeZone(secondsFromGMT: 0)
+///                 formatter = rfc3339Formatter
+///             }
+///         }
+///
+///         private let formatter: Formatter
 ///
 ///         var body: some KvResponse {
-///             KvHttpResponse.static { .string(Date().formatted(format) }
+///             KvHttpResponse.static { .string(formatter.string(for: Date()!) }
 ///         }
 ///     }
 ///
@@ -44,8 +57,8 @@
 ///     KvGroup("iso8601") {
 ///         CurrentDateResponse(format: .iso8601)
 ///     }
-///     KvGroup("date") {
-///         CurrentDateResponse(format: .dateTime.year().month().day())
+///     KvGroup("rfc3339") {
+///         CurrentDateResponse(format: .rfc3339)
 ///     }
 ///
 /// See ``KvHttpResponse``.

@@ -36,7 +36,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.13.0"),
         .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.9.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
-        .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.0.0"),
+        .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.2.0"),
     ],
     
     targets: [
@@ -47,6 +47,7 @@ let package = Package(
                                 .product(name: "NIOHTTP2", package: "swift-nio-http2"),
                                 .product(name: "NIOSSL", package: "swift-nio-ssl") ],
                 swiftSettings: swiftSettings),
+
         .testTarget(name: "kvServerKitTests",
                     dependencies: [ "kvServerKit" ],
                     resources: [ .copy("Resources"), ],

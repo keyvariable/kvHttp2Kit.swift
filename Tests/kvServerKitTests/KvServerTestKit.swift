@@ -21,6 +21,8 @@
 //  Created by Svyatoslav Popov on 05.07.2023.
 //
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+
 import XCTest
 
 @testable import kvServerKit
@@ -231,7 +233,7 @@ class KvServerTestKit {
     class IgnoringCertificateTaskDelegate : NSObject, URLSessionTaskDelegate {
 
         func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-            //Trust the certificate even if not valid
+            // Trust the certificate even if not valid
             let urlCredential = URLCredential(trust: challenge.protectionSpace.serverTrust!)
 
             completionHandler(.useCredential, urlCredential)
@@ -240,3 +242,10 @@ class KvServerTestKit {
     }
 
 }
+
+
+
+#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+#warning("Tests are not available due to URLCredential.init(trust:) or URLCredential.init(identity:certificates:persistence:) are not available")
+
+#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS)

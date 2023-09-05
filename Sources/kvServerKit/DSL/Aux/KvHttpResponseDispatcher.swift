@@ -398,12 +398,17 @@ extension KvHttpResponseDispatcher {
 
                         urlComponents.host = value
 
+                        // TODO: Review if URLComponents.encodedHost is available on non-Apple platforms.
+#if canImport(Darwin)
                         // TODO: Review when target minimum OS versions are changed.
                         if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
                             return urlComponents.encodedHost
                         } else {
                             return urlComponents.url?.host
                         }
+#else // !canImport(Darwin)
+                        return urlComponents.url?.host
+#endif // !canImport(Darwin)
                     }
 
 

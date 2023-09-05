@@ -35,15 +35,16 @@ import Foundation
 @main
 struct DeclarativeServer : KvServer {
 
+    private static let resourceDirectory = "Resources"
+
+
     // MARK: : KvServer
 
     var body: some KvResponseGroup {
-        /// In this example self-signed certificate from the bundle is used to provide HTTPs.
-        ///
-        /// - Warning: Don't use this certificate in your projects.
-        let ssl = try! KvHttpChannel.Configuration.SSL(pemPath: Bundle.module.url(forResource: "https", withExtension: "pem", subdirectory: "Resources")!.path)
+        let ssl = ssl
 
         /// This declaration makes it's HTTP responses to be available at all the current machine's IP addresses on port 8080.
+        /// E.g. if the machine has "192.168.0.2" IP address then the server is available at "https://192.168.0.2:8080" URL.
         ///
         /// `Http` argument instructs the server to use secure HTTP/2.0 protocol.
         ///
@@ -204,7 +205,7 @@ struct DeclarativeServer : KvServer {
                             .requestBody(.json(of: DateComponents.self))
                             .content {
                                 guard let date = $0.requestBody.date else { return .badRequest }
-                                return .string(date.formatted(.iso8601))
+                                return .string(ISO8601DateFormatter().string(from: date))
                             }
                     }
                 }
@@ -227,6 +228,26 @@ struct DeclarativeServer : KvServer {
             BundleImageResponses()
         }
 
+    }
+
+
+    /// In this example self-signed certificate from the bundle is used to provide HTTPs.
+    ///
+    /// - Warning: Don't use this certificate in your projects.
+    private var ssl: KvHttpChannel.Configuration.SSL {
+        let fileName = "https"
+        let fileExtension = "pem"
+
+
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+        let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: Self.resourceDirectory)!.path
+#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+        // - NOTE: Currently there is a bug in opensource `Bundle.module.url(forResource:withExtension:subdirectory:)`.
+        //         So assuming that application is launched with `swift run` at directory containing the package file.
+        let pemPath = "./Sources/DeclarativeServer/\(Self.resourceDirectory)/\(fileName).\(fileExtension)"
+#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+
+        return try! .init(pemPath: pemPath)
     }
 
 
@@ -344,7 +365,7 @@ struct DeclarativeServer : KvServer {
 
         var body: some KvResponseGroup {
             /// - Note: Conditional statements are supported.
-            if let urls = Bundle.module.urls(forResourcesWithExtension: "png", subdirectory: "Resources") {
+            if let urls = imageURLs {
                 KvGroup("images") {
                     /// `KvForEach()` is used to provide dynamic list of responses.
                     /// Also it can be used to provide responses for all cases of an enumeration.
@@ -360,6 +381,17 @@ struct DeclarativeServer : KvServer {
                     }
                 }
             }
+        }
+
+        private var imageURLs: [URL]? {
+            // - NOTE: Currently there is a bug in opensource `Bundle.module.urls(forResourcesWithExtension:subdirectory:)`.
+            //         So this response is implemented only on platforms listed below.
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+            return Bundle.module.urls(forResourcesWithExtension: "png", subdirectory: "Resources")
+#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+            return try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: "./Sources/DeclarativeServer/\(DeclarativeServer.resourceDirectory)/"), includingPropertiesForKeys: nil)
+                .filter { $0.pathExtension == "png" }
+#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
         }
 
     }

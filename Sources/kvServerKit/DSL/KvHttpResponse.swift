@@ -35,13 +35,13 @@ import Foundation
 ///
 /// Below are simple examples of a static and dynamic responses:
 ///
-///     KvHttpResponse.static { .string(Date().formatted(.iso8601)) }
+///     KvHttpResponse.static { .string(ISO8601DateFormatter().string(from: Date())) }
 ///
 ///     KvHttpResponse.dynamic
 ///         .requestBody(.json(of: DateComponents.self))
 ///         .content {
 ///             guard let date = $0.requestBody.date else { return .badRequest }
-///             return .string(date.formatted(.iso8601))
+///             return .string(ISO8601DateFormatter().string(from: date))
 ///         }
 ///
 /// Dynamic responses provide custom and structured handling of URL queries.

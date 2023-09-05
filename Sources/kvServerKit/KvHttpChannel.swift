@@ -972,6 +972,13 @@ open class KvHttpChannel {
             let connectionHeaderValue = nextResponseConnectionHeaderValue
             nextResponseConnectionHeaderValue = nil
 
+
+            @Sendable func Catching(_ body: () throws -> Void) {
+                do { try body() }
+                catch { return requestHandler.httpClient(self, didCatch: error) }
+            }
+
+
             Task.detached {
                 guard let response = await requestHandler.httpClientDidReceiveEnd(self) else {
                     self.withLock { self._activeRequestCount -= 1 }
@@ -979,39 +986,43 @@ open class KvHttpChannel {
                 }
 
                 // Note: _activeRequestCount will be decreased
-                do {
+                Catching {
                     guard let context = self.context else { throw KvError.inconsistency("Channel handler has no context") }
 
                     context.eventLoop.execute {
-                        let httpVersion = self.withLock { self._httpVersion }
+                        Catching {
+                            guard let context = self.context else { throw KvError.inconsistency("Channel handler has no context") }
 
-                        switch httpVersion {
-                        case .http2:
-                            let channel = context.channel
+                            let httpVersion = self.withLock { self._httpVersion }
 
-                            channel.getOption(HTTP2StreamChannelOptions.streamID)
-                                .whenComplete { result in
-                                    guard case .success(let streamID) = result else {
-                                        KvDebug.pause("Failed to get HTTP/2.0 stream ID channel option")
-                                        self.disconnect()
-                                        return
+                            switch httpVersion {
+                            case .http2:
+                                let channel = context.channel
+
+                                channel.getOption(HTTP2StreamChannelOptions.streamID)
+                                    .whenComplete { result in
+                                        Catching {
+                                            guard case .success(let streamID) = result else {
+                                                defer { self.disconnect() }
+                                                throw KvError("Failed to get HTTP/2.0 stream ID channel option")
+                                            }
+
+                                            self.channelWrite(response: response,
+                                                              httpVersion: httpVersion,
+                                                              http2StreamID: String(Int(streamID)),
+                                                              connectionHeaderValue: connectionHeaderValue)
+                                        }
                                     }
 
-                                    self.channelWrite(response: response,
-                                                      httpVersion: httpVersion,
-                                                      http2StreamID: String(Int(streamID)),
-                                                      connectionHeaderValue: connectionHeaderValue)
-                                }
-
-                        default:
-                            self.channelWrite(response: response,
-                                              httpVersion: httpVersion,
-                                              http2StreamID: nil,
-                                              connectionHeaderValue: connectionHeaderValue)
+                            default:
+                                self.channelWrite(response: response,
+                                                  httpVersion: httpVersion,
+                                                  http2StreamID: nil,
+                                                  connectionHeaderValue: connectionHeaderValue)
+                            }
                         }
                     }
                 }
-                catch { requestHandler.httpClient(self, didCatch: error) }
             }
         }
 

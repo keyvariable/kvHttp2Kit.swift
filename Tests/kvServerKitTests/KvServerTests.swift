@@ -21,6 +21,8 @@
 //  Created by Svyatoslav Popov on 04.07.2023.
 //
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+
 import XCTest
 
 @testable import kvServerKit
@@ -29,22 +31,7 @@ import XCTest
 
 final class KvServerTests : XCTestCase {
 
-    static var allTests = [
-        ("cascadeNetworkModifiers", testCascadeNetworkModifiers),
-        ("fileStreamResponse", testFileStreamResponse),
-        ("jsonDate", testJsonDate),
-        ("multichannelServer", testMultichannelServer),
-        ("queryItems", testQueryItems),
-        ("queryOverloads", testQueryOverloads),
-        ("requestBody", testRequestBody),
-        ("responseGroupModifiers", testResponseGroupModifiers),
-        ("responseHierarchy", testResponseHierarchy),
-        ("streamResponse", testStreamResponse),
-    ]
-
-
-
-    // MARK: testMultichannelServer
+    // MARK: - testMultichannelServer()
 
     func testMultichannelServer() async throws {
 
@@ -81,7 +68,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testResponseHierarchy
+    // MARK: - testResponseHierarchy()
 
     func testResponseHierarchy() async throws {
 
@@ -182,7 +169,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testResponseGroupModifiers
+    // MARK: - testResponseGroupModifiers()
 
     func testResponseGroupModifiers() async throws {
 
@@ -216,7 +203,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testQueryOverloads
+    // MARK: - testQueryOverloads()
 
     func testQueryOverloads() async throws {
 
@@ -485,7 +472,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testCascadeNetworkModifiers
+    // MARK: - testCascadeNetworkModifiers()
 
     func testCascadeNetworkModifiers() async throws {
 
@@ -516,7 +503,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testStreamResponse
+    // MARK: - testStreamResponse()
 
     func testStreamResponse() async throws {
         typealias Value = Int
@@ -607,7 +594,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testRequestBody
+    // MARK: - testRequestBody()
 
     func testRequestBody() async throws {
 
@@ -655,7 +642,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testJSON
+    // MARK: - testJSON()
 
     func testJsonDate() async throws {
 
@@ -674,7 +661,7 @@ final class KvServerTests : XCTestCase {
                                 .requestBody(.json(of: DateComponents.self))
                                 .content {
                                     guard let date = $0.requestBody.date else { return .badRequest }
-                                    return .string(date.formatted(.iso8601))
+                                    return .string(ISO8601DateFormatter().string(from: date))
                                 }
                         }
                     }
@@ -693,7 +680,7 @@ final class KvServerTests : XCTestCase {
             do {
                 let date = Date()
                 let payload = try JSONEncoder().encode(Calendar.current.dateComponents(JsonDateServer.dateComponents, from: date))
-                try await KvServerTestKit.assertResponse(baseURL, method: "POST", body: payload, expecting: date.formatted(.iso8601))
+                try await KvServerTestKit.assertResponse(baseURL, method: "POST", body: payload, expecting: ISO8601DateFormatter().string(from: date))
             }
             do {
                 try await KvServerTestKit.assertResponseJSON(baseURL, method: "GET", body: nil, expecting: echoDateComponents)
@@ -703,7 +690,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testFileStreamResponse
+    // MARK: - testFileStreamResponse()
 
     func testFileStreamResponse() async throws {
 
@@ -736,7 +723,7 @@ final class KvServerTests : XCTestCase {
 
 
 
-    // MARK: testQueryItems
+    // MARK: - testQueryItems()
 
     // Tests special kinds of query items. Common query items are tested in other tests.
     func testQueryItems() async throws {
@@ -778,9 +765,13 @@ final class KvServerTests : XCTestCase {
         }
     }
 
+}
 
 
-    // MARK: Execution of Requests
+
+// MARK: - Auxiliaries
+
+extension KvServerTests {
 
     private static func withRunningServer<S, T>(of serverType: S.Type, context contextBlock: (S) -> T, body: (T) async throws -> Void) async throws
     where S : KvServer
@@ -853,3 +844,10 @@ extension KvServerTests.NetworkGroup where Configurations == CollectionOfOne<KvH
     }
 
 }
+
+
+
+#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+#warning("Tests are not available due to URLCredential.init(trust:) or URLCredential.init(identity:certificates:persistence:) are not available")
+
+#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))

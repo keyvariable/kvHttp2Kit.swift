@@ -21,6 +21,8 @@
 //  Created by Svyatoslav Popov on 01.05.2020.
 //
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+
 import XCTest
 
 @testable import kvServerKit
@@ -29,13 +31,7 @@ import XCTest
 
 final class KvHttpServerTests : XCTestCase {
 
-    static var allTests = [
-        ("default", testHttpServer),
-    ]
-
-
-
-    // MARK: testHttpServer
+    // MARK: - testHttpServer()
 
     func testHttpServer() async throws {
         let configurations = KvServerTestKit.testConfigurations
@@ -92,7 +88,13 @@ final class KvHttpServerTests : XCTestCase {
         }
     }
 
+}
 
+
+
+// MARK: - Auxiliaries
+
+extension KvHttpServerTests {
 
     // MARK: .ImperativeHttpServer
 
@@ -381,3 +383,10 @@ final class KvHttpServerTests : XCTestCase {
     }
 
 }
+
+
+
+#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+#warning("Tests are not available due to URLCredential.init(trust:) or URLCredential.init(identity:certificates:persistence:) are not available")
+
+#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
