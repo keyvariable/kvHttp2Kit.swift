@@ -1,13 +1,9 @@
 # kvServerKit.swift
 
-![Linux](https://img.shields.io/badge/os-linux-green.svg)
-![macOS](https://img.shields.io/badge/os-macOS-green.svg)
-
 *kvServerKit* is a framework providing API to implement servers. Some features:
 
 - secure connections over HTTP/1.1 and HTTP/2.0;
-- imperative and declarative APIs;
-- automatic disconnection of clients exceeding configurable limits (request size, idle time, number of requests per connection).
+- imperative and declarative APIs.
 
 *kvServerKit* uses [SwiftNIO](https://github.com/apple/swift-nio) framework to manage network connections and HTTP.
 
@@ -92,14 +88,14 @@ struct RandomValueResponseGroup : KvResponseGroup {
 }
 ```
 
-See well-commented *DeclarativeServer* sample project in `/Samples` directory for more examples.
+See well-commented [*DeclarativeServer*](./Samples/DeclarativeServer) sample project in [`Samples`](./Samples) directory for more examples.
 
 
 ## Imperative API
 
 Imperative API provides classes and delegate protocols to implement servers in an object-oriented way.
 
-See *ImperativeServer* sample project in `/Samples` directory.
+See [*ImperativeServer*](./Samples/ImperativeServer) sample project in [`Samples`](./Samples) directory.
 
 
 ## Supported Platforms
@@ -111,11 +107,11 @@ The same as [SwiftNIO](https://github.com/apple/swift-nio).
 
 #### Package Dependencies:
 ```swift
-dependencies: [ .package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.2.0") ]
+.package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.2.0")
 ```
 #### Target Dependencies:
 ```swift
-dependencies: [ .product(name: "kvServerKit", package: "kvServerKit.swift") ]
+.product(name: "kvServerKit", package: "kvServerKit.swift")
 ```
 #### Import:
 ```swift
