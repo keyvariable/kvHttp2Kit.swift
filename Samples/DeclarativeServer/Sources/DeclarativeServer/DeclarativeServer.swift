@@ -41,17 +41,17 @@ struct DeclarativeServer : KvServer {
     // MARK: : KvServer
 
     var body: some KvResponseGroup {
-        let ssl = ssl
+        let ssl = try! ssl
 
         /// This declaration makes it's HTTP responses to be available at all the current machine's IP addresses on port 8080.
         /// E.g. if the machine has "192.168.0.2" IP address then the server is available at "https://192.168.0.2:8080" URL.
         ///
-        /// `Http` argument instructs the server to use secure HTTP/2.0 protocol.
+        /// `http: .v2(ssl: ssl)` argument instructs the server to use secure HTTP/2.0 protocol.
         ///
         /// Port 8080 is used due to access to standard HTTP port 80 is probably denied.
         /// Besides, real hosting providers usuasy provide specific addressa and port for internet connections.
         ///
-        /// Host names can be used as addresses:
+        /// Host names can be used as addresses. For example:
         ///
         ///     KvGroup(http: .v2(ssl: ssl), at: Host.current().names, on: [ 8080 ])
         ///
@@ -235,19 +235,20 @@ struct DeclarativeServer : KvServer {
     ///
     /// - Warning: Don't use this certificate in your projects.
     private var ssl: KvHttpChannel.Configuration.SSL {
-        let fileName = "https"
-        let fileExtension = "pem"
-
+        get throws {
+            let fileName = "https"
+            let fileExtension = "pem"
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-        let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: Self.resourceDirectory)!.path
+            let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: Self.resourceDirectory)!.path
 #else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-        // - NOTE: Currently there is a bug in opensource `Bundle.module.url(forResource:withExtension:subdirectory:)`.
-        //         So assuming that application is launched with `swift run` at directory containing the package file.
-        let pemPath = "./Sources/DeclarativeServer/\(Self.resourceDirectory)/\(fileName).\(fileExtension)"
+            // - NOTE: Currently there is a bug in opensource `Bundle.module.url(forResource:withExtension:subdirectory:)`.
+            //         So assuming that application is launched with `swift run` shell command in directory containing the package file.
+            let pemPath = "./Sources/DeclarativeServer/\(Self.resourceDirectory)/\(fileName).\(fileExtension)"
 #endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
 
-        return try! .init(pemPath: pemPath)
+            return try .init(pemPath: pemPath)
+        }
     }
 
 

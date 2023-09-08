@@ -257,7 +257,7 @@ extension KvHttpServerTests {
                 else { return nil }
 
                 return KvHttpRequest.HeadOnlyHandler(response: .bodyCallback { buffer in
-                        .success(bodyStream.read(buffer))
+                    return .success(bodyStream.read(buffer))
                 })
 
             default:

@@ -86,7 +86,8 @@ open class KvHttpChannel {
 
 
 
-    init(with configuration: Configuration) {
+    @inlinable
+    public init(with configuration: Configuration) {
         self.configuration = configuration
     }
 
