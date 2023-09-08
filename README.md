@@ -101,6 +101,7 @@ See [*ImperativeServer*](./Samples/ImperativeServer) sample project in [`Samples
 ## Supported Platforms
 
 The same as [SwiftNIO](https://github.com/apple/swift-nio).
+Package is built and the unit-tests are passed on macOS and Linux (Ubuntu 22.04).
 
 
 ## Getting Started
