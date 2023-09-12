@@ -61,7 +61,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
         struct Greeting {
 
             static let path = "/"
-            static var content: String { "Hello! It's a test server on kvServerKit framework" }
+            static var content: String { "Hello! It's a sample server on imperative API of kvServerKit framework" }
 
         }
 

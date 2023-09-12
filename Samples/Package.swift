@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  Package.swift
-//  DeclarativeServer
+//  kvServerKit/Samples
 //
 //  Created by Svyatoslav Popov on 03.07.2023.
 //
@@ -27,19 +27,25 @@ import PackageDescription
 
 
 let package = Package(
-    name: "DeclarativeServer",
+    name: "Samples-kvServerKit",
+
     platforms: [ .iOS(.v11), .macOS(.v10_15), ],
-    products: [
-        .executable(name: "DeclarativeServer", targets: [ "DeclarativeServer" ]),
-    ],
-    dependencies: [
-        .package(path: "../../"),
-    ],
+
+    products: [ .executable(name: "DeclarativeServer", targets: [ "DeclarativeServer" ]),
+                .executable(name: "ImperativeServer", targets: [ "ImperativeServer" ]) ],
+
+    dependencies: [ .package(path: "../") ],
+
     targets: [
         .executableTarget(
             name: "DeclarativeServer",
             dependencies: [ .product(name: "kvServerKit", package: "kvServerKit.swift") ],
-            resources: [ .copy("Resources"), ]
+            resources: [ .copy("Resources") ]
+        ),
+        .executableTarget(
+            name: "ImperativeServer",
+            dependencies: [ .product(name: "kvServerKit", package: "kvServerKit.swift") ],
+            resources: [ .copy("Resources") ]
         ),
     ]
 )

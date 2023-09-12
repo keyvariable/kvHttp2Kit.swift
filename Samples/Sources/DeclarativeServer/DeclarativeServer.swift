@@ -58,7 +58,7 @@ struct DeclarativeServer : KvServer {
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
             /// Static responses ignore any request context like URL and HTTP method.
             KvHttpResponse.static {
-                .string("Hello, client!")
+                .string("Hello! It's a sample server on declarative API of kvServerKit framework")
             }
 
             /// Dynamic responses depend on request context.
