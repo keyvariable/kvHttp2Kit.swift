@@ -1,8 +1,8 @@
-// swift-tools-version:5.2
+// swift-tools-version:5.3
 //
 //===----------------------------------------------------------------------===//
 //
-//  Copyright (c) 2021 Svyatoslav Popov.
+//  Copyright (c) 2021 Svyatoslav Popov (info@keyvar.com).
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
 //  the License. You may obtain a copy of the License at
@@ -19,25 +19,38 @@
 
 import PackageDescription
 
+
+let swiftSettings: [SwiftSetting]? = nil
+
+
 let package = Package(
-    name: "kvHttp2Kit-Swift",
-    platforms: [ .iOS(.v11), ],
+    name: "kvServerKit.swift",
+
+    platforms: [ .iOS(.v11), .macOS(.v10_15), ],
+
     products: [
-        .library(name: "kvHttp2Kit", targets: [ "kvHttp2Kit" ]),
+        .library(name: "kvServerKit", targets: [ "kvServerKit" ]),
     ],
+
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.13.0"),
         .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.9.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
-        .package(url: "https://github.com/keyvariable/kvKit-Swift.git", from: "3.0.0"),
+        .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.2.0"),
     ],
+    
     targets: [
-        .target(name: "kvHttp2Kit",
-                dependencies: [ .product(name: "kvKit", package: "kvKit-Swift"),
+        .target(name: "kvServerKit",
+                dependencies: [ .product(name: "kvKit", package: "kvKit.swift"),
                                 .product(name: "NIO", package: "swift-nio"),
                                 .product(name: "NIOHTTP1", package: "swift-nio"),
                                 .product(name: "NIOHTTP2", package: "swift-nio-http2"),
-                                .product(name: "NIOSSL", package: "swift-nio-ssl") ]),
-        .testTarget(name: "kvHttp2KitTests", dependencies: [ "kvHttp2Kit" ]),
+                                .product(name: "NIOSSL", package: "swift-nio-ssl") ],
+                swiftSettings: swiftSettings),
+
+        .testTarget(name: "kvServerKitTests",
+                    dependencies: [ "kvServerKit" ],
+                    resources: [ .copy("Resources"), ],
+                    swiftSettings: swiftSettings),
     ]
 )

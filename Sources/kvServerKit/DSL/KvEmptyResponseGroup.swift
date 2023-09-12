@@ -1,6 +1,6 @@
 //===----------------------------------------------------------------------===//
 //
-//  Copyright (c) 2021 Svyatoslav Popov.
+//  Copyright (c) 2023 Svyatoslav Popov (info@keyvar.com).
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
 //  the License. You may obtain a copy of the License at
@@ -15,18 +15,31 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  XCTestManifests.swift
-//  kvHttp2Kit
+//  KvEmptyResponseGroup.swift
+//  kvServerKit
 //
-//  Created by Svyatoslav Popov on 16.04.2020.
+//  Created by Svyatoslav Popov on 03.07.2023.
 //
 
-import XCTest
+/// It's designated to explicitely declare empty response groups.
+public struct KvEmptyResponseGroup : KvResponseGroup {
 
-#if !canImport(ObjectiveC)
-public func allTests() -> [XCTestCaseEntry] {
-    return [
-        testCase(kvHttp2KitTests.allTests),
-    ]
+    public typealias Body = KvNeverResponseGroup
+
+
+    @inlinable
+    public init() { }
+
 }
-#endif
+
+
+
+// MARK: : KvResponseGroupInternalProtocol
+
+extension KvEmptyResponseGroup : KvResponseGroupInternalProtocol {
+
+    func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
+        // Nothing to do
+    }
+
+}

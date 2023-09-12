@@ -2,12 +2,21 @@
   "object": {
     "pins": [
       {
-        "package": "kvKit-Swift",
-        "repositoryURL": "https://github.com/keyvariable/kvKit-Swift.git",
+        "package": "kvKit.swift",
+        "repositoryURL": "https://github.com/keyvariable/kvKit.swift.git",
         "state": {
           "branch": null,
-          "revision": "b451453e89f2497df61e261c3709b03ae8f3db7c",
-          "version": "3.0.0"
+          "revision": "181cdf56d1a55dc94932d53f3e09ba497fc2ce16",
+          "version": "4.2.0"
+        }
+      },
+      {
+        "package": "kvSIMD.swift",
+        "repositoryURL": "https://github.com/keyvariable/kvSIMD.swift.git",
+        "state": {
+          "branch": null,
+          "revision": "ae96f63ed309c30e9dd2459cb1a22b994e61546f",
+          "version": "1.0.1"
         }
       },
       {
