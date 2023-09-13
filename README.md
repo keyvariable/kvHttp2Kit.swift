@@ -1,6 +1,6 @@
 # kvServerKit.swift
 
-*kvServerKit* is a framework providing API to implement servers. Some features:
+*kvServerKit* is a cross-platform framework providing API to implement servers. Some features:
 
 - secure connections over HTTP/1.1 and HTTP/2.0;
 - imperative and declarative APIs.
