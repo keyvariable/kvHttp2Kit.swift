@@ -200,7 +200,7 @@ public struct KvHttpResponseProvider {
                 case .markdown:
                     return ("text/markdown", options: nil)
                 case .plain:
-                    return ("text/plain", options: nil)
+                    return ("text/plain", options: "charset=UTF-8")
                 }
             }
 
