@@ -73,7 +73,7 @@ final class KvHttpServerTests : XCTestCase {
 
             // ##  Echo
             do {
-                let body = Data((0 ..< Int.random(in: (1 << 16)...numericCast(ImperativeHttpServer.Constants.Echo.bodyLimits.implicit)))
+                let body = Data((0 ..< Int.random(in: (1 << 16)...numericCast(ImperativeHttpServer.Constants.Echo.bodyLimit)))
                     .lazy.map { _ in UInt8.random(in: .min ... .max) })
 
                 try await KvServerTestKit.assertResponse(
@@ -131,7 +131,7 @@ final class KvHttpServerTests : XCTestCase {
         // ##  Echo with exceeding body.
         try await KvServerTestKit.assertResponse(
             baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path,
-            body: .init(count: numericCast(ImperativeHttpServer.Constants.Echo.bodyLimits.implicit + 1)),
+            body: .init(count: numericCast(ImperativeHttpServer.Constants.Echo.bodyLimit + 1)),
             statusCode: .payloadTooLarge,
             contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Echo.payloadTooLargeContent
         )
@@ -182,7 +182,7 @@ extension KvHttpServerTests {
             struct Echo {
 
                 static let path = "/echo"
-                static let bodyLimits: KvHttpRequest.BodyLimits = 262_144 // 256 KiB == (1 << 18) B
+                static let bodyLimit: UInt = 256 << 10 // 256 KiB == (1 << 18) B
 
                 static var payloadTooLargeContent: String { "Payload is too large" }
 
@@ -342,7 +342,7 @@ extension KvHttpServerTests {
         fileprivate class EchoRequestHandler : KvHttpRequest.CollectingBodyHandler {
 
             init() {
-                super.init(bodyLimits: Constants.Echo.bodyLimits) { body in
+                super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body in
                     guard let body = body else { return nil }
 
                     return .binary(body)

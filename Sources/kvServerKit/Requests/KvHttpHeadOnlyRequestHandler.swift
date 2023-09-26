@@ -53,19 +53,18 @@ open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
     
     // MARK: : KvHttpRequestHandler
 
-    /// See ``KvHttpRequestHandler``.
-    public var contentLengthLimit: UInt { 0 }
-    /// See ``KvHttpRequestHandler``.
-    public var implicitBodyLengthLimit: UInt { 0 }
+    /// See ``KvHttpRequestHandler/bodyLengthLimit`` for details.
+    @inlinable public var bodyLengthLimit: UInt { 0 }
 
 
     /// See ``KvHttpRequestHandler``.
-    public func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) { }
+    @inlinable public func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) { }
 
 
     /// - Returns: Value of the receiver's `.response` property.
     ///
     /// See ``KvHttpRequestHandler``.
+    @inlinable
     open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
         return responseBlock()
     }

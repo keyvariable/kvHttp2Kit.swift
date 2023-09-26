@@ -28,13 +28,12 @@ import Foundation
 /// Request handler collecting body fragments and then handling entire body.
 open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
-    public typealias BodyLimits = KvHttpRequest.BodyLimits
-
     public typealias ResponseBlock = (Data?) -> KvHttpResponseProvider?
 
 
 
-    public let bodyLimits: BodyLimits
+    /// See ``KvHttpRequestHandler/bodyLengthLimit`` for details.
+    public let bodyLengthLimit: UInt
 
 
 
@@ -46,22 +45,17 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
 
 
+    /// - Parameter bodyLengthLimit: See ``KvHttpRequestHandler/bodyLengthLimit`` for details. Default value is ``KvHttpRequest/Constants/bodyLengthLimit``.
     /// - Parameter responseBlock: Block passed with collected request body data if available and returning response to be send to a client.
     @inlinable
-    public init(bodyLimits: BodyLimits, responseBlock: @escaping ResponseBlock) {
-        self.bodyLimits = bodyLimits
+    public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit, responseBlock: @escaping ResponseBlock) {
+        self.bodyLengthLimit = bodyLengthLimit
         self.responseBlock = responseBlock
     }
 
 
 
     // MARK: : KvHttpRequestHandler
-
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var contentLengthLimit: UInt { bodyLimits.contentLength }
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var implicitBodyLengthLimit: UInt { bodyLimits.implicit }
-
 
     /// See ``KvHttpRequestHandler``.
     @inlinable

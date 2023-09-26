@@ -68,7 +68,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
         struct Echo {
 
             static let path = "/echo"
-            static let bodyLimits: KvHttpRequest.BodyLimits = 262_144 // 256 KiB == (1 << 18) B
+            static let bodyLimit: UInt = 256 << 10 // 256 KiB
 
         }
 
@@ -217,7 +217,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
     private class EchoRequestHandler : KvHttpRequest.CollectingBodyHandler {
 
         init() {
-            super.init(bodyLimits: Constants.Echo.bodyLimits) { body in
+            super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body in
                 guard let body = body else { return nil }
 
                 return .binary(body)
@@ -231,7 +231,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
             switch incident {
             case .byteLimitExceeded:
                 return incident.defaultResponse
-                    .string("Payload exceeds \(Constants.Echo.bodyLimits.contentLength) byte limit.")
+                    .string("Payload exceeds \(Constants.Echo.bodyLimit) byte limit.")
             case .noResponse:
                 return super.httpClient(httpClient, didCatch: incident)
             }

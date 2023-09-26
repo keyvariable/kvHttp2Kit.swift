@@ -30,20 +30,15 @@ import Foundation
 /// - Note: Requests having no body are ignored and `nil` response are returned.
 open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
 
-    public typealias BodyLimits = KvHttpRequest.BodyLimits
-
     public typealias ResponseBlock = (Result<T, Error>) -> KvHttpResponseProvider?
 
 
 
-    @inlinable public var bodyLimits: BodyLimits { underlying.bodyLimits }
-
-
-
+    /// - Parameter bodyLengthLimit: see ``KvHttpRequestHandler/bodyLengthLimit`` for details. Default value is ``KvHttpRequest/Constants/bodyLengthLimit``.
     /// - Parameter responseBlock: Block passed with result of decoding collected request body data and returning response to be send to a client.
     @inlinable
-    public init(bodyLimits: BodyLimits, responseBlock: @escaping ResponseBlock) {
-        underlying = .init(bodyLimits: bodyLimits, responseBlock: { data in
+    public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit, responseBlock: @escaping ResponseBlock) {
+        underlying = .init(bodyLengthLimit: bodyLengthLimit, responseBlock: { data in
             guard let data = data else { return nil }
 
             let result = Result {
@@ -63,10 +58,8 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
 
     // MARK: : KvHttpRequestHandler
 
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var contentLengthLimit: UInt { bodyLimits.contentLength }
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var implicitBodyLengthLimit: UInt { bodyLimits.implicit }
+    /// See ``KvHttpRequestHandler/bodyLengthLimit`` for details.
+    @inlinable public var bodyLengthLimit: UInt { underlying.bodyLengthLimit }
 
 
     /// See ``KvHttpRequestHandler``.

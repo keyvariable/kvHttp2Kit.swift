@@ -26,13 +26,12 @@
 /// Note that the body limits are applied.
 public class KvHttpIgnoringBodyRequestHandler : KvHttpRequestHandler {
 
-    public typealias BodyLimits = KvHttpRequest.BodyLimits
-
     public typealias ResponseBlock = () -> KvHttpResponseProvider?
 
 
 
-    public let bodyLimits: BodyLimits
+    /// See ``KvHttpRequestHandler/bodyLengthLimit`` for details.
+    public let bodyLengthLimit: UInt
 
 
 
@@ -41,22 +40,17 @@ public class KvHttpIgnoringBodyRequestHandler : KvHttpRequestHandler {
 
 
 
+    /// - Parameter bodyLengthLimit: See ``KvHttpRequestHandler/bodyLengthLimit`` for details. Default value is ``KvHttpRequest/Constants/bodyLengthLimit``.
     /// - Parameter responseBlock: Block passed with collected request body data if available and returning response to be send to a client.
     @inlinable
-    public init(bodyLimits: BodyLimits, responseBlock: @escaping ResponseBlock) {
-        self.bodyLimits = bodyLimits
+    public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit, responseBlock: @escaping ResponseBlock) {
+        self.bodyLengthLimit = bodyLengthLimit
         self.responseBlock = responseBlock
     }
 
 
 
     // MARK: : KvHttpRequestHandler
-
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var contentLengthLimit: UInt { bodyLimits.contentLength }
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var implicitBodyLengthLimit: UInt { bodyLimits.implicit }
-
 
     /// See ``KvHttpRequestHandler``.
     @inlinable

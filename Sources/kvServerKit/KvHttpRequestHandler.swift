@@ -24,14 +24,8 @@
 /// Protocol for request handlers. See provided common request handlers.
 public protocol KvHttpRequestHandler : AnyObject {
 
-    /// Maximum acceptable value of `Content-Length` header.
-    ///
-    /// See ``implicitBodyLengthLimit``.
-    var contentLengthLimit: UInt { get }
-    /// Maximum acceptable number of bytes in request body when `Content-Length` header is missing. Pass 0 if request must have no body or empty body.
-    ///
-    /// See ``contentLengthLimit``.
-    var implicitBodyLengthLimit: UInt { get }
+    /// Maximum acceptable number of bytes in request body. Zero means that request must have no body or empty body.
+    var bodyLengthLimit: UInt { get }
 
 
     /// It's invoked when server receives bytes from the client related with the request.

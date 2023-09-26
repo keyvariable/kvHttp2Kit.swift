@@ -28,13 +28,12 @@
 /// See: ``init(bodyLimits:initial:nextPartialResult:responseBlock:)``, ``init(bodyLimits:into:updateAccumulatingResult:responseBlock:)``.
 open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
-    public typealias BodyLimits = KvHttpRequest.BodyLimits
-
     public typealias ResponseBlock = (PartialResult) -> KvHttpResponseProvider?
 
 
 
-    public let bodyLimits: BodyLimits
+    /// See ``KvHttpRequestHandler/bodyLengthLimit`` for details.
+    public let bodyLengthLimit: UInt
 
 
 
@@ -46,19 +45,21 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
 
 
+    /// - Parameter bodyLengthLimit: see ``KvHttpRequestHandler/bodyLengthLimit`` for details. Default value is ``KvHttpRequest/Constants/bodyLengthLimit``.
+    ///
     /// The partial result and received body fragments are passed to *nextPartialResult* block and partial result is replaced with value returned by *nextPartialResult*.
     /// When entire body is processed, last partial result is passed to *responseBlock*.
     ///
     /// See: ``init(bodyLimits:into:updateAccumulatingResult:responseBlock:)``.
     @inlinable
-    public init(bodyLimits: BodyLimits,
+    public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit,
                 initial initialResult: PartialResult,
                 nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) -> PartialResult,
                 responseBlock: @escaping ResponseBlock)
     {
         var partialResult = initialResult
 
-        self.bodyLimits = bodyLimits
+        self.bodyLengthLimit = bodyLengthLimit
         self.bodyCallback = { bytes in
             partialResult = nextPartialResult(partialResult, bytes)
         }
@@ -68,19 +69,21 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     }
 
 
+    /// - Parameter bodyLengthLimit: see ``KvHttpRequestHandler/bodyLengthLimit`` for details. Default value is ``KvHttpRequest/Constants/bodyLengthLimit``.
+    ///
     /// The mutable partial result and received body fragments are passed to *updateAccumulatingResult* block.
     /// When entire body is processed, partial result is passed to *responseBlock*.
     ///
     /// See: ``init(bodyLimits:initial:nextPartialResult:responseBlock:)``.
     @inlinable
-    public init(bodyLimits: BodyLimits,
+    public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit,
                 into initialResult: PartialResult,
                 updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) -> Void,
                 responseBlock: @escaping ResponseBlock)
     {
         var partialResult = initialResult
 
-        self.bodyLimits = bodyLimits
+        self.bodyLengthLimit = bodyLengthLimit
         self.bodyCallback = { bytes in
             updateAccumulatingResult(&partialResult, bytes)
         }
@@ -92,12 +95,6 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
 
     // MARK: : KvHttpRequestHandler
-
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var contentLengthLimit: UInt { bodyLimits.contentLength }
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var implicitBodyLengthLimit: UInt { bodyLimits.implicit }
-
 
     /// See ``KvHttpRequestHandler``.
     @inlinable

@@ -31,8 +31,6 @@ public class KvHttpRequestBody<Value> {
 
     public typealias Value = Value
 
-    public typealias BodyLimits = KvHttpRequest.BodyLimits
-
 
 
     @usableFromInline
@@ -65,12 +63,12 @@ public class KvHttpRequestBody<Value> {
     struct Configuration {
 
         @usableFromInline
-        var bodyLimits: BodyLimits
+        var bodyLengthLimit: UInt
 
 
         @usableFromInline
-        init(bodyLimits: BodyLimits = 16384 /* 16 KiB */) {
-            self.bodyLimits = bodyLimits
+        init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit) {
+            self.bodyLengthLimit = bodyLengthLimit
         }
 
     }
@@ -111,7 +109,7 @@ public class KvHttpRequestProhibitedBody : KvHttpRequestBody<KvHttpRequestVoidBo
 
     @usableFromInline
     init() {
-        super.init(with: .init(bodyLimits: 0))
+        super.init(with: .init(bodyLengthLimit: 0))
     }
 
 
@@ -146,36 +144,12 @@ extension KvHttpRequestRequiredBody {
     }
 
 
-    /// This modifier declares limits for HTTP body and related headers. E.g. there are limits for length of the body and for value of `Content-Length` HTTP header.
-    ///
-    /// Previously declared values are replaced.
-    ///
-    /// See: ``bodyLimits(contentLength:)``, ``bodyLimits(implicit:)``, ``BodyLimits``.
-    @inlinable
-    public func bodyLimits(_ bodyLimits: BodyLimits) -> Self {
-        map { $0.bodyLimits = bodyLimits }
-    }
-
-
-    /// This modifier declares limit for value of `Content-Length` HTTP header.
+    /// This modifier declares limit for length of request body.
     ///
     /// Previously declared value is replaced.
-    ///
-    /// See: ``bodyLimits(_:)``, ``bodyLimits(implicit:)``.
     @inlinable
-    public func bodyLimits(contentLength: UInt) -> Self {
-        map { $0.bodyLimits.contentLength = contentLength }
-    }
-
-
-    /// This modifier declares limit for length of HTTP request body.
-    ///
-    /// Previously declared value is replaced.
-    ///
-    /// See: ``bodyLimits(contentLength:)``, ``bodyLimits(implicit:)``.
-    @inlinable
-    public func bodyLimits(implicit: UInt) -> Self {
-        map { $0.bodyLimits.implicit = implicit }
+    public func bodyLengthLimit(_ value: UInt) -> Self {
+        map { $0.bodyLengthLimit = value }
     }
 
 }
@@ -197,7 +171,7 @@ class KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBody<Parti
     {
         requestHandlerProvider = { body, responseBlock in
             KvHttpReducingRequestHandler(
-                bodyLimits: body.configuration.bodyLimits,
+                bodyLengthLimit: body.configuration.bodyLengthLimit,
                 initial: initialResult,
                 nextPartialResult: nextPartialResult,
                 responseBlock: { partialResult in
@@ -214,7 +188,7 @@ class KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBody<Parti
     {
         requestHandlerProvider = { body, responseBlock in
             KvHttpReducingRequestHandler(
-                bodyLimits: body.configuration.bodyLimits,
+                bodyLengthLimit: body.configuration.bodyLengthLimit,
                 into: initialResult,
                 updateAccumulatingResult: updateAccumulatingResult,
                 responseBlock: { partialResult in
@@ -297,7 +271,7 @@ class KvHttpRequestDataBody : KvHttpRequestRequiredBody<Data?> {
 
     override func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
         KvHttpCollectingBodyRequestHandler(
-            bodyLimits: configuration.bodyLimits,
+            bodyLengthLimit: configuration.bodyLengthLimit,
             responseBlock: { data in
                 self.catching { try responseBlock(data) }
             }
@@ -334,7 +308,7 @@ class KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBody<Value
 
     override func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
         KvHttpJsonRequestHandler<Value>(
-            bodyLimits: configuration.bodyLimits,
+            bodyLengthLimit: configuration.bodyLengthLimit,
             responseBlock: { value in
                 switch value {
                 case .success(let payload):

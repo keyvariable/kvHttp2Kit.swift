@@ -37,32 +37,12 @@ public class KvHttpRequest {
 
 
 
-    // MARK: .BodyLimits
+    // MARK: .Constants
 
-    public struct BodyLimits : ExpressibleByIntegerLiteral {
+    public struct Constants {
 
-        /// Maximum acceptable value of `Content-Length` header.
-        public var contentLength: UInt
-
-        /// Maximum acceptable number of bytes in request body when `Content-Length` header is missing. Pass 0 if request must have no body or empty body.
-        public var implicit: UInt
-
-
-        /// Memberwise initializer.
-        @inlinable
-        public init(contentLength: UInt, implicit: UInt) {
-            self.contentLength = contentLength
-            self.implicit = implicit
-        }
-
-
-        /// Initializes an instance where all the limits are equal to given value.
-        @inlinable public init(_ value: UInt) { self.init(contentLength: value, implicit: value) }
-
-
-        // MARK: : ExpressibleByIntegerLiteral
-
-        @inlinable public init(integerLiteral value: UInt) { self.init(value) }
+        /// Default limit for requests having body.
+        @inlinable public static var bodyLengthLimit: UInt { 16384 /* 16 KiB */ }
 
     }
 

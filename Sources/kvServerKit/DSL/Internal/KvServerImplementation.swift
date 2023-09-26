@@ -400,15 +400,6 @@ extension KvServerImplementation {
         private var channelControllers: [ChannelController] = .init()
 
 
-        // MARK: .Defaults
-
-        struct Defaults {
-
-            static var ignoredBodyLimits: KvHttpRequest.BodyLimits { 4046 /* 4 KiB */ }
-
-        }
-
-
         // MARK: Managing Channels
 
         func createChannel(_ channelSchema: Schema.HttpChannel) {
@@ -521,10 +512,9 @@ extension KvServerImplementation.HttpServer {
 
         // MARK: : KvHttpClientDelegate
 
-        // TODO: Find better way to ignore body of unexpected requests than `KvHttpIgnoringBodyRequestHandler`.
         func httpClient(_ httpClient: KvHttpChannel.Client, requestHandlerFor requestHead: KvHttpServer.RequestHead) -> KvHttpRequestHandler? {
             guard let context = Dispatcher.Context(from: requestHead)
-            else { return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .badRequest } }
+            else { return KvHttpHeadOnlyRequestHandler { .badRequest } }
 
             let requestProcessor: KvHttpRequestProcessorProtocol
 
@@ -534,10 +524,10 @@ extension KvServerImplementation.HttpServer {
                 requestProcessor = value
 
             case .notFound:
-                return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .notFound }
+                return KvHttpHeadOnlyRequestHandler { .notFound }
 
             case .ambiguous:
-                return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .badRequest }
+                return KvHttpHeadOnlyRequestHandler { .badRequest }
             }
 
             // Custom processing of headers
@@ -547,7 +537,7 @@ extension KvServerImplementation.HttpServer {
 
             case .failure:
                 // TODO: pass the associated error and default response to user-declared handler.
-                return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .badRequest }
+                return KvHttpHeadOnlyRequestHandler { .badRequest }
             }
 
             // Creation of a request processor
@@ -557,7 +547,7 @@ extension KvServerImplementation.HttpServer {
 
             case .failure:
                 // TODO: pass the associated error and default response to user-declared handler.
-                return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .internalServerError }
+                return KvHttpHeadOnlyRequestHandler { .internalServerError }
             }
         }
 

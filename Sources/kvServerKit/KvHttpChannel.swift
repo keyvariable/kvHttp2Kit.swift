@@ -917,50 +917,6 @@ open class KvHttpChannel {
         }
 
 
-        // MARK: .ByteLimit
-
-        private enum ByteLimit {
-
-            /// Exact number of bytes are expected to be received. Otherwise request is rejected.
-            case exact(UInt)
-            /// Maximum number of bytes allowed to be received. If larger number of bytes are received then request is rejected.
-            case maximum(UInt)
-
-
-            // MARK: Operations
-
-            /// A boolean value indicating whether the limit condition is met.
-            var isAcceptable: Bool {
-                switch self {
-                case .exact(let value):
-                    return value == 0
-                case .maximum:
-                    return true
-                }
-            }
-
-            /// Reduces *lhs* by *rhs* number of bytes.
-            ///
-            /// - Returns: Resulting limit or `nil` if the limit is exceeded.
-            static func -(lhs: Self, rhs: Int) -> Self? {
-                assert(rhs >= 0, "Internal inconsistency: number of bytes (\(rhs)) is negative")
-
-                let rhs: UInt = numericCast(rhs)
-
-                switch lhs {
-                case .exact(let value):
-                    guard value >= rhs else { return nil }
-                    return .exact(value - rhs)
-
-                case .maximum(let value):
-                    guard value >= rhs else { return nil }
-                    return .maximum(value - rhs)
-                }
-            }
-
-        }
-
-
         // MARK: Operations
 
         private func processIncident(_ incident: ClientIncident, context: ChannelHandlerContext, httpVersion: HTTPVersion, keepAlive: Bool?) {
@@ -1197,20 +1153,6 @@ open class KvHttpChannel {
             }
 
 
-            enum ByteLimitResult { case success(ByteLimit), exceeded }
-
-            func ExtractByteLimit(_ head: HTTPRequestHead, _ requestHandler: KvHttpRequestHandler) -> ByteLimitResult {
-                switch head.headers.first(name: "Content-Length").flatMap(UInt.init(_:)) {
-                case .some(let contentLength):
-                    guard contentLength <= requestHandler.contentLengthLimit else { return .exceeded }
-                    return .success(.exact(contentLength))
-
-                case .none:
-                    return .success(.maximum(requestHandler.implicitBodyLengthLimit))
-                }
-            }
-
-
             switch requestProcessingState {
             case .idle:
                 break   // OK
@@ -1231,13 +1173,13 @@ open class KvHttpChannel {
             guard let requestHandler = delegate?.httpClient(self, requestHandlerFor: head)
             else { return processIncident(.noRequestHandler, context: context, httpVersion: httpVersion, keepAlive: keepAlive) }
 
-            let byteLimit: ByteLimit
-            do {
-                switch ExtractByteLimit(head, requestHandler) {
-                case .success(let value):
-                    byteLimit = value
+            let bodyLengthLimit = requestHandler.bodyLengthLimit
 
-                case .exceeded:
+            switch head.headers.first(name: "Content-Length").flatMap(UInt.init(_:)) {
+            case .none:
+                break
+            case .some(let contentLength):
+                guard contentLength <= bodyLengthLimit else {
                     return processIncident(RequestIncident.byteLimitExceeded, context: context, httpVersion: httpVersion, keepAlive: keepAlive) {
                         $0.response(client: self, requestHandler: requestHandler)
                     }
@@ -1246,7 +1188,7 @@ open class KvHttpChannel {
 
             requestProcessingState = .processing(.init(httpVersion: httpVersion,
                                                        handler: requestHandler,
-                                                       bodyByteLimit: byteLimit,
+                                                       bodyLengthLimit: bodyLengthLimit,
                                                        keepAlive: keepAlive))
         }
 
@@ -1254,20 +1196,18 @@ open class KvHttpChannel {
         private func handleRequestBodyBytes(_ byteBuffer: inout ByteBuffer, in context: ChannelHandlerContext) {
             switch requestProcessingState {
             case .processing(var requestContext):
-                switch requestContext.bodyByteLimit - byteBuffer.readableBytes {
-                case .some(let byteLimit):
-                    requestContext.bodyByteLimit = byteLimit
+                guard requestContext.bodyLengthLimit >= byteBuffer.readableBytes else { return processIncident(.byteLimitExceeded, in: context, requestContext) }
 
-                    byteBuffer.readWithUnsafeReadableBytes { pointer in
-                        requestContext.handler.httpClient(self, didReceiveBodyBytes: pointer)
-                        return pointer.count
-                    }
+                let bytesRead: UInt = numericCast(byteBuffer.readWithUnsafeReadableBytes { pointer in
+                    requestContext.handler.httpClient(self, didReceiveBodyBytes: pointer)
+                    return pointer.count
+                })
 
-                    requestProcessingState = .processing(requestContext)
+                assert(requestContext.bodyLengthLimit >= bytesRead)
 
-                case .none:
-                    return processIncident(.byteLimitExceeded, in: context, requestContext)
-                }
+                requestContext.bodyLengthLimit -= bytesRead
+
+                requestProcessingState = .processing(requestContext)
 
             case .stopped:
                 return  // Requests are ignored
@@ -1281,9 +1221,6 @@ open class KvHttpChannel {
         private func handleRequestEnd(in context: ChannelHandlerContext) {
             switch requestProcessingState {
             case .processing(let requestContext):
-                guard requestContext.bodyByteLimit.isAcceptable
-                else { return processIncident(.byteLimitExceeded, in: context, requestContext) }
-
                 dispatchQueue.async {
                     guard let response = requestContext.handler.httpClientDidReceiveEnd(self)
                     else { return self.processIncident(.noResponse, in: context, requestContext) }
@@ -1325,7 +1262,7 @@ open class KvHttpChannel {
             let handler: KvHttpRequestHandler
 
             /// Maximum number of bytes current request handler can process Number of received bytes passed to current `.requestHandler`.
-            var bodyByteLimit: ByteLimit
+            var bodyLengthLimit: UInt
 
             /// An optional boolean value indicating whether `keep-alive` or `close` value is set for `Connection` header.
             /// Also it's used to disconnect after submission of response.
