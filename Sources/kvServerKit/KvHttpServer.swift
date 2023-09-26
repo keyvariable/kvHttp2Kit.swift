@@ -40,9 +40,14 @@ public protocol KvHttpServerDelegate : AnyObject {
 
 
 
-/// An HTTP/2 server handling requests in HTTP1 style. HTTP1 is supported.
+/// *KvHttpServer* class provides ability to implement request handling in imperative paradigm.
 ///
-/// This implementation provides ability to implement request handling in structured manner.
+/// Usually there is no need to subclass *KvHttpServer* or ``KvHttpChannel`` classes.
+/// Most of work should be done via delegates and dedicated classes for request handling.
+/// See *ImperativeServer* sample in *Samples* package at `/Samples` directory.
+///
+/// When instance of running *KvHttpServer* is being destroyed, the deinitializer is waiting until server actually stopped.
+/// Use async ``KvHttpServer/stop()`` method or sync ``KvHttpServer/stop(_:)`` and ``KvHttpServer/waitUntilStopped()`` methods to wait explicitely.
 open class KvHttpServer {
 
     public typealias RequestHead = HTTPRequestHead
@@ -59,6 +64,7 @@ open class KvHttpServer {
 
     deinit {
         stop()
+        waitUntilStopped()
     }
 
 
