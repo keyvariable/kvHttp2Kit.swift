@@ -30,7 +30,7 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
     public typealias BodyLimits = KvHttpRequest.BodyLimits
 
-    public typealias ResponseBlock = (Data?) async -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (Data?) -> KvHttpResponseProvider?
 
 
 
@@ -77,8 +77,18 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
-        await responseBlock(bodyData)
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
+        return responseBlock(bodyData)
+    }
+
+
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:responseFor:)``.
+    /// Override it to provide custom incident handling.
+    ///
+    /// See ``KvHttpRequestHandler``.
+    @inlinable
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        return nil
     }
 
 

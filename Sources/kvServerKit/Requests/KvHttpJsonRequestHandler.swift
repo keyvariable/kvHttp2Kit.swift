@@ -32,7 +32,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
 
     public typealias BodyLimits = KvHttpRequest.BodyLimits
 
-    public typealias ResponseBlock = (Result<T, Error>) async -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (Result<T, Error>) -> KvHttpResponseProvider?
 
 
 
@@ -50,7 +50,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
                 try JSONDecoder().decode(T.self, from: data)
             }
 
-            return await responseBlock(result)
+            return responseBlock(result)
         })
     }
 
@@ -82,8 +82,18 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
-        await underlying.httpClientDidReceiveEnd(httpClient)
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
+        return underlying.httpClientDidReceiveEnd(httpClient)
+    }
+
+
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:responseFor:)``.
+    /// Override it to provide custom incident handling. 
+    ///
+    /// See ``KvHttpRequestHandler``.
+    @inlinable
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        return nil
     }
 
 

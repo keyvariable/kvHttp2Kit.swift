@@ -24,7 +24,7 @@
 /// Simple handler for requests having no body. It just sends response passed to the initializer.
 open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = () async -> KvHttpResponseProvider?
+    public typealias ResponseBlock = () -> KvHttpResponseProvider?
 
 
 
@@ -66,8 +66,18 @@ open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
     /// - Returns: Value of the receiver's `.response` property.
     ///
     /// See ``KvHttpRequestHandler``.
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
-        await responseBlock()
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
+        return responseBlock()
+    }
+
+
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:responseFor:)``.
+    /// Override it to provide custom incident handling. 
+    ///
+    /// See ``KvHttpRequestHandler``.
+    @inlinable
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        return nil
     }
 
 

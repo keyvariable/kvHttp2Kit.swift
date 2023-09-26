@@ -114,7 +114,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///
     ///     KvHttpResponse.static { .string(UUID().uuidString) }
     ///
-    public static func `static`(content: @escaping () async throws -> KvHttpResponseProvider) -> KvHttpResponse {
+    public static func `static`(content: @escaping () throws -> KvHttpResponseProvider) -> KvHttpResponse {
         .init {
             KvHttpResponseImplementation(responseProvider: content)
         }
@@ -252,14 +252,14 @@ extension KvHttpResponse {
         /// Shorthand auxiliary method.
         private func makeImplementation<QueryParser>(
             _ queryParser: QueryParser,
-            _ callback: @escaping (Context) async throws -> KvHttpResponseProvider
+            _ callback: @escaping (Context) throws -> KvHttpResponseProvider
         ) -> KvHttpResponseImplementation<QueryParser, RequestHeaders, RequestBodyValue>
         where QueryParser : KvUrlQueryParserProtocol, QueryParser.Value == QueryItemGroup.Value
         {
             KvHttpResponseImplementation(urlQueryParser: queryParser,
                                          headCallback: configuration.requestHeadCallback,
                                          body: configuration.requestBody,
-                                         responseProvider: { try await callback(($0, $1, $2)) })
+                                         responseProvider: { try callback(($0, $1, $2)) })
         }
 
     }
@@ -274,7 +274,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQuery
     /// - Parameter callback: Function to be called for each request with a request context.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
-    public func content(_ callback: @escaping (Context) async throws -> KvHttpResponseProvider) -> KvHttpResponse {
+    public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
         return .init {
             makeImplementation(KvEmptyUrlQueryParser(), callback)
         }
@@ -290,7 +290,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvRawUrlQueryIte
     /// - Parameter callback: Function to be called for each request with a request context.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
-    public func content(_ callback: @escaping (Context) async throws -> KvHttpResponseProvider) -> KvHttpResponse {
+    public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
         return .init {
             makeImplementation(KvRawUrlQueryParser(for: configuration.queryItemGroup), callback)
         }
@@ -306,7 +306,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemIm
     /// - Parameter callback: Function to be called for each request with a request context.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
-    public func content(_ callback: @escaping (Context) async throws -> KvHttpResponseProvider) -> KvHttpResponse {
+    public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
         return .init {
             makeImplementation(KvUrlQueryParser(for: configuration.queryItemGroup), callback)
         }

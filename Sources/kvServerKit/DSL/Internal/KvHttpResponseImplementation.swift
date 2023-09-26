@@ -55,7 +55,7 @@ struct KvHttpResponseImplementation<QueryParser, Headers, BodyValue> : KvHttpRes
 where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
     typealias HeadCallback = (KvHttpServer.RequestHeaders) -> Result<Headers, Error>
-    typealias ResponseProvider = (QueryParser.Value, Headers, BodyValue) async throws -> KvHttpResponseProvider
+    typealias ResponseProvider = (QueryParser.Value, Headers, BodyValue) throws -> KvHttpResponseProvider
 
 
 
@@ -138,7 +138,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
             let responseProvider = responseProvider
 
             return .success(body.makeRequestHandler { bodyValue in
-                try await responseProvider(queryValue, headers, bodyValue)
+                try responseProvider(queryValue, headers, bodyValue)
             })
         }
 
@@ -160,11 +160,11 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 extension KvHttpResponseImplementation where QueryParser == KvEmptyUrlQueryParser, Headers == Void, BodyValue == KvHttpRequestVoidBodyValue {
 
     /// Initializes implementation for emptry URL query, requiring head-only request, providing no analysis of request headers.
-    init(responseProvider: @escaping () async throws -> KvHttpResponseProvider) {
+    init(responseProvider: @escaping () throws -> KvHttpResponseProvider) {
         self.init(urlQueryParser: .init(),
                   headCallback: { _ in .success(()) },
                   body: KvHttpRequestProhibitedBody(),
-                  responseProvider: { _, _, _ in try await responseProvider() })
+                  responseProvider: { _, _, _ in try responseProvider() })
     }
 
 }

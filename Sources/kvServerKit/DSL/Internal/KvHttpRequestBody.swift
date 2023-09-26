@@ -36,7 +36,7 @@ public class KvHttpRequestBody<Value> {
 
 
     @usableFromInline
-    typealias ResponseBlock = (Value) async throws -> KvHttpResponseProvider
+    typealias ResponseBlock = (Value) throws -> KvHttpResponseProvider
 
 
 
@@ -80,8 +80,8 @@ public class KvHttpRequestBody<Value> {
     // MARK: Operations
 
     /// It's designated to unwrap result of *ResponseBlock*.
-    fileprivate func catching(_ block: () async throws -> KvHttpResponseProvider) async -> KvHttpResponseProvider {
-        do { return try await block() }
+    fileprivate func catching(_ block: () throws -> KvHttpResponseProvider) -> KvHttpResponseProvider {
+        do { return try block() }
         catch {
 #if DEBUG
             return .internalServerError.string("\(error)")
@@ -117,7 +117,7 @@ public class KvHttpRequestProhibitedBody : KvHttpRequestBody<KvHttpRequestVoidBo
 
     override func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
         KvHttpHeadOnlyRequestHandler {
-            await self.catching { try await responseBlock(.init()) }
+            self.catching { try responseBlock(.init()) }
         }
     }
 
@@ -201,7 +201,7 @@ class KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBody<Parti
                 initial: initialResult,
                 nextPartialResult: nextPartialResult,
                 responseBlock: { partialResult in
-                    await body.catching { try await responseBlock(partialResult) }
+                    body.catching { try responseBlock(partialResult) }
                 }
             )
         }
@@ -218,7 +218,7 @@ class KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBody<Parti
                 into: initialResult,
                 updateAccumulatingResult: updateAccumulatingResult,
                 responseBlock: { partialResult in
-                    await body.catching { try await responseBlock(partialResult) }
+                    body.catching { try responseBlock(partialResult) }
                 }
             )
         }
@@ -299,7 +299,7 @@ class KvHttpRequestDataBody : KvHttpRequestRequiredBody<Data?> {
         KvHttpCollectingBodyRequestHandler(
             bodyLimits: configuration.bodyLimits,
             responseBlock: { data in
-                await self.catching { try await responseBlock(data) }
+                self.catching { try responseBlock(data) }
             }
         )
     }
@@ -338,8 +338,8 @@ class KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBody<Value
             responseBlock: { value in
                 switch value {
                 case .success(let payload):
-                    return await self.catching {
-                        try await responseBlock(payload)
+                    return self.catching {
+                        try responseBlock(payload)
                     }
 #if DEBUG
                 case .failure(let error):

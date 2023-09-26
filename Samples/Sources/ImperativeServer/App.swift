@@ -51,6 +51,9 @@ struct App {
 
         // Code below is optional. It's a way to wait for all server's channels are started.
         do {
+            // `channel.waitWhileStarting()` below can fail due to channels may be is in *stopped* state until server is completely started.
+            // So we wait while server is starting and then wait while channels are starting.
+            try server.waitWhileStarting().get()
             try await server.forEachChannel { channel in
                 try channel.waitWhileStarting().get()
 
@@ -60,8 +63,8 @@ struct App {
         }
 
         // In this example server is operating until any key is pressed.
-        print("Press any key to stop server")
-        _ = getchar()
+        print("Press enter to stop server")
+        while getchar() < 0 { }
 
         server.stop()
 

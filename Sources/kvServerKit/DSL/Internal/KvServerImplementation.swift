@@ -562,6 +562,11 @@ extension KvServerImplementation.HttpServer {
         }
 
 
+        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
+            return nil
+        }
+
+
         // TODO: pass error to user-declared handler.
         func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) { }
 

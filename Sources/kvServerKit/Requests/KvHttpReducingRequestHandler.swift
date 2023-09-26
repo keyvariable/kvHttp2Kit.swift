@@ -30,7 +30,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
     public typealias BodyLimits = KvHttpRequest.BodyLimits
 
-    public typealias ResponseBlock = (PartialResult) async -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (PartialResult) -> KvHttpResponseProvider?
 
 
 
@@ -42,7 +42,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     let bodyCallback: (UnsafeRawBufferPointer) -> Void
 
     @usableFromInline
-    let responseBlock: () async -> KvHttpResponseProvider?
+    let responseBlock: () -> KvHttpResponseProvider?
 
 
 
@@ -63,7 +63,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
             partialResult = nextPartialResult(partialResult, bytes)
         }
         self.responseBlock = {
-            await responseBlock(partialResult)
+            responseBlock(partialResult)
         }
     }
 
@@ -85,7 +85,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
             updateAccumulatingResult(&partialResult, bytes)
         }
         self.responseBlock = {
-            await responseBlock(partialResult)
+            responseBlock(partialResult)
         }
     }
 
@@ -112,8 +112,18 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
-        await responseBlock()
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
+        return responseBlock()
+    }
+
+
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:responseFor:)``.
+    /// Override it to provide custom incident handling. 
+    ///
+    /// See ``KvHttpRequestHandler``.
+    @inlinable
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        return nil
     }
 
 

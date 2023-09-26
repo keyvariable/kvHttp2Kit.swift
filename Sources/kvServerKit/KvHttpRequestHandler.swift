@@ -40,7 +40,17 @@ public protocol KvHttpRequestHandler : AnyObject {
     func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer)
 
     /// It's invoked when the request is completely received (including it's body bytes) and is ready to be handled.
-    func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider?
+    ///
+    /// - Note: `nil` response causes ``KvHttpChannel/RequestIncident/noResponse`` incident.
+    func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider?
+
+    /// - Returns:  Optional custom response for an incident related to the request on a client.
+    ///             If `nil` is returned then ``KvHttpChannel/RequestIncident/defaultResponse`` is submitted to client.
+    ///
+    /// - Note: Use ``KvHttpChannel/RequestIncident/defaultResponse`` to get and modify default responses for incidents.
+    ///
+    /// - Note: Server will close connection to the client just after the response will be submitted.
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider?
 
     /// - Note: The client will continue to process requests.
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error)

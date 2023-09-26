@@ -60,6 +60,10 @@ public struct KvHttpResponseProvider {
     @usableFromInline
     var contentLength: UInt64?
 
+    /// Response options. E.g. disconnection flag.
+    @usableFromInline
+    var options: Options
+
 
     /// Memberwise initializer.
     @usableFromInline
@@ -67,12 +71,14 @@ public struct KvHttpResponseProvider {
          customHeaderCallback: HeaderCallback? = nil,
          contentType: ContentType? = nil,
          contentLength: UInt64? = nil,
+         options: Options = [ ],
          bodyCallback: BodyCallback? = nil
     ) {
         self.status = status
         self.customHeaderCallback = customHeaderCallback
         self.contentType = contentType
         self.contentLength = contentLength
+        self.options = options
         self.bodyCallback = bodyCallback
     }
 
@@ -225,6 +231,23 @@ public struct KvHttpResponseProvider {
             }
         }
 
+    }
+
+
+    // MARK: .Options
+
+    /// Response options. E.g. disconnection flag.
+    public struct Options : OptionSet {
+
+        /// This flag causes connection to be closed just after the response is submitted.
+        public static let needsDisconnect = Self(rawValue: 1 << 0)
+
+
+        // MARK: : OptionSet
+
+        public var rawValue: UInt
+
+        @inlinable public init(rawValue: UInt) { self.rawValue = rawValue }
     }
 
 
@@ -681,5 +704,18 @@ extension KvHttpResponseProvider {
     @inlinable public var notExtended: Self { map { $0.status = .notExtended } }
     /// - Returns: A copy where *status* is chaned to`.networkAuthenticationRequired`.
     @inlinable public var networkAuthenticationRequired: Self { map { $0.status = .networkAuthenticationRequired } }
+
+}
+
+
+
+// MARK: Dedicated Option Modifiers
+
+extension KvHttpResponseProvider {
+
+    /// Sets or clears ``KvHttpResponseProvider/Options/needsDisconnect`` option.
+    @inlinable public func needsDisconnect(_ value: Bool = true) -> Self {
+        map { value ? $0.options.formUnion(.needsDisconnect) : $0.options.subtract(.needsDisconnect) }
+    }
 
 }
