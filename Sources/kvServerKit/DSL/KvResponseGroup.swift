@@ -37,41 +37,44 @@ import NIOHTTP1
 ///
 /// Below is an example where response group is used to provide some responses on two hosts with optional subdomain "www".
 ///
-///     KvGroup(hosts: "example.com", "example.org") {
-///         Response1()
-///         Response2()
-///     }
-///     .subdomains(optional: "www")
+/// ```swift
+/// KvGroup(hosts: "example.com", "example.org") {
+///     Response1()
+///     Response2()
+/// }
+/// .subdomains(optional: "www")
+/// ```
 ///
 /// Below is a more complicated example where response group is used to incapsulate some part of response hierarchy with options.
 ///
-///     struct TestableServer : KvServer {
-///         var body: some KvResponseGroup {
-///             RootResponseGroup(options: [ ])
-///             RootResponseGroup(options: .testMode)
-///         }
-///
-///         private struct RootResponseGroup : KvResponseGroup {
-///             let options: Options
-///
-///             var body: some KvResponseGroup {
-///                 let hostPrefix = options.contains(.testMode) ? "test." : ""
-///
-///                 KvGroup(hosts: [ "example.com", "example.org" ].lazy.map { hostPrefix + $0 ) {
-///                     KvGroup("a") {
-///                         SomeTestableResponse(options: options)
-///                     }
-///
-///                     SomeResponse()
-///                 }
-///                 .subdomains(optional: "www")
-///             }
-///         }
+/// ```swift
+/// struct TestableServer : KvServer {
+///     var body: some KvResponseGroup {
+///         RootResponseGroup(options: [ ])
+///         RootResponseGroup(options: .testMode)
 ///     }
 ///
+///     private struct RootResponseGroup : KvResponseGroup {
+///         let options: Options
+///
+///         var body: some KvResponseGroup {
+///             let hostPrefix = options.contains(.testMode) ? "test." : ""
+///
+///             KvGroup(hosts: [ "example.com", "example.org" ].lazy.map { hostPrefix + $0 ) {
+///                 KvGroup("a") {
+///                     SomeTestableResponse(options: options)
+///                 }
+///
+///                 SomeResponse()
+///             }
+///             .subdomains(optional: "www")
+///         }
+///     }
+/// }
+/// ```
 public protocol KvResponseGroup {
 
-    /// It's inferred from your implementation of the required property ``body-swift.property-3n17l``.
+    /// It's inferred from your implementation of the required property ``KvResponseGroup/body-swift.property-79vqj``.
     associatedtype Body : KvResponseGroup
 
 
@@ -79,7 +82,7 @@ public protocol KvResponseGroup {
     ///
     /// It's a place to define group's contents.
     @KvResponseGroupBuilder
-    var body: Self.Body { get }
+    var body: Body { get }
 
 }
 
@@ -133,8 +136,10 @@ extension KvResponseGroup {
     ///
     /// Below is an example where the contents of `SomeResposeGroup` are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
     ///
-    ///     SomeResposeGroup()
-    ///         .http(Host.current().addresses.lazy.map { (.init($0, on: 8080), .v2(ssl: ssl)) })
+    /// ```swift
+    /// SomeResposeGroup()
+    ///     .http(Host.current().addresses.lazy.map { (.init($0, on: 8080), .v2(ssl: ssl)) })
+    /// ```
     ///
     /// See: ``KvHttpConfiguration``, ``KvGroup(httpEndpoints:content:)``, ``http(_:at:)``, ``http(_:at:on:)``.
     ///
@@ -153,8 +158,10 @@ extension KvResponseGroup {
     ///
     /// Below is an example where the contents of `SomeResposeGroup` are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
     ///
-    ///     SomeResposeGroup()
-    ///         .http(.v2(ssl: ssl), at: Host.current().addresses.lazy.map { .init($0, on: 8080) })
+    /// ```swift
+    /// SomeResposeGroup()
+    ///     .http(.v2(ssl: ssl), at: Host.current().addresses.lazy.map { .init($0, on: 8080) })
+    /// ```
     ///
     /// See: ``KvHttpConfiguration``, ``KvGroup(http:at:content:)``.
     @inlinable
@@ -169,8 +176,10 @@ extension KvResponseGroup {
     ///
     /// Below is an example where the contents of `SomeResposeGroup` are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
     ///
-    ///     SomeResposeGroup()
-    ///         .http(.v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ])
+    /// ```swift
+    /// SomeResposeGroup()
+    ///     .http(.v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ])
+    /// ```
     ///
     /// See: ``KvHttpConfiguration``, ``KvGroup(http:at:on:content:)``.
     @inlinable
@@ -188,7 +197,7 @@ extension KvResponseGroup {
 
     /// Adds given values into list of HTTP methods.
     ///
-    /// The result is the same as ``httpMethods(_:)-958ys``. See it's documentation for details.
+    /// The result is the same as ``KvResponseGroup/httpMethods(_:)-6fbma``. See it's documentation for details.
     @inlinable
     public func httpMethods<Methods>(_ httpMethods: Methods) -> some KvResponseGroup
     where Methods : Sequence, Methods.Element == HttpMethod
@@ -206,10 +215,12 @@ extension KvResponseGroup {
     ///
     /// Below is a simple example:
     ///
-    ///     SomeResponseGroup()
-    ///         .httpMethods(.GET, .PUT, .DELETE)
+    /// ```swift
+    /// SomeResponseGroup()
+    ///     .httpMethods(.GET, .PUT, .DELETE)
+    /// ```
     ///
-    /// See: ``KvGroup(httpMethods:content:)-555rc``.
+    /// See: ``KvGroup(httpMethods:content:)-29gzp``.
     @inlinable
     public func httpMethods(_ httpMethods: HttpMethod...) -> some KvResponseGroup {
         self.httpMethods(httpMethods)
@@ -218,7 +229,7 @@ extension KvResponseGroup {
 
     /// Adds given values into list of users.
     ///
-    /// The result is the same as ``users(_:)-4xacq``. See it's documentation for details.
+    /// The result is the same as ``KvResponseGroup/users(_:)-48ll0``. See it's documentation for details.
     @inlinable
     public func users<Users>(_ users: Users) -> some KvResponseGroup
     where Users : Sequence, Users.Element == String
@@ -238,10 +249,12 @@ extension KvResponseGroup {
     ///
     /// Below is a simple example:
     ///
-    ///     SomeResponseGroup()
-    ///         .users("user1", "user2")
+    /// ```swift
+    /// SomeResponseGroup()
+    ///     .users("user1", "user2")
+    /// ```
     ///
-    /// See: ``KvGroup(users:content:)-8egsq``.
+    /// See: ``KvGroup(users:content:)-3140o``.
     @inlinable
     public func users(_ users: String...) -> some KvResponseGroup {
         self.users(users)
@@ -250,7 +263,7 @@ extension KvResponseGroup {
 
     /// Adds given values into list of hosts.
     ///
-    /// The result is the same as ``hosts(_:)-6n0ay``. See it's documentation for details.
+    /// The result is the same as ``KvResponseGroup/hosts(_:)-1pv6b``. See it's documentation for details.
     @inlinable
     public func hosts<Hosts>(_ hosts: Hosts) -> some KvResponseGroup
     where Hosts : Sequence, Hosts.Element == String
@@ -270,10 +283,12 @@ extension KvResponseGroup {
     ///
     /// Below is a simple example:
     ///
-    ///     SomeResponseGroup()
-    ///         .hosts("example.com", "example.org")
+    /// ```swift
+    /// SomeResponseGroup()
+    ///     .hosts("example.com", "example.org")
+    /// ```
     ///
-    /// See: ``KvGroup(hosts:content:)-3noju``, ``subdomains(optional:)-4tz8u``.
+    /// See: ``KvGroup(hosts:content:)-872vb``, ``KvResponseGroup/subdomains(optional:)-9g9xv``.
     @inlinable
     public func hosts(_ hosts: String...) -> some KvResponseGroup {
         self.hosts(hosts)
@@ -282,7 +297,7 @@ extension KvResponseGroup {
 
     /// Adds given values into list of optional subdomains.
     ///
-    /// The result is the same as ``subdomains(optional:)-4tz8u``. See it's documentation for details.
+    /// The result is the same as ``KvResponseGroup/subdomains(optional:)-9g9xv``. See it's documentation for details.
     @inlinable
     public func subdomains<Subdomains>(optional subdomains: Subdomains) -> some KvResponseGroup
     where Subdomains : Sequence, Subdomains.Element == String
@@ -299,11 +314,13 @@ extension KvResponseGroup {
     ///
     /// Below is an example where `SomeResponseGroup` is available on "example.com", "example.org", "www.example.com", "www.example.org":
     ///
-    ///     SomeResponseGroup()
-    ///         .hosts("example.com", "example.org")
-    ///         .subdomains(optional: "www")
+    /// ```swift
+    /// SomeResponseGroup()
+    ///     .hosts("example.com", "example.org")
+    ///     .subdomains(optional: "www")
+    /// ```
     ///
-    /// See: ``hosts(_:)-6n0ay``.
+    /// See: ``KvResponseGroup/hosts(_:)-1pv6b``.
     @inlinable
     public func subdomains(optional subdomains: String...) -> some KvResponseGroup {
         self.subdomains(optional: subdomains)
@@ -321,26 +338,28 @@ extension KvResponseGroup {
     /// Below is an example where `response1` is available at both root and "/a" paths, `response2` is available at "/a" path,
     /// `response3` is available at "/b" path, `response4` is available at "/b/c/d" path, `response5` is available at "/b/c/e" path:
     ///
-    ///     KvGroup(hosts: "example.com") {
-    ///         response1               // /
-    ///         KvGroup {
-    ///             response1           // /a
-    ///             response2           // /a
-    ///         }
-    ///         .path("a")
-    ///         KvGroup {
-    ///             response3           // /b
-    ///             KvGroup {
-    ///                 response4       // /b/c/d
-    ///             }
-    ///             .path("c/d")
-    ///         }
-    ///         .path("b")
-    ///         KvGroup {
-    ///             response5           // /b/c/e
-    ///         }
-    ///         .path("b/c/e")
+    /// ```swift
+    /// KvGroup(hosts: "example.com") {
+    ///     response1               // /
+    ///     KvGroup {
+    ///         response1           // /a
+    ///         response2           // /a
     ///     }
+    ///     .path("a")
+    ///     KvGroup {
+    ///         response3           // /b
+    ///         KvGroup {
+    ///             response4       // /b/c/d
+    ///         }
+    ///         .path("c/d")
+    ///     }
+    ///     .path("b")
+    ///     KvGroup {
+    ///         response5           // /b/c/e
+    ///     }
+    ///     .path("b/c/e")
+    /// }
+    /// ```
     ///
     /// See: ``KvGroup(_:content:)``.
     @inlinable
@@ -354,6 +373,8 @@ extension KvResponseGroup {
     /// Declares default body length limit in bytes for HTTP requests in the receiver and it's descendant groups.
     ///
     /// Previously declared value is replaced.
+    ///
+    /// See: ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
     @inlinable
     public func httpBodyLengthLimit(_ value: UInt) -> some KvResponseGroup {
         modified {

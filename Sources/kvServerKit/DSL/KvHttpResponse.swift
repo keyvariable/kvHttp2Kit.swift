@@ -35,14 +35,16 @@ import Foundation
 ///
 /// Below are simple examples of a static and dynamic responses:
 ///
-///     KvHttpResponse.static { .string(ISO8601DateFormatter().string(from: Date())) }
+/// ```swift
+/// KvHttpResponse.static { .string(ISO8601DateFormatter().string(from: Date())) }
 ///
-///     KvHttpResponse.dynamic
-///         .requestBody(.json(of: DateComponents.self))
-///         .content {
-///             guard let date = $0.requestBody.date else { return .badRequest }
-///             return .string(ISO8601DateFormatter().string(from: date))
-///         }
+/// KvHttpResponse.dynamic
+///     .requestBody(.json(of: DateComponents.self))
+///     .content {
+///         guard let date = $0.requestBody.date else { return .badRequest }
+///         return .string(ISO8601DateFormatter().string(from: date))
+///     }
+/// ```
 ///
 /// Dynamic responses provide custom and structured handling of URL queries.
 /// Structured handling of URL queries is a powerful way to produce short and well readable declarations with input validation.
@@ -56,33 +58,35 @@ import Foundation
 ///
 /// Below is an example of three unambiguous HTTP responses for requests having all the same dispatch parameters but URL query component:
 ///
-///     KvHttpResponse.dynamic
-///         .query(.required("from", of: Float.self))
-///         .query(.optional("to", of: Float.self))
-///         .content {
-///             switch $0.query {
-///             case (let from, .none):
-///                 return .string("\(from) ...")
-///             case (let from, .some(let to)):
-///                 return .string("\(from) ..< \(to)")
-///             }
+/// ```swift
+/// KvHttpResponse.dynamic
+///     .query(.required("from", of: Float.self))
+///     .query(.optional("to", of: Float.self))
+///     .content {
+///         switch $0.query {
+///         case (let from, .none):
+///             return .string("\(from) ...")
+///         case (let from, .some(let to)):
+///             return .string("\(from) ..< \(to)")
 ///         }
-///     KvHttpResponse.dynamic
-///         .query(.required("to", of: Float.self))
-///         .content {
-///             .string("..< \($0.query)")
+///     }
+/// KvHttpResponse.dynamic
+///     .query(.required("to", of: Float.self))
+///     .content {
+///         .string("..< \($0.query)")
+///     }
+/// KvHttpResponse.dynamic
+///     .query(.optional("from", of: Float.self))
+///     .query(.required("through", of: Float.self))
+///     .content {
+///         switch $0.query {
+///         case (.none, let through):
+///             return .string("... \(through)")
+///         case (.some(let from), let through):
+///             return .string("\(from) ... \(through)")
 ///         }
-///     KvHttpResponse.dynamic
-///         .query(.optional("from", of: Float.self))
-///         .query(.required("through", of: Float.self))
-///         .content {
-///             switch $0.query {
-///             case (.none, let through):
-///                 return .string("... \(through)")
-///             case (.some(let from), let through):
-///                 return .string("\(from) ... \(through)")
-///             }
-///         }
+///     }
+/// ```
 public struct KvHttpResponse : KvResponseInternalProtocol {
 
     /// Type of raw URL query passed to the custom handlers.
@@ -112,8 +116,9 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///
     /// Below is an example of a static HTTP response with standard text representation of a generated UUID:
     ///
-    ///     KvHttpResponse.static { .string(UUID().uuidString) }
-    ///
+    /// ```swift
+    /// KvHttpResponse.static { .string(UUID().uuidString) }
+    /// ```
     public static func `static`(content: @escaping () throws -> KvHttpResponseProvider) -> KvHttpResponse {
         .init { baseBodyConfiguration in
             KvHttpResponseImplementation(responseProvider: content)
@@ -130,26 +135,30 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///
     /// Below is an example of a dymanic HTTP response with generated UUID. Format of returned UUID depends on *string* flag in URL query.
     ///
-    ///     KvHttpResponse.dynamic
-    ///         .query(.bool("string"))
-    ///         .content { context in
-    ///             let uuid = UUID()
+    /// ```swift
+    /// KvHttpResponse.dynamic
+    ///     .query(.bool("string"))
+    ///     .content { context in
+    ///         let uuid = UUID()
     ///
-    ///             switch context.query {
-    ///             case true:
-    ///                 return .string(uuid.uuidString)
-    ///             case false:
-    ///                 return withUnsafeBytes(of: uuid, { buffer in
-    ///                     return .binary(buffer)
-    ///                 })
-    ///             }
+    ///         switch context.query {
+    ///         case true:
+    ///             return .string(uuid.uuidString)
+    ///         case false:
+    ///             return withUnsafeBytes(of: uuid, { buffer in
+    ///                 return .binary(buffer)
+    ///             })
     ///         }
+    ///     }
+    /// ```
     ///
     /// Below is an example of an echo response returning a request body:
     ///
-    ///     KvHttpResponse.dynamic
-    ///         .requestBody(.data)
-    ///         .content { .binary($0.requestBody ?? Data()) }
+    /// ```swift
+    /// KvHttpResponse.dynamic
+    ///     .requestBody(.data)
+    ///     .content { .binary($0.requestBody ?? Data()) }
+    /// ```
     ///
     /// Initially response matches empty URL query and empty or missing HTTP request body.
     ///
@@ -157,15 +166,16 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     /// Below is an example of a random integer response. Note how `.queryFlatMap`() is used to validate and wrap the values into a standard *ClosedRange* structure.
     /// Also note that `.queryFlatMap`() produces single query value so it can be appended with up to 9 query items.
     ///
-    ///     KvHttpResponse.dynamic
-    ///         .query(.optional("from", of: Int.self))
-    ///         .query(.optional("through", of: Int.self))
-    ///         .queryFlatMap { from, through -> QueryResult<ClosedRange<Int>> in
-    ///             let lowerBound = from ?? .min, upperBound = through ?? .max
-    ///             return lowerBound <= upperBound ? .success(lowerBound ... upperBound) : .failure
-    ///         }
-    ///         .content { .string("\(Int.random(in: $0.query))") }
-    ///
+    /// ```swift
+    /// KvHttpResponse.dynamic
+    ///     .query(.optional("from", of: Int.self))
+    ///     .query(.optional("through", of: Int.self))
+    ///     .queryFlatMap { from, through -> QueryResult<ClosedRange<Int>> in
+    ///         let lowerBound = from ?? .min, upperBound = through ?? .max
+    ///         return lowerBound <= upperBound ? .success(lowerBound ... upperBound) : .failure
+    ///     }
+    ///     .content { .string("\(Int.random(in: $0.query))") }
+    /// ```
     @inlinable
     public static var `dynamic`: InitialDynamicResponse { .init() }
 
@@ -386,7 +396,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQuery
     /// Transformation result is available in the context passed to the response callback.
     ///
     /// Transformation block always return the result. So response will always match any URL query.
-    /// Avoid use of such responses in overloading by URL query. To be able to reject URL queries use ``queryFlatMap(_:)-4tx12`` modifier.
+    /// Avoid use of such responses in overloading by URL query. To be able to reject URL queries use ``KvHttpResponse/DynamicResponse/queryFlatMap(_:)-6axey`` modifier.
     ///
     /// Custom processing of URL queries can't be combined with the structured processing.
     ///
@@ -402,7 +412,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQuery
     /// Transformation result is available in the context passed to the response callback.
     ///
     /// Transformation block returns instance of ``KvUrlQueryParseResult``. So an URL query can be rejected.
-    /// If processing of URL query always succeeds then ``queryMap(_:)-5bmhb`` modifier should be used instead.
+    /// If processing of URL query always succeeds then ``KvHttpResponse/DynamicResponse/queryMap(_:)-42x5j`` modifier should be used instead.
     ///
     /// Custom processing of URL queries can't be combined with the structured processing.
     ///
@@ -840,7 +850,7 @@ extension KvHttpResponse.DynamicResponse where RequestHeaders == KvHttpRequestIg
     ///
     /// The result of transformation is available in the context passed to the callback. Use this method to collect some data from HTTP request headers and then use it in the callback.
     ///
-    /// See ``requestHeadersFlatMap(_:)-670sw`` to reject HTTP requests by their headers.
+    /// See ``requestHeadersFlatMap(_:)-30yby`` to reject HTTP requests by their headers.
     @inlinable
     public func requestHeadersMap<H>(_ transform: @escaping (KvHttpServer.RequestHeaders) -> H) -> HandlingRequestHeaders<H> {
         requestHeadersFlatMap { .success(transform($0)) }
@@ -851,7 +861,7 @@ extension KvHttpResponse.DynamicResponse where RequestHeaders == KvHttpRequestIg
     ///
     /// The result of succeeded transformation is available in the context passed to the callback. Use this method to collect some data from HTTP request headers and then use it in the callback.
     ///
-    /// See ``requestHeadersMap(_:)-9lyas`` if there is no need to validate headers of HTTP requests.
+    /// See ``requestHeadersMap(_:)-mpsl`` if there is no need to validate headers of HTTP requests.
     @inlinable
     public func requestHeadersFlatMap<H>(_ transform: @escaping (KvHttpServer.RequestHeaders) -> Result<H, Error>) -> HandlingRequestHeaders<H> {
         map { .init(queryItemGroup: $0.queryItemGroup, requestHeadCallback: transform, requestBody: $0.requestBody) }

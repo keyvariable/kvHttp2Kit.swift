@@ -29,8 +29,9 @@ import Foundation
 ///
 /// Consider fabrics and modfiers providing ability to build configurations:
 ///
-///     .v2(ssl: ssl).connection(requestLimit: 256)
-///
+/// ```swift
+/// .v2(ssl: ssl).connection(requestLimit: 256)
+/// ```
 public struct KvHttpConfiguration : Equatable {
 
     public typealias Connection = KvHttpChannel.Configuration.Connection
@@ -41,7 +42,9 @@ public struct KvHttpConfiguration : Equatable {
     public static let `default` = Self()
 
 
+    /// Configuration of HTTP protocol.
     public var http: HTTP
+    /// Configuration of network connection.
     public var connection: Connection
 
 
@@ -56,18 +59,18 @@ public struct KvHttpConfiguration : Equatable {
 
     // MARK: Fabrics
 
-    /// - Returns: A configuration with ``http`` property set to HTTP/1.1 with optional *ssl* configuration.
+    /// - Returns: A configuration with ``http-swift.property`` property set to HTTP/1.1 with optional *ssl* configuration.
     @inlinable
     public static func v1_1(ssl: SSL? = nil) -> Self { .init(http: .v1_1(ssl: ssl)) }
 
-    /// - Returns: A configuration with ``http`` property set to HTTP/2.0 with givel *ssl* configuration.
+    /// - Returns: A configuration with ``http-swift.property`` property set to HTTP/2.0 with given *ssl* configuration.
     @inlinable
     public static func v2(ssl: SSL) -> Self { .init(http: .v2(ssl: ssl)) }
 
 
     // MARK: Modifiers
 
-    /// - Returns: A copy of the receiver where ``http`` propetry is replaced with new *value*.
+    /// - Returns: A copy of the receiver where ``http-swift.property`` propetry is replaced with new *value*.
     @inlinable
     public func http(_ value: HTTP) -> Self {
         modified {
@@ -76,7 +79,7 @@ public struct KvHttpConfiguration : Equatable {
     }
 
 
-    /// - Returns: A copy of the receiver where ``connection`` propetry is merged with new *value*.
+    /// - Returns: A copy of the receiver where ``connection-swift.property`` propetry is merged with new *value*.
     @inlinable
     public func connection(_ value: Connection) -> Self {
         modified {
@@ -85,7 +88,7 @@ public struct KvHttpConfiguration : Equatable {
     }
 
 
-    /// - Returns: A copy of the receiver where ``connection`` propetry is merged with new values.
+    /// - Returns: A copy of the receiver where ``connection-swift.property`` propetry is merged with new values.
     @inlinable
     public func connection(idleTimeInterval: TimeInterval? = nil, requestLimit: UInt? = nil) -> Self {
         connection(.init(idleTimeInterval: idleTimeInterval, requestLimit: requestLimit))

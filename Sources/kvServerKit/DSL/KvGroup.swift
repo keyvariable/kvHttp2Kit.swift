@@ -44,9 +44,11 @@ public func KvGroup<Content : KvResponseGroup>(
 ///
 /// Below is an example where the contents are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
 ///
-///     KvGroup(httpEndpoints: Host.current().addresses.lazy.map { (.init($0, on: 8080), .v2(ssl: ssl)) }) {
-///         Contents()
-///     }
+/// ```swift
+/// KvGroup(httpEndpoints: Host.current().addresses.lazy.map { (.init($0, on: 8080), .v2(ssl: ssl)) }) {
+///     Contents()
+/// }
+/// ```
 ///
 /// See: ``KvGroup(http:at:content:)``, ``KvGroup(http:at:on:content:)``, ``KvResponseGroup/http(_:)``.
 ///
@@ -70,9 +72,11 @@ where HttpEndpoints : Sequence, HttpEndpoints.Element == (KvNetworkEndpoint, KvR
 ///
 /// Below is an example where the contents are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
 ///
-///     KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses.lazy.map { .init($0, on: 8080) }) {
-///         Contents()
-///     }
+/// ```swift
+/// KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses.lazy.map { .init($0, on: 8080) }) {
+///     Contents()
+/// }
+/// ```
 ///
 /// See: ``KvResponseGroup/http(_:at:)``.
 @inlinable
@@ -91,9 +95,11 @@ where Endpoints : Sequence, Endpoints.Element == KvNetworkEndpoint
 ///
 /// Below is an example where the contents are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
 ///
-///     KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-///         Contents()
-///     }
+/// ```swift
+/// KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
+///     Contents()
+/// }
+/// ```
 ///
 /// See: ``KvResponseGroup/http(_:at:on:)``.
 @inlinable
@@ -113,7 +119,7 @@ where Addresses : Sequence, Addresses.Element == KvNetworkEndpoint.Address, Port
 
 /// Adds given values into list of HTTP methods.
 ///
-/// The result is the same as ``KvGroup(httpMethods:content:)-555rc``. See it's documentation for details.
+/// The result is the same as ``KvGroup(httpMethods:content:)-29gzp``. See it's documentation for details.
 @inlinable
 public func KvGroup<Methods, Content : KvResponseGroup>(
     httpMethods: Methods,
@@ -132,20 +138,24 @@ where Methods : Sequence, Methods.Element == KvResponseGroup.HttpMethod
 ///
 /// Below is an example of typical usage:
 ///
-///     KvGroup(httpMethods: .GET, .PUT, .DELETE) {
-///         HttpResponses()
-///     }
+/// ```swift
+/// KvGroup(httpMethods: .GET, .PUT, .DELETE) {
+///     HttpResponses()
+/// }
+/// ```
 ///
 /// Below is an example where `Response1` is available for `.GET`, `.PUT` and `.DELETE` HTTP methods but `Response2` is available only for `.GET` and `.PUT` HTTP methods.
 ///
-///     KvGroup(httpMethods: .GET, .PUT) {
-///         KvGroup(httpMethods: .DELETE) {
-///             Response1()
-///         }
-///         Response2()
+/// ```swift
+/// KvGroup(httpMethods: .GET, .PUT) {
+///     KvGroup(httpMethods: .DELETE) {
+///         Response1()
 ///     }
+///     Response2()
+/// }
+/// ```
 ///
-/// See: ``KvResponseGroup/httpMethods(_:)-958ys``.
+/// See: ``KvResponseGroup/httpMethods(_:)-6fbma``.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
     httpMethods: KvResponseGroup.HttpMethod...,
@@ -157,7 +167,7 @@ public func KvGroup<Content : KvResponseGroup>(
 
 /// Adds given values into list of users.
 ///
-/// The result is the same as ``KvGroup(users:content:)-8egsq``. See it's documentation for details.
+/// The result is the same as ``KvGroup(users:content:)-3140o``. See it's documentation for details.
 @inlinable
 public func KvGroup<Users, Content : KvResponseGroup>(
     users: Users,
@@ -178,20 +188,24 @@ where Users : Sequence, Users.Element == String
 ///
 /// Below is an example of typical usage:
 ///
-///     KvGroup(users: "user1", "user2") {
-///         Responses()
-///     }
+/// ```swift
+/// KvGroup(users: "user1", "user2") {
+///     Responses()
+/// }
+/// ```
 ///
 /// Below is an example where `Response1` is available for "user1", "user2" and "admin" users but `Response2` is available only for "user1" and "user2" users.
 ///
-///     KvGroup(users: "user1", "user2") {
-///         KvGroup(users: "admin") {
-///             Response1()
-///         }
-///         Response2()
+/// ```swift
+/// KvGroup(users: "user1", "user2") {
+///     KvGroup(users: "admin") {
+///         Response1()
 ///     }
+///     Response2()
+/// }
+/// ```
 ///
-/// See: ``KvResponseGroup/users(_:)-4xacq``.
+/// See: ``KvResponseGroup/users(_:)-48ll0``.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
     users: String...,
@@ -208,9 +222,9 @@ public func KvGroup<Content : KvResponseGroup>(
 ///
 /// Usually host is provided as a component of an URL.
 ///
-/// See ``KvGroup(hosts:content:)-3noju`` for examples.
+/// See ``KvGroup(hosts:content:)-872vb`` for examples.
 ///
-/// See: ``KvResponseGroup/hosts(_:)-3ccij``.
+/// See: ``KvResponseGroup/hosts(_:)-3ilz3``.
 @inlinable
 public func KvGroup<Hosts, Content : KvResponseGroup>(
     hosts: Hosts,
@@ -231,20 +245,24 @@ where Hosts : Sequence, Hosts.Element == String
 ///
 /// Below is an example of typical usage:
 ///
-///     KvGroup(hosts: "example.com", "example.org") {
-///         Responses()
-///     }
+/// ```swift
+/// KvGroup(hosts: "example.com", "example.org") {
+///     Responses()
+/// }
+/// ```
 ///
 /// Below is an example where `Response1` is available for "user1", "user2" and "admin" users but `Response2` is available only for "user1" and "user2" users.
 ///
-///     KvGroup(users: "user1", "user2") {
-///         KvGroup(users: "admin") {
-///             Response1()
-///         }
-///         Response2()
+/// ```swift
+/// KvGroup(users: "user1", "user2") {
+///     KvGroup(users: "admin") {
+///         Response1()
 ///     }
+///     Response2()
+/// }
+/// ```
 ///
-/// See: ``KvResponseGroup/hosts(_:)-6n0ay``.
+/// See: ``KvResponseGroup/hosts(_:)-1pv6b``.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
     hosts: String...,
@@ -265,24 +283,26 @@ public func KvGroup<Content : KvResponseGroup>(
 /// Below is an example where `response1` is available at both root and "/a" paths, `response2` is available at "/a" path,
 /// `response3` is available at "/b" path, `response4` is available at "/b/c/d" path, `response5` is available at "/b/c/e" path:
 ///
-///     KvGroup(hosts: "example.com") {
-///         response1               // /
-///         KvGroup("a") {
-///             response1           // /a
-///         }
-///         KvGroup("a") {
-///             response2           // /a
-///         }
-///         KvGroup("b") {
-///             response3           // /b
-///             KvGroup("c/d") {
-///                 response4       // /b/c/d
-///             }
-///         }
-///         KvGroup("b/c/e") {
-///             response5           // /b/c/e
+/// ```swift
+/// KvGroup(hosts: "example.com") {
+///     response1               // /
+///     KvGroup("a") {
+///         response1           // /a
+///     }
+///     KvGroup("a") {
+///         response2           // /a
+///     }
+///     KvGroup("b") {
+///         response3           // /b
+///         KvGroup("c/d") {
+///             response4       // /b/c/d
 ///         }
 ///     }
+///     KvGroup("b/c/e") {
+///         response5           // /b/c/e
+///     }
+/// }
+/// ```
 ///
 /// See: ``KvResponseGroup/path(_:)``.
 @inlinable

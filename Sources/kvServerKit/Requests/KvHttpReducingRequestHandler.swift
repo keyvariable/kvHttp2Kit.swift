@@ -25,7 +25,7 @@
 ///
 /// This handler is designated to process request bodies on the fly minimizing memory usage and improving performance of large body processing.
 ///
-/// See: ``init(bodyLimits:initial:nextPartialResult:responseBlock:)``, ``init(bodyLimits:into:updateAccumulatingResult:responseBlock:)``.
+/// See: ``init(bodyLengthLimit:initial:nextPartialResult:responseBlock:)``, ``init(bodyLengthLimit:into:updateAccumulatingResult:responseBlock:)``.
 open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
     public typealias ResponseBlock = (PartialResult) -> KvHttpResponseProvider?
@@ -50,7 +50,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     /// The partial result and received body fragments are passed to *nextPartialResult* block and partial result is replaced with value returned by *nextPartialResult*.
     /// When entire body is processed, last partial result is passed to *responseBlock*.
     ///
-    /// See: ``init(bodyLimits:into:updateAccumulatingResult:responseBlock:)``.
+    /// See: ``init(bodyLengthLimit:into:updateAccumulatingResult:responseBlock:)``.
     @inlinable
     public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit,
                 initial initialResult: PartialResult,
@@ -74,7 +74,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     /// The mutable partial result and received body fragments are passed to *updateAccumulatingResult* block.
     /// When entire body is processed, partial result is passed to *responseBlock*.
     ///
-    /// See: ``init(bodyLimits:initial:nextPartialResult:responseBlock:)``.
+    /// See: ``init(bodyLengthLimit:initial:nextPartialResult:responseBlock:)``.
     @inlinable
     public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit,
                 into initialResult: PartialResult,
@@ -114,7 +114,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     }
 
 
-    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:responseFor:)``.
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
     /// Override it to provide custom incident handling. 
     ///
     /// See ``KvHttpRequestHandler``.

@@ -157,6 +157,8 @@ public protocol KvHttpRequestRequiredBody : KvHttpRequestBody {
     /// This modifier declares limit for length of request body.
     ///
     /// Previously declared value is replaced.
+    ///
+    /// See: ``KvResponseGroup/httpBodyLengthLimit(_:)``.
     func bodyLengthLimit(_ value: UInt) -> Self
 
 }
@@ -212,7 +214,7 @@ extension KvHttpRequestRequiredBodyInternal {
 
 // MARK: - KvHttpRequestReducingBody
 
-/// See ``KvHttpRequestRequiredBody/reduce(_:_:)`` and ``KvHttpRequestRequiredBody/reduce(into:_:)`` fabrics for details.
+/// See ``reduce(_:_:)`` and ``reduce(into:_:)`` fabrics for details.
 public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBodyInternal {
 
     public typealias Value = PartialResult
@@ -320,7 +322,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
 
 // MARK: - KvHttpRequestDataBody
 
-/// See ``KvHttpRequestRequiredBody/data`` fabric for details.
+/// See ``data`` fabric for details.
 public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
 
     public typealias Value = Data?

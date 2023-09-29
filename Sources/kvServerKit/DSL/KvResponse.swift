@@ -29,47 +29,51 @@
 ///
 /// Below is an example of a current server time HTTP response type having *format* parameter:
 ///
-///     struct CurrentDateResponse : KvResponse {
-///         enum Format { case iso8601, rfc3339 }
+/// ```swift
+/// struct CurrentDateResponse : KvResponse {
+///     enum Format { case iso8601, rfc3339 }
 ///
-///         init(format: Format) {
-///             switch {
-///             case .iso8601:
-///                 formatter = ISO8601DateFormatter()
-///             case .rfc3339:
-///                 let rfc3339Formatter = DateFormatter()
-///                 rfc3339Formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
-///                 rfc3339Formatter.locale = Locale(identifier: "en_US_POSIX")
-///                 rfc3339Formatter.timeZone = TimeZone(secondsFromGMT: 0)
-///                 formatter = rfc3339Formatter
-///             }
-///         }
-///
-///         private let formatter: Formatter
-///
-///         var body: some KvResponse {
-///             KvHttpResponse.static { .string(formatter.string(for: Date()!) }
+///     init(format: Format) {
+///         switch {
+///         case .iso8601:
+///             formatter = ISO8601DateFormatter()
+///         case .rfc3339:
+///             let rfc3339Formatter = DateFormatter()
+///             rfc3339Formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
+///             rfc3339Formatter.locale = Locale(identifier: "en_US_POSIX")
+///             rfc3339Formatter.timeZone = TimeZone(secondsFromGMT: 0)
+///             formatter = rfc3339Formatter
 ///         }
 ///     }
+///
+///     private let formatter: Formatter
+///
+///     var body: some KvResponse {
+///         KvHttpResponse.static { .string(formatter.string(for: Date()!) }
+///     }
+/// }
+/// ```
 ///
 /// Then `CurrentDateResponse` can be used as any Swift type. For example:
 ///
-///     KvGroup("iso8601") {
-///         CurrentDateResponse(format: .iso8601)
-///     }
-///     KvGroup("rfc3339") {
-///         CurrentDateResponse(format: .rfc3339)
-///     }
+/// ```swift
+/// KvGroup("iso8601") {
+///     CurrentDateResponse(format: .iso8601)
+/// }
+/// KvGroup("rfc3339") {
+///     CurrentDateResponse(format: .rfc3339)
+/// }
+/// ```
 ///
-/// See ``KvHttpResponse``.
+/// See: ``KvHttpResponse``.
 public protocol KvResponse {
 
-    /// It's inferred from your implementation of the required property ``KvResponse/body-swift.property-9pflg``.
+    /// It's inferred from your implementation of the required property ``KvResponse/body-swift.property-7lcxm``.
     associatedtype Body : KvResponse
 
 
     /// Represens the behaviour of response.
-    var body: Self.Body { get }
+    var body: Body { get }
 
 }
 

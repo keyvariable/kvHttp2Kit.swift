@@ -26,28 +26,30 @@
 ///
 /// Below is an example of simple server:
 ///
-///     @main
-///     struct ExampleServer : KvServer {
-///         var body: some KvResponseGroup {
-///             KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-///                 KvHttpResponse.static { .string("Hello, client") }
+/// ```swift
+/// @main
+/// struct ExampleServer : KvServer {
+///     var body: some KvResponseGroup {
+///         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
+///             KvHttpResponse.static { .string("Hello, client") }
 ///
-///                 KvGroup("echo") {
-///                     KvHttpResponse.dynamic
-///                         .requestBody(.data)
-///                         .content { .binary($0.requestBody ?? Data()) }
-///                 }
-///                 .httpMethods(.POST)
-///
-///                 KvGroup("uuid") {
-///                     KvHttpResponse.static
-///                         .content { .string(UUID().uuidString) }
-///                 }
+///             KvGroup("echo") {
+///                 KvHttpResponse.dynamic
+///                     .requestBody(.data)
+///                     .content { .binary($0.requestBody ?? Data()) }
 ///             }
-///             .hosts("example.com")
-///             .subdomains(optional: "www")
+///             .httpMethods(.POST)
+///
+///             KvGroup("uuid") {
+///                 KvHttpResponse.static
+///                     .content { .string(UUID().uuidString) }
+///             }
 ///         }
+///         .hosts("example.com")
+///         .subdomains(optional: "www")
 ///     }
+/// }
+/// ```
 ///
 /// Note `@main` attribute in the exapmle above. This attribute makes the server's ``main()`` method to be the entry point of application.
 ///
@@ -84,8 +86,10 @@ extension KvServer {
     /// It's automatically called when application is launched if server implementation is annotated with
     /// [@main](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/attributes/#main) attribute.
     ///
-    ///     @main
-    ///     struct ExampleServer : KvServer
+    /// ```swift
+    /// @main
+    /// struct ExampleServer : KvServer
+    /// ```
     ///
     /// See: ``start()``.
     public static func main() {
@@ -113,14 +117,16 @@ extension KvServer {
     /// Starts the server and returns a token. The token provides life-cycle management of started server instance.
     ///
     /// For example:
+    /// 
+    /// ```swift
+    /// let token = try ExampleServer().start()
     ///
-    ///     let token = try ExampleServer().start()
+    /// try token.waitWhileStarting().get()
+    /// CustomActions()
     ///
-    ///     try token.waitWhileStarting().get()
-    ///     CustomActions()
-    ///
-    ///     try token.waitUntilStopped().get()
-    ///     CustomCompletion()
+    /// try token.waitUntilStopped().get()
+    /// CustomCompletion()
+    /// ```
     ///
     /// See: ``main()``.
     public func start() throws -> KvServerToken {

@@ -250,8 +250,8 @@ open class KvHttpChannel {
             var _requestLimit: UInt?
 
 
-            /// - Parameter idleTimeInterval: If `nil` then ``KvHttpChannel/Configuration/Defaults/connectionIdleTimeInterval`` is used.
-            /// - Parameter requestLimit: If `nil` then ``KvHttpChannel/Configuration/Defaults/connectionRequestLimit`` is used.
+            /// - Parameter idleTimeInterval: If `nil` then ``KvHttpChannel/Configuration/Defaults/connectionIdleTimeInterval-swift.type.property`` is used.
+            /// - Parameter requestLimit: If `nil` then ``KvHttpChannel/Configuration/Defaults/connectionRequestLimit-swift.type.property`` is used.
             @inlinable
             public init(idleTimeInterval: TimeInterval? = nil,
                         requestLimit: UInt? = nil)
@@ -760,7 +760,8 @@ open class KvHttpChannel {
     /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
     public enum RequestIncident : Incident {
 
-        /// This incident is emitted when a request exceeds provided or default limits for a body. See ``KvHttpRequest/BodyLimits``.
+        /// This incident is emitted when a request exceeds provided or default limit for a body.
+        /// See ``KvHttpRequestHandler/bodyLengthLimit``, ``KvResponseGroup/httpBodyLengthLimit(_:)``, ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
         /// By default `.payloadTooLarge` (413) status is returned.
         case byteLimitExceeded
         /// This incident is emitted when request handler returns `nil` response.

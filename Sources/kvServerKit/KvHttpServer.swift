@@ -210,7 +210,7 @@ open class KvHttpServer {
     }
 
 
-    /// Async wrapper around ``stop(completion:)`` method.
+    /// Async wrapper around ``stop(_:)`` method.
     ///
     /// See: ``start()``.
     @inlinable
@@ -375,7 +375,7 @@ open class KvHttpServer {
     ///
     /// - Note: This property is thread-safe so costs of mutual exclusion should be taken into account.
     ///
-    /// See: ``addChannel``, ``KvHttpChannel/removeFromServer()``.
+    /// See: ``addChannel(_:)``, ``KvHttpChannel/removeFromServer()``.
     public func contains(channelWith id: KvHttpChannel.ID) -> Bool { mutationLock.withLock { _channels[id] != nil } }
 
 

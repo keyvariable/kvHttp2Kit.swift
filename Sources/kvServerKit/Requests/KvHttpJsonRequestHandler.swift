@@ -80,7 +80,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     }
 
 
-    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:responseFor:)``.
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
     /// Override it to provide custom incident handling. 
     ///
     /// See ``KvHttpRequestHandler``.

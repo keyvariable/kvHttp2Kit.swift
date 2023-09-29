@@ -25,18 +25,20 @@
 ///
 /// Let `urls` is an array of file URLs.  Then code providing responses with contents of the files can be implemented as shown below:
 ///
-///     KvForEach(urls) { url in
-///         KvGroup(url.path) {
-///             KvHttpResponse.static {
-///                 guard let stream = InputStream(url: url) else { return .internalServerError }
-///                 return .binary(stream)
-///             }
+/// ```swift
+/// KvForEach(urls) { url in
+///     KvGroup(url.path) {
+///         KvHttpResponse.static {
+///             guard let stream = InputStream(url: url) else { return .internalServerError }
+///             return .binary(stream)
 ///         }
 ///     }
+/// }
+/// ```
 ///
 /// Also it can be used to provide responses for all cases of an enumeration.
 ///
-/// - Note: The content is generated once before server is started. Any changes in ``data`` after ``content`` block is invoked take no effect.
+/// - Note: It's discouraged to mutate provided data. The content is generated once before server is started and there is no guaranties that changes will take effect.
 public struct KvForEach<Data, Content> where Data : Sequence {
 
     /// Collection of data that is used to generate content dynamically.
