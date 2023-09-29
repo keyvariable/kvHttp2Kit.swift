@@ -233,16 +233,39 @@ open class KvHttpChannel {
 
         public struct Connection : Equatable {
 
-            public var idleTimeInterval: TimeInterval
-            public var requestLimit: UInt
-
+            @inlinable
+            public var idleTimeInterval: TimeInterval {
+                get { _idleTimeInterval ?? Defaults.connectionIdleTimeInterval }
+                set { _idleTimeInterval = newValue }
+            }
+            @usableFromInline
+            var _idleTimeInterval: TimeInterval?
 
             @inlinable
-            public init(idleTimeInterval: TimeInterval = Defaults.connectionIdleTimeInterval,
-                        requestLimit: UInt = Defaults.connectionRequestLimit)
+            var requestLimit: UInt {
+                get { _requestLimit ?? Defaults.connectionRequestLimit }
+                set { _requestLimit = newValue }
+            }
+            @usableFromInline
+            var _requestLimit: UInt?
+
+
+            /// - Parameter idleTimeInterval: If `nil` then ``KvHttpChannel/Configuration/Defaults/connectionIdleTimeInterval`` is used.
+            /// - Parameter requestLimit: If `nil` then ``KvHttpChannel/Configuration/Defaults/connectionRequestLimit`` is used.
+            @inlinable
+            public init(idleTimeInterval: TimeInterval? = nil,
+                        requestLimit: UInt? = nil)
             {
-                self.idleTimeInterval = idleTimeInterval
-                self.requestLimit = requestLimit
+                self._idleTimeInterval = idleTimeInterval
+                self._requestLimit = requestLimit
+            }
+
+
+            /// Initializes the result of merging *rhs* into *lhs*.
+            @usableFromInline
+            init(lhs: Self, rhs: Self) {
+                self.init(idleTimeInterval: rhs._idleTimeInterval ?? lhs._idleTimeInterval,
+                          requestLimit: rhs._requestLimit ?? lhs._requestLimit)
             }
 
         }

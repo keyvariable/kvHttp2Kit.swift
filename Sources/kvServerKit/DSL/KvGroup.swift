@@ -59,7 +59,7 @@ public func KvGroup<HttpEndpoints, Content : KvResponseGroup>(
 where HttpEndpoints : Sequence, HttpEndpoints.Element == (KvNetworkEndpoint, KvResponseGroup.HTTP)
 {
     let network: KvResponseGroup.Configuration.Network = .init(
-        httpEndpoints: .init(uniqueKeysWithValues: httpEndpoints.lazy.map { ($0.0, .init(http: $0.1)) })
+        httpEndpoints: .init(uniqueKeysWithValues: httpEndpoints)
     )
 
     return KvModifiedResponseGroup(configuration: .init(network: network), source: content)

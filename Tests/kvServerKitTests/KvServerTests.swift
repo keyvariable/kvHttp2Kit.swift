@@ -943,7 +943,7 @@ extension KvServerTests {
 
 
         var body: some KvResponseGroup {
-            KvGroup(httpEndpoints: configurations.lazy.map { ($0.endpoint, $0.http) },
+            KvGroup(httpEndpoints: configurations.lazy.map { ($0.endpoint, .init(http: $0.http, connection: $0.connection)) },
                     content: content)
         }
 

@@ -84,7 +84,6 @@ struct KvHttpRequestBodyConfiguration {
         get { _bodyLengthLimit ?? KvHttpRequest.Constants.bodyLengthLimit }
         set { _bodyLengthLimit = newValue }
     }
-
     @usableFromInline
     var _bodyLengthLimit: UInt?
 

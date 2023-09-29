@@ -85,19 +85,15 @@ public protocol KvResponseGroup {
 
 
 
-// MARK: Auxiliaries
-
 extension KvResponseGroup {
+
+    // MARK: Auxiliaries
 
     public typealias QueryResult = KvUrlQueryParseResult
 
-}
 
 
-
-// MARK: Accumulation
-
-extension KvResponseGroup {
+    // MARK: Accumulation
 
     internal func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
         switch self {
@@ -108,15 +104,11 @@ extension KvResponseGroup {
         }
     }
 
-}
 
 
+    // MARK: Modifiers
 
-// MARK: Modifiers
-
-extension KvResponseGroup {
-
-    public typealias HTTP = KvHttpChannel.Configuration.HTTP
+    public typealias HTTP = KvHttpConfiguration
 
     public typealias HttpMethod = HTTPMethod
 
@@ -144,7 +136,7 @@ extension KvResponseGroup {
     ///     SomeResposeGroup()
     ///         .http(Host.current().addresses.lazy.map { (.init($0, on: 8080), .v2(ssl: ssl)) })
     ///
-    /// See: ``KvGroup(httpEndpoints:content:)``, ``http(_:at:)``, ``http(_:at:on:)``.
+    /// See: ``KvHttpConfiguration``, ``KvGroup(httpEndpoints:content:)``, ``http(_:at:)``, ``http(_:at:on:)``.
     ///
     /// - Note: By default HTTP responses are available at IPv6 local machine address `::1`, on port 80, via insecure HTTP/1.1.
     @inlinable
@@ -164,9 +156,9 @@ extension KvResponseGroup {
     ///     SomeResposeGroup()
     ///         .http(.v2(ssl: ssl), at: Host.current().addresses.lazy.map { .init($0, on: 8080) })
     ///
-    /// See: ``KvGroup(http:at:content:)``.
+    /// See: ``KvHttpConfiguration``, ``KvGroup(http:at:content:)``.
     @inlinable
-    public func http<Endpoints>(_ http: HTTP = KvHttpChannel.Configuration.Defaults.http, at endpoints: Endpoints) -> some KvResponseGroup
+    public func http<Endpoints>(_ http: HTTP = .init(), at endpoints: Endpoints) -> some KvResponseGroup
     where Endpoints : Sequence, Endpoints.Element == KvNetworkEndpoint
     {
         self.http(endpoints.lazy.map { ($0, http) })
@@ -180,10 +172,10 @@ extension KvResponseGroup {
     ///     SomeResposeGroup()
     ///         .http(.v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ])
     ///
-    /// See: ``KvGroup(http:at:on:content:)``.
+    /// See: ``KvHttpConfiguration``, ``KvGroup(http:at:on:content:)``.
     @inlinable
     public func http<Addresses, Ports>(
-        _ http: HTTP = KvHttpChannel.Configuration.Defaults.http,
+        _ http: HTTP = .init(),
         at addresses: Addresses,
         on ports: Ports
     ) -> some KvResponseGroup
@@ -426,18 +418,22 @@ struct KvResponseGroupConfiguration {
 
         /// Protocol IDs for endpoints.
         @usableFromInline
-        private(set) var protocolIDs: [KvNetworkEndpoint : ProtocolID] = [:]
+        private(set) var protocolIDs: [KvNetworkEndpoint : ProtocolID]
 
         /// Prepared data to configure HTTP channels.
-        private(set) var httpEndpoints: HttpEndpoints = .empty
+        @usableFromInline
+        private(set) var httpEndpoints: HttpEndpoints
 
 
-        private init() { }
+        private init() {
+            protocolIDs = [:]
+            httpEndpoints = .empty
+        }
 
 
         @usableFromInline
         init(httpEndpoints: HttpEndpoints) {
-            protocolIDs = .init(uniqueKeysWithValues: httpEndpoints.elements.lazy.map { ($0, .http) })
+            self.protocolIDs = .init(uniqueKeysWithValues: httpEndpoints.elements.lazy.map { ($0, .http) })
             self.httpEndpoints = httpEndpoints
         }
 
@@ -508,34 +504,7 @@ struct KvResponseGroupConfiguration {
             // MARK: .Configuration
 
             @usableFromInline
-            struct Configuration : Equatable {
-
-                @usableFromInline
-                typealias Connection = KvHttpChannel.Configuration.Connection
-
-                @usableFromInline
-                typealias HTTP = KvResponseGroup.HTTP
-
-
-                static let `default` = Self()
-
-
-                var http: HTTP
-                var connection: Connection
-
-
-                @usableFromInline
-                init(http: HTTP = KvHttpChannel.Configuration.Defaults.http,
-                     connection: Connection = .init(
-                        idleTimeInterval: KvHttpChannel.Configuration.Defaults.connectionIdleTimeInterval,
-                        requestLimit: KvHttpChannel.Configuration.Defaults.connectionRequestLimit
-                     )
-                ) {
-                    self.http = http
-                    self.connection = connection
-                }
-
-            }
+            typealias Configuration = KvHttpConfiguration
 
 
             // MARK: Operations
@@ -570,10 +539,10 @@ struct KvResponseGroupConfiguration {
 
 
         @usableFromInline
-        mutating func insert<H>(_ httpEndpoints: H) where H : Sequence, H.Element == (KvNetworkEndpoint, KvResponseGroup.HTTP) {
-            httpEndpoints.forEach { (endpoint, http) in
+        mutating func insert<H>(_ httpEndpoints: H) where H : Sequence, H.Element == (KvNetworkEndpoint, HttpEndpoints.Configuration) {
+            httpEndpoints.forEach { (endpoint, httpConfiguration) in
                 insert(protocolID: .http, for: endpoint)
-                self.httpEndpoints.insert(.init(http: http), for: endpoint)
+                self.httpEndpoints.insert(httpConfiguration, for: endpoint)
             }
         }
 
