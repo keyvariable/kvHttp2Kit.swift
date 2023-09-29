@@ -363,7 +363,7 @@ extension KvResponseGroup {
     ///
     /// Previously declared value is replaced.
     @inlinable
-    public func bodyLengthLimit(_ value: UInt) -> some KvResponseGroup {
+    public func httpBodyLengthLimit(_ value: UInt) -> some KvResponseGroup {
         modified {
             $0.httpRequestBody.bodyLengthLimit = value
         }

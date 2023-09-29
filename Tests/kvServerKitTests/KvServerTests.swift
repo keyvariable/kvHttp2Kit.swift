@@ -825,7 +825,7 @@ final class KvServerTests : XCTestCase {
                 switch limit {
                 case .some(let limit):
                     KvGroup(path, content: content)
-                        .bodyLengthLimit(limit)
+                        .httpBodyLengthLimit(limit)
                 case .none:
                     KvGroup(path, content: content)
                 }

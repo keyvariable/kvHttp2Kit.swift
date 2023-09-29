@@ -197,7 +197,7 @@ struct DeclarativeServer : KvServer {
             /// Responses without HTTP request body handling always have zero body limit.
             ///
             /// - Note: If an HTTP request has body exceeding the limit then 413 (Payload Too Large) status is returned by default.
-            .bodyLengthLimit(256 << 10)
+            .httpBodyLengthLimit(256 << 10)
 
             /// Example of responses processing JSON entites available at the same path by for different HTTP methods.
             KvGroup("date") {
