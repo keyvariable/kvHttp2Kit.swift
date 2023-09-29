@@ -358,6 +358,17 @@ extension KvResponseGroup {
         }
     }
 
+
+    /// Declares default body length limit in bytes for HTTP requests in the receiver and it's descendant groups.
+    ///
+    /// Previously declared value is replaced.
+    @inlinable
+    public func bodyLengthLimit(_ value: UInt) -> some KvResponseGroup {
+        modified {
+            $0.httpRequestBody.bodyLengthLimit = value
+        }
+    }
+
 }
 
 
@@ -377,18 +388,23 @@ struct KvResponseGroupConfiguration {
     @usableFromInline
     var dispatching: Dispatching
 
+    @usableFromInline
+    var httpRequestBody: HttpRequestBody
+
 
     @usableFromInline
-    init(network: Network = .empty, dispatching: Dispatching = .empty) {
+    init(network: Network = .empty, dispatching: Dispatching = .empty, httpRequestBody: HttpRequestBody = .empty) {
         self.network = network
         self.dispatching = dispatching
+        self.httpRequestBody = httpRequestBody
     }
 
 
     @usableFromInline
     init(lhs: Self, rhs: Self) {
         self.init(network: .init(lhs: lhs.network, rhs: rhs.network),
-                  dispatching: .init(lhs: lhs.dispatching, rhs: rhs.dispatching))
+                  dispatching: .init(lhs: lhs.dispatching, rhs: rhs.dispatching),
+                  httpRequestBody: .init(lhs: lhs.httpRequestBody, rhs: rhs.httpRequestBody))
     }
 
 
@@ -675,6 +691,12 @@ struct KvResponseGroupConfiguration {
         }
 
     }
+
+
+    // MARK: .HttpRequestBody
+
+    @usableFromInline
+    typealias HttpRequestBody = KvHttpRequestBodyConfiguration
 
 }
 

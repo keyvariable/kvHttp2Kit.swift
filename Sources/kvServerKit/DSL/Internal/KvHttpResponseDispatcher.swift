@@ -794,7 +794,7 @@ extension KvHttpResponseDispatcher {
                 switch queryParser {
                 case let queryParser as KvEmptyUrlQueryParser:
                     if emptyQueryElement != nil {
-                        KvDebug.pause("Warninig: HTTP response for empty URL query has was replaced")
+                        KvDebug.pause("Warning: HTTP response for empty URL query has was replaced")
                     }
                     emptyQueryElement = .init(queryParser: queryParser, processorBlock: response.makeProcessor)
 
@@ -805,7 +805,7 @@ extension KvHttpResponseDispatcher {
                     Append(.init(queryParser: queryParser, processorBlock: response.makeProcessor), to: &serialQueryElements)
 
                 default:
-                    KvDebug.pause("Warninig: HTTP response for unexpected URL query type was ignored")
+                    KvDebug.pause("Warning: HTTP response for unexpected URL query type was ignored")
                 }
             }
 

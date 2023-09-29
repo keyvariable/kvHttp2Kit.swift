@@ -81,6 +81,7 @@ public struct KvResponseGroupBuilder {
     where Component : Group
     { first }
 
+    // TODO: Apply parameter packs from Swift 5.9.
     @inlinable
     public static func buildPartialBlock<C0, C1>(accumulated: C0, next: C1) -> GroupOfTwo<C0, C1>
     where C0 : Group, C1 : Group

@@ -63,9 +63,11 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
 
 
-    init<Body>(urlQueryParser: QueryParser, headCallback: @escaping HeadCallback, body: Body, responseProvider: @escaping ResponseProvider)
-    where Body : KvHttpRequestBody<BodyValue>
-    {
+    init(urlQueryParser: QueryParser,
+         headCallback: @escaping HeadCallback,
+         body: any KvHttpRequestBodyInternal,
+         responseProvider: @escaping ResponseProvider
+    ) {
         self.queryParser = urlQueryParser
         self.headCallback = headCallback
         self.body = body
@@ -77,7 +79,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
     private let queryParser: QueryParser
 
     private let headCallback: HeadCallback
-    private let body: KvHttpRequestBody<BodyValue>
+    private let body: any KvHttpRequestBodyInternal
     private let responseProvider: ResponseProvider
 
 
@@ -99,9 +101,11 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
     class Processor : KvHttpRequestProcessorProtocol {
 
-        init<Body>(_ queryValue: QueryParser.Value, _ headCallback: @escaping HeadCallback, _ body: Body, _ responseProvider: @escaping ResponseProvider)
-        where Body : KvHttpRequestBody<BodyValue>
-        {
+        init(_ queryValue: QueryParser.Value,
+             _ headCallback: @escaping HeadCallback,
+             _ body: any KvHttpRequestBodyInternal,
+             _ responseProvider: @escaping ResponseProvider
+        ) {
             self.queryValue = queryValue
             self.headCallback = headCallback
             self.body = body
@@ -113,7 +117,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
         private var headers: Headers?
 
         private let headCallback: HeadCallback
-        private let body: KvHttpRequestBody<BodyValue>
+        private let body: any KvHttpRequestBodyInternal
         private let responseProvider: ResponseProvider
 
 
@@ -138,7 +142,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
             let responseProvider = responseProvider
 
             return .success(body.makeRequestHandler { bodyValue in
-                try responseProvider(queryValue, headers, bodyValue)
+                try responseProvider(queryValue, headers, bodyValue as! BodyValue)
             })
         }
 

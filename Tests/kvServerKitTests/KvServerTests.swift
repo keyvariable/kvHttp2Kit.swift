@@ -725,7 +725,7 @@ final class KvServerTests : XCTestCase {
 
     // MARK: - testQueryItems()
 
-    // Tests special kinds of query items. Common query items are tested in other tests.
+    /// Tests special kinds of query items. Common query items are tested in other tests.
     func testQueryItems() async throws {
 
         struct QueryItemServer : KvServer {
@@ -763,6 +763,124 @@ final class KvServerTests : XCTestCase {
             try await KvServerTestKit.assertResponse(baseURL, path: "void", query: nil, statusCode: .notFound)
             try await KvServerTestKit.assertResponse(baseURL, path: "void", query: "value=a", statusCode: .notFound)
         }
+    }
+
+
+
+    // MARK: - testBodyLimit()
+
+    /// Tests request body limit modifiers in groups and responses.
+    func testBodyLimit() async throws {
+
+        struct BodyLimitServer : KvServer {
+
+            static let limits: [UInt] = [ 8, 7, 6, 5 ]
+            var limits: [UInt] { Self.limits }
+
+            let configuration = KvServerTestKit.secureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvGroup("no_body") {
+                        KvHttpResponse.static { .string("0") }
+                    }
+                    KvGroup("default_limit") {
+                        response
+                    }
+
+                    KvForEach([ limits[1], nil ]) { limit1 in group(limit: limit1) {
+                        KvForEach([ limits[2], nil ]) { limit2 in group(limit: limit2) {
+                            KvForEach([ limits[3], nil ]) { limit3 in KvGroup(path("r", limit3)) {
+                                switch limit3 {
+                                case .some(let limit3):
+                                    response(limit: limit3)
+                                case .none:
+                                    response
+                                }
+                            } }
+                        } }
+                    } }
+                }
+                .httpMethods(.POST)
+            }
+
+            private var response: some KvResponse { response(body: .data) }
+
+            private func response(limit: UInt) -> some KvResponse { response(body: .data.bodyLengthLimit(limit)) }
+
+            private func response(body: KvHttpRequestDataBody) -> some KvResponse {
+                KvHttpResponse.dynamic
+                    .requestBody(body)
+                    .content {
+                        .string("\($0.requestBody?.count ?? 0)")
+                    }
+            }
+
+            /// - Returns: The response in two groups with given limits.
+            @KvResponseGroupBuilder
+            private func group<Content>(limit: UInt?, @KvResponseGroupBuilder content: @escaping () -> Content) -> some KvResponseGroup
+            where Content : KvResponseGroup {
+                let path = self.path("g", limit)
+
+                switch limit {
+                case .some(let limit):
+                    KvGroup(path, content: content)
+                        .bodyLengthLimit(limit)
+                case .none:
+                    KvGroup(path, content: content)
+                }
+            }
+
+            static func path(_ prefix: String, _ limit: UInt?) -> String { prefix + (limit.map { "\($0)" } ?? "") }
+
+            func path(_ prefix: String, _ limit: UInt?) -> String { Self.path(prefix, limit) }
+
+        }
+
+        try await Self.withRunningServer(of: BodyLimitServer.self, context: { KvServerTestKit.baseURL(for: $0.configuration) }) { baseURL in
+
+            func Assert(_ urlSession: URLSession, path: String, contentLength: UInt, expectedLimit: UInt) async throws {
+                let (statusCode, content): (KvHttpResponseProvider.Status, String)
+                = contentLength <= expectedLimit ? (.ok, "\(contentLength)") : (.payloadTooLarge, "")
+
+                try await KvServerTestKit.assertResponse(
+                    urlSession: urlSession,
+                    baseURL, method: "POST", path: path, query: nil, body: contentLength > 0 ? Data(count: numericCast(contentLength)) : nil,
+                    statusCode: statusCode, contentType: .text(.plain), expecting: content
+                )
+            }
+
+            func Assert(path: String, expectedLimit: UInt) async throws {
+                // URL sessions are used to prevent reponses after body limit incidents to be discarded.
+                let urlSession = URLSession(configuration: .ephemeral)
+
+                let limits = [ [ 0, 1 ],
+                               Array((BodyLimitServer.limits.min()! - 1)...(BodyLimitServer.limits.max()! + 1)),
+                               [ KvHttpRequest.Constants.bodyLengthLimit, KvHttpRequest.Constants.bodyLengthLimit + 1 ]
+                ].joined().sorted()
+
+                for limit in limits {
+                    try await Assert(urlSession, path: path, contentLength: limit, expectedLimit: expectedLimit)
+                    // Stop after first out-of-limit request due to server drops requests.
+                    guard limit <= expectedLimit else { break }
+                }
+            }
+
+            try await Assert(path: "no_body", expectedLimit: 0)
+            try await Assert(path: "default_limit", expectedLimit: KvHttpRequest.Constants.bodyLengthLimit)
+
+            for limit1 in [ BodyLimitServer.limits[1], nil ] {
+                for limit2 in [ BodyLimitServer.limits[2], nil ] {
+                    for limit3 in [ BodyLimitServer.limits[3], nil ] {
+                        let path = "\(BodyLimitServer.path("g", limit1))/\(BodyLimitServer.path("g", limit2))/\(BodyLimitServer.path("r", limit3))"
+                        let expectedLimit = [ limit1, limit2, limit3 ].lazy.compactMap({ $0 }).min() ?? KvHttpRequest.Constants.bodyLengthLimit
+
+                        try await Assert(path: path, expectedLimit: expectedLimit)
+                    }
+                }
+            }
+        }
+
     }
 
 }

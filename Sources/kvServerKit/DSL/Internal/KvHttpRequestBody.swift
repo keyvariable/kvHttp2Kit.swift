@@ -27,55 +27,32 @@ import Foundation
 
 // MARK: - KvHttpRequestBody
 
-public class KvHttpRequestBody<Value> {
+public protocol KvHttpRequestBody {
 
-    public typealias Value = Value
+    associatedtype Value
+
+}
 
 
 
-    @usableFromInline
+// MARK: - KvHttpRequestBodyInternal
+
+@usableFromInline
+protocol KvHttpRequestBodyInternal : KvHttpRequestBody {
+
+    typealias Configuration = KvHttpRequestBodyConfiguration
+
     typealias ResponseBlock = (Value) throws -> KvHttpResponseProvider
 
 
+    func with(baseConfiguration: Configuration) -> Self
 
-    @usableFromInline
-    var configuration: Configuration
+    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler
 
-
-
-    fileprivate init(with configuration: Configuration = .init()) {
-        self.configuration = configuration
-    }
+}
 
 
-
-    // MARK: Required Methods to Override
-
-    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        fatalError("This implementation must never be invoked")
-    }
-
-
-
-    // MARK: .Configuration
-
-    @usableFromInline
-    struct Configuration {
-
-        @usableFromInline
-        var bodyLengthLimit: UInt
-
-
-        @usableFromInline
-        init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit) {
-            self.bodyLengthLimit = bodyLengthLimit
-        }
-
-    }
-
-
-
-    // MARK: Operations
+extension KvHttpRequestBodyInternal {
 
     /// It's designated to unwrap result of *ResponseBlock*.
     fileprivate func catching(_ block: () throws -> KvHttpResponseProvider) -> KvHttpResponseProvider {
@@ -93,11 +70,45 @@ public class KvHttpRequestBody<Value> {
 
 
 
+// MARK: - KvHttpRequestBodyConfiguration
+
+@usableFromInline
+struct KvHttpRequestBodyConfiguration {
+
+    @usableFromInline
+    static let empty: Self = .init()
+    
+
+    @usableFromInline
+    var bodyLengthLimit: UInt {
+        get { _bodyLengthLimit ?? KvHttpRequest.Constants.bodyLengthLimit }
+        set { _bodyLengthLimit = newValue }
+    }
+
+    @usableFromInline
+    var _bodyLengthLimit: UInt?
+
+
+    @usableFromInline
+    init(bodyLengthLimit: UInt? = nil) {
+        self._bodyLengthLimit = bodyLengthLimit
+    }
+
+
+    @usableFromInline
+    init(lhs: Self, rhs: Self) {
+        self.init(bodyLengthLimit: rhs._bodyLengthLimit ?? lhs._bodyLengthLimit)
+    }
+
+}
+
+
+
 // MARK: - KvHttpRequestVoidBodyValue
 
 public struct KvHttpRequestVoidBodyValue {
 
-    init() { }
+    internal init() { }
 
 }
 
@@ -105,15 +116,27 @@ public struct KvHttpRequestVoidBodyValue {
 
 // MARK: - KvHttpRequestProhibitedBody
 
-public class KvHttpRequestProhibitedBody : KvHttpRequestBody<KvHttpRequestVoidBodyValue> {
+/// This type declares absence (or zero length) of body in HTTP request.
+public struct KvHttpRequestProhibitedBody : KvHttpRequestBodyInternal {
+
+    public typealias Value = KvHttpRequestVoidBodyValue
+
 
     @usableFromInline
-    init() {
-        super.init(with: .init(bodyLengthLimit: 0))
-    }
+    var configuration: Configuration { .init(bodyLengthLimit: 0) }
 
 
-    override func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+    @usableFromInline
+    init() { }
+
+
+    // MARK: : KvHttpRequestBodyInternal
+
+    @usableFromInline
+    func with(baseConfiguration: Configuration) -> Self { self }
+
+    @usableFromInline
+    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
         KvHttpHeadOnlyRequestHandler {
             self.catching { try responseBlock(.init()) }
         }
@@ -125,31 +148,63 @@ public class KvHttpRequestProhibitedBody : KvHttpRequestBody<KvHttpRequestVoidBo
 
 // MARK: - KvHttpRequestRequiredBody
 
-/// Base class for declarations of HTTP request body
+/// Protocol for declarations of HTTP request bodies.
 ///
-/// See it's fabrics and modifiers.
-public class KvHttpRequestRequiredBody<Value> : KvHttpRequestBody<Value> { }
+/// Use fabrics and modifiers of conforming types: ``KvHttpRequestDataBody``, ``KvHttpRequestJsonBody``, ``KvHttpRequestReducingBody``.
+public protocol KvHttpRequestRequiredBody : KvHttpRequestBody {
 
-
-
-// MARK: Modifiers
-
-extension KvHttpRequestRequiredBody {
-
-    @usableFromInline
-    @inline(__always)
-    func map(_ transform: (inout Configuration) -> Void) -> Self {
-        transform(&configuration)
-        return self
-    }
-
+    // MARK: Modifiers
 
     /// This modifier declares limit for length of request body.
     ///
     /// Previously declared value is replaced.
+    func bodyLengthLimit(_ value: UInt) -> Self
+
+}
+
+
+
+// MARK: - KvHttpRequestRequiredBodyInternal
+
+@usableFromInline
+protocol KvHttpRequestRequiredBodyInternal : KvHttpRequestBodyInternal, KvHttpRequestRequiredBody {
+
+    var configuration: Configuration { get set }
+
+}
+
+
+extension KvHttpRequestRequiredBodyInternal {
+
+    // MARK: : KvHttpRequestBodyInternal
+
+    @usableFromInline
+    func with(baseConfiguration: Configuration) -> Self {
+        var copy = self
+        copy.configuration = .init(lhs: baseConfiguration, rhs: copy.configuration)
+        return copy
+    }
+
+
+    // MARK: Operations
+
+    @usableFromInline
+    @inline(__always)
+    func modified(_ transform: (inout Configuration) -> Void) -> Self {
+        var copy = self
+        transform(&copy.configuration)
+        return copy
+    }
+
+
+    // MARK: Modifiers
+
+    /// This modifier declares limit in bytes for length of request body.
+    ///
+    /// Previously declared value is replaced.
     @inlinable
     public func bodyLengthLimit(_ value: UInt) -> Self {
-        map { $0.bodyLengthLimit = value }
+        modified { $0.bodyLengthLimit = value }
     }
 
 }
@@ -158,11 +213,16 @@ extension KvHttpRequestRequiredBody {
 
 // MARK: - KvHttpRequestReducingBody
 
-@usableFromInline
-class KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBody<PartialResult> {
+/// See ``KvHttpRequestRequiredBody/reduce(_:_:)`` and ``KvHttpRequestRequiredBody/reduce(into:_:)`` fabrics for details.
+public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBodyInternal {
+
+    public typealias Value = PartialResult
+
 
     @usableFromInline
-    let requestHandlerProvider: (KvHttpRequestReducingBody, @escaping ResponseBlock) -> KvHttpRequestHandler
+    var configuration: Configuration = .init()
+
+    let requestHandlerProvider: (Self, @escaping ResponseBlock) -> KvHttpRequestHandler
 
 
     @usableFromInline
@@ -199,16 +259,7 @@ class KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBody<Parti
     }
 
 
-    // MARK: : KvHttpRequestBody
-
-    override func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        requestHandlerProvider(self, responseBlock)
-    }
-
-}
-
-
-extension KvHttpRequestRequiredBody {
+    // MARK: Fabrics
 
     /// - Returns: An HTTP request body handler processing request body fragments when they are received and collecting the result until the body is completely processed.
     ///
@@ -233,7 +284,7 @@ extension KvHttpRequestRequiredBody {
     public static func reduce(
         _ initialResult: Value,
         _ nextPartialResult: @escaping (Value, UnsafeRawBufferPointer) -> Value
-    ) -> KvHttpRequestRequiredBody<Value>
+    ) -> KvHttpRequestReducingBody<Value>
     {
         KvHttpRequestReducingBody(initialResult, nextPartialResult)
     }
@@ -251,9 +302,17 @@ extension KvHttpRequestRequiredBody {
     public static func reduce(
         into initialResult: Value,
         _ updateAccumulatingResult: @escaping (inout Value, UnsafeRawBufferPointer) -> Void
-    ) -> KvHttpRequestRequiredBody<Value>
+    ) -> KvHttpRequestReducingBody<Value>
     {
         KvHttpRequestReducingBody(into: initialResult, updateAccumulatingResult)
+    }
+
+
+    // MARK: : KvHttpRequestBodyInternal
+
+    @usableFromInline
+    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+        requestHandlerProvider(self, responseBlock)
     }
 
 }
@@ -262,26 +321,21 @@ extension KvHttpRequestRequiredBody {
 
 // MARK: - KvHttpRequestDataBody
 
-@usableFromInline
-class KvHttpRequestDataBody : KvHttpRequestRequiredBody<Data?> {
+/// See ``KvHttpRequestRequiredBody/data`` fabric for details.
+public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
+
+    public typealias Value = Data?
+
+
+    @usableFromInline
+    var configuration: Configuration = .init()
+
 
     @usableFromInline
     init() { }
 
 
-    override func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        KvHttpCollectingBodyRequestHandler(
-            bodyLengthLimit: configuration.bodyLengthLimit,
-            responseBlock: { data in
-                self.catching { try responseBlock(data) }
-            }
-        )
-    }
-
-}
-
-
-extension KvHttpRequestRequiredBody {
+    // MARK: Fabrics
 
     /// - Returns: An HTTP request body handler collecting the received bytes into standard *Data*.
     ///
@@ -295,7 +349,20 @@ extension KvHttpRequestRequiredBody {
     ///         .content { .binary($0.requestBody ?? Data()) }
     ///
     @inlinable
-    public static var data: KvHttpRequestRequiredBody<Data?> { KvHttpRequestDataBody() }
+    public static var data: KvHttpRequestDataBody { KvHttpRequestDataBody() }
+
+
+    // MARK: : KvHttpRequestBodyInternal
+
+    @usableFromInline
+    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+        KvHttpCollectingBodyRequestHandler(
+            bodyLengthLimit: configuration.bodyLengthLimit,
+            responseBlock: { data in
+                self.catching { try responseBlock(data) }
+            }
+        )
+    }
 
 }
 
@@ -303,10 +370,43 @@ extension KvHttpRequestRequiredBody {
 
 // MARK: - KvHttpRequestJsonBody
 
-@usableFromInline
-class KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBody<Value> {
+/// See ``json(of:)`` fabric for details.
+public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBodyInternal {
 
-    override func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+    public typealias Value = Value
+
+
+    @usableFromInline
+    var configuration: Configuration = .init()
+
+
+    @usableFromInline
+    init() { }
+
+
+    // MARK: Fabrics
+
+    /// - Returns: An HTTP request body handler decoding received bytes as a JSON.
+    ///
+    /// The resulting type of body processing result is `T`. If the body is missing or can't be decoded then simple response with 400 (Bad Request) status code is returned.
+    ///
+    /// Below is an example of response decoding JSON respresentation of standard *DateComponents* and returning received date in ISO 8601 format.
+    ///
+    ///     KvHttpResponse.dynamic
+    ///         .requestBody(.json(of: DateComponents.self))
+    ///         .content {
+    ///             guard let date = $0.requestBody.date else { return .badRequest }
+    ///             return .string(ISO8601DateFormatter().string(from: date))
+    ///         }
+    ///
+    @inlinable
+    public static func json<T : Decodable>(of type: T.Type) -> KvHttpRequestJsonBody<T> { KvHttpRequestJsonBody<T>() }
+
+
+    // MARK: : KvHttpRequestBodyInternal
+
+    @usableFromInline
+    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
         KvHttpJsonRequestHandler<Value>(
             bodyLengthLimit: configuration.bodyLengthLimit,
             responseBlock: { value in
@@ -326,25 +426,5 @@ class KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBody<Value
             }
         )
     }
-
-}
-
-
-extension KvHttpRequestRequiredBody {
-
-    /// - Returns: An HTTP request body handler decoding received bytes as a JSON.
-    ///
-    /// The resulting type of body processing result is `T`. If the body is missing or can't be decoded then simple response with 400 (Bad Request) status code is returned.
-    ///
-    /// Below is an example of response decoding JSON respresentation of standard *DateComponents* and returning received date in ISO 8601 format.
-    ///
-    ///     KvHttpResponse.dynamic
-    ///         .requestBody(.json(of: DateComponents.self))
-    ///         .content {
-    ///             guard let date = $0.requestBody.date else { return .badRequest }
-    ///             return .string(ISO8601DateFormatter().string(from: date))
-    ///         }
-    ///
-    public static func json<T : Decodable>(of type: T.Type) -> KvHttpRequestRequiredBody<T> { KvHttpRequestJsonBody<T>() }
 
 }

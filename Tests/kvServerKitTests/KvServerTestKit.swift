@@ -111,13 +111,13 @@ class KvServerTestKit {
 
     // MARK: Response Execution
 
-    static func queryDataIgnoringCertificate(from url: URL) async throws -> (Data, URLResponse) {
-        try await URLSession.shared.data(from: url, delegate: IgnoringCertificateTaskDelegate())
+    static func queryDataIgnoringCertificate(from url: URL, in urlSession: URLSession? = nil) async throws -> (Data, URLResponse) {
+        try await (urlSession ?? URLSession.shared).data(from: url, delegate: IgnoringCertificateTaskDelegate())
     }
 
 
-    static func queryDataIgnoringCertificate(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await URLSession.shared.data(for: request, delegate: IgnoringCertificateTaskDelegate())
+    static func queryDataIgnoringCertificate(for request: URLRequest, in urlSession: URLSession? = nil) async throws -> (Data, URLResponse) {
+        try await (urlSession ?? URLSession.shared).data(for: request, delegate: IgnoringCertificateTaskDelegate())
     }
 
 
@@ -125,6 +125,7 @@ class KvServerTestKit {
     // MARK: Validation Auxiliaries
 
     static func assertResponse(
+        urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
         message: @escaping @autoclosure () -> String = "",
@@ -159,7 +160,7 @@ class KvServerTestKit {
         }
 
         let message = { [ "\(request)", message() ].joined(separator: ". ") }
-        let (data, response) = try await queryDataIgnoringCertificate(for: request)
+        let (data, response) = try await queryDataIgnoringCertificate(for: request, in: urlSession)
 
         do {
             guard let httpResponse = response as? HTTPURLResponse
@@ -174,12 +175,13 @@ class KvServerTestKit {
 
 
     static func assertResponse(
+        urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
         expecting expected: String,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
             let result = String(data: data, encoding: .utf8)
             XCTAssertEqual(result, expected, message())
         }
@@ -187,24 +189,26 @@ class KvServerTestKit {
 
 
     static func assertResponse(
+        urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .application(.octetStream),
         expecting expected: Data,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
             XCTAssertEqual(data, expected, message())
         }
     }
 
 
     static func assertResponseJSON<T : Decodable & Equatable>(
+        urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .application(.json),
         expecting expected: T,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
             let result = try JSONDecoder().decode(T.self, from: data)
             XCTAssertEqual(result, expected, message())
         }

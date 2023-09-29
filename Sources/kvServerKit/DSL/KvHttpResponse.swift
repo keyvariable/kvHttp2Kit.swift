@@ -90,7 +90,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
 
     typealias Implementation = KvHttpResponseImplementationProtocol
-    fileprivate typealias ImplementationBlock = () -> Implementation
+    fileprivate typealias ImplementationBlock = (KvHttpRequestBodyConfiguration?) -> Implementation
 
 
 
@@ -115,7 +115,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///     KvHttpResponse.static { .string(UUID().uuidString) }
     ///
     public static func `static`(content: @escaping () throws -> KvHttpResponseProvider) -> KvHttpResponse {
-        .init {
+        .init { baseBodyConfiguration in
             KvHttpResponseImplementation(responseProvider: content)
         }
     }
@@ -180,7 +180,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     // MARK: : KvResponseInternalProtocol
 
     func insert<A : KvResponseAccumulator>(to accumulator: A) {
-        accumulator.insert(implementationBlock())
+        accumulator.insert(implementationBlock(accumulator.responseGroupConfiguration?.httpRequestBody))
     }
 
 }
@@ -200,9 +200,6 @@ extension KvHttpResponse {
 
         /// Type representing processed content of the HTTP request. It's passed to the response's content callback.
         public typealias Context = (query: QueryItemGroup.Value, requestHeaders: RequestHeaders, requestBody: RequestBodyValue)
-
-        @usableFromInline
-        typealias RequestBody = KvHttpRequestBody<RequestBodyValue>
 
 
         @usableFromInline
@@ -231,14 +228,14 @@ extension KvHttpResponse {
             let requestHeadCallback: RequestHeadCallback
 
             @usableFromInline
-            let requestBody: RequestBody
+            let requestBody: any KvHttpRequestBodyInternal
 
             // TODO: error callbacks with ability to modify default response.
             // TODO: .catch(_:) modifier for all channel and client errors.
 
 
             @usableFromInline
-            init(queryItemGroup: QueryItemGroup, requestHeadCallback: @escaping RequestHeadCallback, requestBody: RequestBody) {
+            init(queryItemGroup: QueryItemGroup, requestHeadCallback: @escaping RequestHeadCallback, requestBody: any KvHttpRequestBodyInternal) {
                 self.queryItemGroup = queryItemGroup
                 self.requestHeadCallback = requestHeadCallback
                 self.requestBody = requestBody
@@ -252,14 +249,21 @@ extension KvHttpResponse {
         /// Shorthand auxiliary method.
         private func makeImplementation<QueryParser>(
             _ queryParser: QueryParser,
+            _ baseBodyConfiguration: KvHttpRequestBodyConfiguration?,
             _ callback: @escaping (Context) throws -> KvHttpResponseProvider
         ) -> KvHttpResponseImplementation<QueryParser, RequestHeaders, RequestBodyValue>
         where QueryParser : KvUrlQueryParserProtocol, QueryParser.Value == QueryItemGroup.Value
         {
-            KvHttpResponseImplementation(urlQueryParser: queryParser,
-                                         headCallback: configuration.requestHeadCallback,
-                                         body: configuration.requestBody,
-                                         responseProvider: { try callback(($0, $1, $2)) })
+            var body = configuration.requestBody
+
+            if let baseBodyConfiguration = baseBodyConfiguration {
+                body = body.with(baseConfiguration: baseBodyConfiguration)
+            }
+
+            return KvHttpResponseImplementation(urlQueryParser: queryParser,
+                                                headCallback: configuration.requestHeadCallback,
+                                                body: body,
+                                                responseProvider: { try callback(($0, $1, $2)) })
         }
 
     }
@@ -275,8 +279,8 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQuery
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
     public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
-        return .init {
-            makeImplementation(KvEmptyUrlQueryParser(), callback)
+        return .init { baseBodyConfiguration in
+            makeImplementation(KvEmptyUrlQueryParser(), baseBodyConfiguration, callback)
         }
     }
 
@@ -291,8 +295,8 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvRawUrlQueryIte
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
     public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
-        return .init {
-            makeImplementation(KvRawUrlQueryParser(for: configuration.queryItemGroup), callback)
+        return .init { baseBodyConfiguration in
+            makeImplementation(KvRawUrlQueryParser(for: configuration.queryItemGroup), baseBodyConfiguration, callback)
         }
     }
 
@@ -307,8 +311,8 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemIm
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
     public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
-        return .init {
-            makeImplementation(KvUrlQueryParser(for: configuration.queryItemGroup), callback)
+        return .init { baseBodyConfiguration in
+            makeImplementation(KvUrlQueryParser(for: configuration.queryItemGroup), baseBodyConfiguration, callback)
         }
     }
 
@@ -456,6 +460,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 // MARK: Query of Two Elements
 
+// TODO: Apply parameter packs from Swift 5.9.
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfTwoProtocol {
 
     public typealias AmmendedUpToThree<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
@@ -895,15 +900,40 @@ extension KvHttpResponse.DynamicResponse where RequestBodyValue == KvHttpRequest
 
     /// Adds processing of HTTP request body.
     ///
-    /// - Parameter requestBody: Declaration of HTTP request body processing. See ``KvHttpRequestRequiredBody`` for available body processing options.
+    /// - Parameter requestBody: Declaration of HTTP request body processing as instance of ``KvHttpRequestDataBody``.
     ///
     /// The result of HTTP request body processing is available in the context passed to the callback.
     ///
     /// Initially response matches empty or missing HTTP request body. Requests having non-empty bodies are rejected.
-    ///
-    /// See ``KvHttpResponse/dynamic`` for an example.
     @inlinable
-    public func requestBody<B>(_ requestBody: KvHttpRequestRequiredBody<B>) -> HandlingRequestBody<B> {
+    public func requestBody(_ requestBody: KvHttpRequestDataBody) -> HandlingRequestBody<KvHttpRequestDataBody.Value> {
+        map { .init(queryItemGroup: $0.queryItemGroup, requestHeadCallback: $0.requestHeadCallback, requestBody: requestBody) }
+    }
+
+
+    /// Adds processing of HTTP request body.
+    ///
+    /// - Parameter requestBody: Declaration of HTTP request body processing. See ``KvHttpRequestJsonBody`` for available body processing options.
+    ///
+    /// The result of HTTP request body processing is available in the context passed to the callback.
+    ///
+    /// Initially response matches empty or missing HTTP request body. Requests having non-empty bodies are rejected.
+    @inlinable
+    public func requestBody<B>(_ requestBody: KvHttpRequestJsonBody<B>) -> HandlingRequestBody<B>
+    where B : Decodable {
+        map { .init(queryItemGroup: $0.queryItemGroup, requestHeadCallback: $0.requestHeadCallback, requestBody: requestBody) }
+    }
+
+
+    /// Adds processing of HTTP request body.
+    ///
+    /// - Parameter requestBody: Declaration of HTTP request body processing. See ``KvHttpRequestReducingBody`` for available body processing options.
+    ///
+    /// The result of HTTP request body processing is available in the context passed to the callback.
+    ///
+    /// Initially response matches empty or missing HTTP request body. Requests having non-empty bodies are rejected.
+    @inlinable
+    public func requestBody<B>(_ requestBody: KvHttpRequestReducingBody<B>) -> HandlingRequestBody<B> {
         map { .init(queryItemGroup: $0.queryItemGroup, requestHeadCallback: $0.requestHeadCallback, requestBody: requestBody) }
     }
 

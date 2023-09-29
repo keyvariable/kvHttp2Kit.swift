@@ -129,15 +129,15 @@ extension KvServerImplementation {
 
             weak var schema: Schema!
 
-            let configuration: KvResponseGroup.Configuration?
+            let responseGroupConfiguration: KvResponseGroup.Configuration?
 
             private(set) lazy var httpChannels: [HttpChannel] = schema
-                .httpChannels(for: configuration)
+                .httpChannels(for: responseGroupConfiguration)
 
 
             init(_ schema: Schema, configuration: KvResponseGroup.Configuration? = nil, httpChannels: [HttpChannel]? = nil) {
                 self.schema = schema
-                self.configuration = configuration
+                self.responseGroupConfiguration = configuration
 
                 if let httpChannels {
                     self.httpChannels = httpChannels
@@ -148,9 +148,9 @@ extension KvServerImplementation {
             // MARK: : KvResponseAccumulator
 
             func with(_ configuration: KvResponseGroup.Configuration, body: (KvResponseAccumulator) -> Void) {
-                let newConfiguration = self.configuration.map { KvResponseGroup.Configuration(lhs: $0, rhs: configuration) } ?? configuration
+                let newConfiguration = self.responseGroupConfiguration.map { KvResponseGroup.Configuration(lhs: $0, rhs: configuration) } ?? configuration
 
-                let isHttpConfigurationChanged = newConfiguration.network.httpEndpoints != self.configuration?.network.httpEndpoints
+                let isHttpConfigurationChanged = newConfiguration.network.httpEndpoints != self.responseGroupConfiguration?.network.httpEndpoints
 
                 let accumulator = Accumulator(schema,
                                               configuration: newConfiguration,
@@ -163,7 +163,7 @@ extension KvServerImplementation {
             func insert<HttpResponse>(_ response: HttpResponse)
             where HttpResponse : KvHttpResponseImplementationProtocol
             {
-                httpChannels.forEach { $0.dispatchSchema.insert(response, for: configuration?.dispatching ?? .empty) }
+                httpChannels.forEach { $0.dispatchSchema.insert(response, for: responseGroupConfiguration?.dispatching ?? .empty) }
             }
 
         }

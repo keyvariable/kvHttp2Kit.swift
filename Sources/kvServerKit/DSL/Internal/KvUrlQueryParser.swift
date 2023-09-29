@@ -258,7 +258,7 @@ class KvUrlQueryParser<Value> : KvSerialUrlQueryParser, KvUrlQueryParseResultPro
             numberOfRequiredValues += parser.isRequired ? 1 : 0
 
             if let oldValue = itemParsers.updateValue(parser, forKey: name) {
-                assertionFailure("Warninig: value parser for URL query item named \"\(name)\" has been replaced")
+                assertionFailure("Warning: value parser for URL query item named \"\(name)\" has been replaced")
 
                 numberOfRequiredValues -= oldValue.isRequired ? 1 : 0
             }
