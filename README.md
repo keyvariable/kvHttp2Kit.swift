@@ -3,7 +3,8 @@
 *kvServerKit* is a cross-platform framework providing API to implement servers. Some features:
 
 - secure connections over HTTP/1.1 and HTTP/2.0;
-- imperative and declarative APIs.
+- imperative and declarative APIs;
+- validation of requests and various automatic customizable context-dependent responses like 400, 404, 413.
 
 *kvServerKit* uses [SwiftNIO](https://github.com/apple/swift-nio) framework to manage network connections and HTTP.
 
