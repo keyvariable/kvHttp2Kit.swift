@@ -187,10 +187,17 @@ struct DeclarativeServer : KvServer {
                         }
                 }
             }
-            /// Responses in the group above are provided only HTTP requests with POST method.
+            /// Responses in the group above are provided for HTTP requests with POST method only.
             ///
             /// - Note: Responses are available for any HTTP method by default.
             .httpMethods(.POST)
+            /// Length limit of HTTP request bodies for responses in the group above is increased to 256 KiB.
+            /// This limit also can be declared in a request this way: `.requestBody(.data.bodyLengthLimit(65_536))`.
+            /// Default limit is ``kvServerKit/KvHttpRequest/Constants/bodyLengthLimit``.
+            /// Responses without HTTP request body handling always have zero body limit.
+            ///
+            /// - Note: If an HTTP request has body exceeding the limit then 413 (Payload Too Large) status is returned by default.
+            .bodyLengthLimit(256 << 10)
 
             /// Example of responses processing JSON entites available at the same path by for different HTTP methods.
             KvGroup("date") {
