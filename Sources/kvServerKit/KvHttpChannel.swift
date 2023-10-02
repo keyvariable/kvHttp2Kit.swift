@@ -1041,14 +1041,12 @@ open class KvHttpChannel {
                         .whenComplete { _ in
                             let needsDisconnect: Bool = self.withLock {
                                 self._activeRequestCount -= 1
-                                self._requestLimit = self._requestLimit > 0 ? self._requestLimit - 1 : 0
 
                                 return (response.options.contains(.needsDisconnect)
                                         || keepAlive == false
                                         || !head.isKeepAlive
                                         || self.channel?.isActive != true
-                                        || (self._isIdleTimerFired && self._activeRequestCount <= 0)
-                                        || self._requestLimit <= 0)
+                                        || (self._activeRequestCount <= 0 && (self._isIdleTimerFired || self._requestLimit <= 0)))
                             }
 
                             if needsDisconnect {
@@ -1181,10 +1179,24 @@ open class KvHttpChannel {
                 return  // Requests are ignored
             }
 
-            let httpVersion: HTTPVersion = withLock {
+            let httpVersion: HTTPVersion
+            do {
+                lock()
+                defer { unlock() }
+
+                guard _requestLimit > 0 else {
+                    // It is not threated as incident due to channel will close connection just after the last response.
+                    // So response on incident will not be sent.
+                    //
+                    // Also `_requestLimit` is not decresed in ``handleRequestEnd(in:)`` to minimize locking of the handler.
+                    requestProcessingState = .stopped
+                    return
+                }
+
+                _requestLimit -= 1
                 _activeRequestCount += 1
 
-                return _httpVersion
+                httpVersion = _httpVersion
             }
 
             let keepAlive = ExtractKeepAlive(head)
