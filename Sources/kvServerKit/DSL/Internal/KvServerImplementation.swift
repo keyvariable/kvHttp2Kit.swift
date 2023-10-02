@@ -304,7 +304,9 @@ extension KvServerImplementation {
 
 
             mutating func httpChannels(for configuration: KvResponseGroup.Configuration?) -> [HttpChannel] {
-                let endpoints = configuration?.network.httpEndpoints ?? Defaults.httpEndpoints
+                let endpoints = {
+                    $0?.isEmpty == false ? $0! : Defaults.httpEndpoints
+                }(configuration?.network.httpEndpoints)
 
                 return fetch(for: endpoints.elements, fabric: { slice in
                     HttpChannel(for: endpoints.intersection(slice))
