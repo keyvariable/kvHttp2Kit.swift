@@ -4,7 +4,7 @@
 
 - secure connections over HTTP/1.1 and HTTP/2.0;
 - imperative and declarative APIs;
-- validation of requests and various automatic customizable context-dependent responses like 400, 404, 413.
+- validation of requests and various automatic customizable context-dependent responses, e.g. 400, 404, 413.
 
 *kvServerKit* uses [SwiftNIO](https://github.com/apple/swift-nio) framework to manage network connections and HTTP.
 

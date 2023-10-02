@@ -131,17 +131,15 @@ extension KvServerImplementation {
 
             let responseGroupConfiguration: KvResponseGroup.Configuration?
 
-            private(set) lazy var httpChannels: [HttpChannel] = schema
-                .httpChannels(for: responseGroupConfiguration)
+            let httpChannels: [HttpChannel]
 
 
             init(_ schema: Schema, configuration: KvResponseGroup.Configuration? = nil, httpChannels: [HttpChannel]? = nil) {
                 self.schema = schema
                 self.responseGroupConfiguration = configuration
+                self.httpChannels = httpChannels ?? schema.httpChannels(for: responseGroupConfiguration)
 
-                if let httpChannels {
-                    self.httpChannels = httpChannels
-                }
+                updateSchemaNode()
             }
 
 
@@ -163,7 +161,24 @@ extension KvServerImplementation {
             func insert<HttpResponse>(_ response: HttpResponse)
             where HttpResponse : KvHttpResponseImplementationProtocol
             {
-                httpChannels.forEach { $0.dispatchSchema.insert(response, for: responseGroupConfiguration?.dispatching ?? .empty) }
+                forEachDispatchSchema { $0.insert(response, for: responseGroupConfiguration?.dispatching ?? .empty) }
+            }
+
+
+            // MARK: Operations
+
+            @inline(__always)
+            private func forEachDispatchSchema(_ body: (KvHttpResponseDispatcher.Schema) -> Void) {
+                httpChannels.forEach { body($0.dispatchSchema) }
+            }
+
+
+            private func updateSchemaNode() {
+                guard let responseGroupConfiguration,
+                      let attributes = KvHttpResponseDispatcher.Attributes.from(responseGroupConfiguration)
+                else { return }
+
+                forEachDispatchSchema { $0.insert(attributes, for: responseGroupConfiguration.dispatching) }
             }
 
         }
@@ -513,52 +528,57 @@ extension KvServerImplementation.HttpServer {
         // MARK: : KvHttpClientDelegate
 
         func httpClient(_ httpClient: KvHttpChannel.Client, requestHandlerFor requestHead: KvHttpServer.RequestHead) -> KvHttpRequestHandler? {
-            guard let context = Dispatcher.Context(from: requestHead)
+            guard let requestContext = KvHttpRequestContext(from: requestHead)
             else { return KvHttpHeadOnlyRequestHandler { .badRequest } }
 
             let requestProcessor: KvHttpRequestProcessorProtocol
 
             // Dispatching request
-            switch dispatcher.requestProcessor(in: context) {
+            let dispatchingResult = dispatcher.requestProcessor(in: requestContext)
+            let onIndicent = dispatchingResult.resolvedAttributes?.clientCallbacks?.onHttpIncident
+
+
+            func RequestHandler(for incident: KvHttpResponse.Incident) -> KvHttpRequestHandler {
+                KvHttpHeadOnlyRequestHandler { onIndicent?(incident) ?? .status(incident.defaultStatus) }
+            }
+
+
+            switch dispatchingResult.match {
             case .unambiguous(let value):
                 requestProcessor = value
-
             case .notFound:
-                return KvHttpHeadOnlyRequestHandler { .notFound }
-
+                return RequestHandler(for: .responseNotFound)
             case .ambiguous:
-                return KvHttpHeadOnlyRequestHandler { .badRequest }
+                return RequestHandler(for: .ambiguousRequest)
             }
 
             // Custom processing of headers
             switch requestProcessor.process(requestHead.headers) {
             case .success:
                 break
-
-            case .failure:
-                // TODO: pass the associated error and default response to user-declared handler.
-                return KvHttpHeadOnlyRequestHandler { .badRequest }
+            case .failure(let error):
+                return RequestHandler(for: .invalidHeaders(error))
             }
 
             // Creation of a request processor
             switch requestProcessor.makeRequestHandler() {
             case .success(let requestHandler):
                 return requestHandler
-
-            case .failure:
-                // TODO: pass the associated error and default response to user-declared handler.
-                return KvHttpHeadOnlyRequestHandler { .internalServerError }
+            case .failure(let error):
+                return RequestHandler(for: .processingFailed(error))
             }
         }
 
 
         func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
+            // TODO: Pass to provided handler of channel incidents when implemented.
             return nil
         }
 
 
-        // TODO: pass error to user-declared handler.
-        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) { }
+        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
+            // TODO: Pass to provided handler of channel errors when implemented.
+        }
 
     }
 

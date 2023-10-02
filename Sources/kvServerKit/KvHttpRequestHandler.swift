@@ -39,9 +39,10 @@ public protocol KvHttpRequestHandler : AnyObject {
     func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider?
 
     /// - Returns:  Optional custom response for an incident related to the request on a client.
-    ///             If `nil` is returned then ``KvHttpChannel/RequestIncident/defaultResponse`` is submitted to client.
+    ///             If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
     ///
-    /// - Note: Use ``KvHttpChannel/RequestIncident/defaultResponse`` to get and modify default responses for incidents.
+    /// Use ``KvHttpIncident/defaultStatus`` to compose responses with default status codes for incidents.
+    /// Also you can return custom responses depending on default status.
     ///
     /// - Note: Server will close connection to the client just after the response will be submitted.
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider?

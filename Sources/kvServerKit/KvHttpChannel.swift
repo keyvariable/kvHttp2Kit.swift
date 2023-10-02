@@ -58,9 +58,10 @@ public protocol KvHttpClientDelegate : AnyObject {
     func httpClient(_ httpClient: KvHttpChannel.Client, requestHandlerFor requestHead: KvHttpServer.RequestHead) -> KvHttpRequestHandler?
 
     /// - Returns:  Optional custom response for an incident on a client.
-    ///             If `nil` is returned then ``KvHttpChannel/ClientIncident/defaultResponse`` is submitted to client.
+    ///             If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
     ///
-    /// - Note: Use ``KvHttpChannel/ClientIncident/defaultResponse`` to get and modify default responses for incidents.
+    /// Use ``KvHttpIncident/defaultStatus`` to compose responses with default status codes for incidents.
+    /// Also you can return custom responses depending on default status.
     ///
     /// - Note: Server will close connection to the client just after the response will be submitted.
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider?
@@ -709,12 +710,6 @@ open class KvHttpChannel {
 
 
 
-    // MARK: .Incident
-
-    public typealias Incident = KvHttpChannelIncident
-
-
-
     // MARK: .ClientIncident
 
     /// Client specific incidents.
@@ -722,18 +717,18 @@ open class KvHttpChannel {
     /// - Note: Server closes connections with clients after incidents.
     ///
     /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
-    public enum ClientIncident : Incident {
+    public enum ClientIncident : KvHttpChannelIncident {
 
         /// This incident is emitted when client's delegate returns no handler for a request.
         /// By default `.notFound` (404) status is returned.
         case noRequestHandler
 
 
-        // MARK: : Incident
+        // MARK: : KvHttpChannelIncident
 
-        /// Default response for the receiver.
+        /// Default HTTP status code submitted to a client when incident occurs.
         @inlinable
-        public var defaultResponse: KvHttpResponseProvider {
+        public var defaultStatus: KvHttpResponseProvider.Status {
             switch self {
             case .noRequestHandler:
                 return .notFound
@@ -744,7 +739,7 @@ open class KvHttpChannel {
         // MARK: Operations
 
         fileprivate func response(client: KvHttpChannel.Client) -> KvHttpResponseProvider {
-            client.delegate?.httpClient(client, didCatch: self) ?? defaultResponse
+            client.delegate?.httpClient(client, didCatch: self) ?? .status(defaultStatus)
         }
 
     }
@@ -758,22 +753,22 @@ open class KvHttpChannel {
     /// - Note: Server closes connections with clients after incidents.
     ///
     /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
-    public enum RequestIncident : Incident {
+    public enum RequestIncident : KvHttpChannelIncident {
 
         /// This incident is emitted when a request exceeds provided or default limit for a body.
         /// See ``KvHttpRequestHandler/bodyLengthLimit``, ``KvResponseGroup/httpBodyLengthLimit(_:)``, ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
         /// By default `.payloadTooLarge` (413) status is returned.
         case byteLimitExceeded
-        /// This incident is emitted when request handler returns `nil` response.
+        /// This incident is emitted when request handler returns `nil` response from ``KvHttpRequestHandler/httpClientDidReceiveEnd(_:)`` method.
         /// By default `.notFound` (404) status is returned.
         case noResponse
 
 
-        // MARK: : Incident
+        // MARK: : KvHttpChannelIncident
 
-        /// Default response for the receiver.
+        /// Default HTTP status code submitted to a client when incident occurs.
         @inlinable
-        public var defaultResponse: KvHttpResponseProvider {
+        public var defaultStatus: KvHttpResponseProvider.Status {
             switch self {
             case .byteLimitExceeded:
                 return .payloadTooLarge
@@ -786,7 +781,7 @@ open class KvHttpChannel {
         // MARK: Operations
 
         fileprivate func response(client: KvHttpChannel.Client, requestHandler: KvHttpRequestHandler) -> KvHttpResponseProvider {
-            requestHandler.httpClient(client, didCatch: self) ?? defaultResponse
+            requestHandler.httpClient(client, didCatch: self) ?? .status(defaultStatus)
         }
 
     }
@@ -966,11 +961,11 @@ open class KvHttpChannel {
                                         httpVersion: HTTPVersion,
                                         keepAlive: Bool?,
                                         responseBlock: @escaping (I) -> KvHttpResponseProvider?
-        ) where I : Incident {
+        ) where I : KvHttpChannelIncident {
             requestProcessingState = .stopped
 
             dispatchQueue.async {
-                let response = (responseBlock(incident) ?? incident.defaultResponse)
+                let response = (responseBlock(incident) ?? .status(incident.defaultStatus))
                     .needsDisconnect()  // Clients are always disconnected after incidents.
 
                 self.channelWrite(response, context: context, httpVersion: httpVersion, keepAlive: keepAlive)
@@ -1315,15 +1310,10 @@ extension KvHttpChannel : Identifiable {
 
 // MARK: - KvHttpChannelIncident
 
-/// A protocol all incidents conform to.
+/// A protocol all channel incidents conform to.
 ///
-/// - Note: Server immediately closes a connection to a client after any incident.
-public protocol KvHttpChannelIncident {
-
-    /// Default response for an incident.
-    var defaultResponse: KvHttpResponseProvider { get }
-
-}
+/// - Note: Server immediately closes a connection to a client after any channel incident.
+public protocol KvHttpChannelIncident : KvHttpIncident { }
 
 
 

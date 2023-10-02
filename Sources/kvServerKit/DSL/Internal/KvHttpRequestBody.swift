@@ -42,12 +42,13 @@ protocol KvHttpRequestBodyInternal : KvHttpRequestBody {
 
     typealias Configuration = KvHttpRequestBodyConfiguration
 
+    typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
     typealias ResponseBlock = (Value) throws -> KvHttpResponseProvider
 
 
     func with(baseConfiguration: Configuration) -> Self
 
-    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler
+    func makeRequestHandler(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler
 
 }
 
@@ -135,10 +136,38 @@ public struct KvHttpRequestProhibitedBody : KvHttpRequestBodyInternal {
     func with(baseConfiguration: Configuration) -> Self { self }
 
     @usableFromInline
-    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        KvHttpHeadOnlyRequestHandler {
+    func makeRequestHandler(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+        RequestHandler(clientCallbacks) {
             self.catching { try responseBlock(.init()) }
         }
+    }
+
+
+    // MARK: .RequestHandler
+
+    private class RequestHandler : KvHttpHeadOnlyRequestHandler {
+
+        init(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping KvHttpHeadOnlyRequestHandler.ResponseBlock) {
+            self.clientCallbacks = clientCallbacks
+
+            super.init(responseBlock: responseBlock)
+        }
+
+
+        private let clientCallbacks: ClientCallbacks?
+
+
+        // MARK: : KvHttpRequestHandler
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+            clientCallbacks?.onHttpIncident?(incident)
+        }
+
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
+            clientCallbacks?.onError?(error)
+        }
+
     }
 
 }
@@ -223,18 +252,19 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
     @usableFromInline
     var configuration: Configuration = .init()
 
-    let requestHandlerProvider: (Self, @escaping ResponseBlock) -> KvHttpRequestHandler
+    let requestHandlerProvider: (Self, ClientCallbacks?, @escaping ResponseBlock) -> KvHttpRequestHandler
 
 
     @usableFromInline
     init(_ initialResult: PartialResult,
          _ nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) -> PartialResult)
     {
-        requestHandlerProvider = { body, responseBlock in
-            KvHttpReducingRequestHandler(
-                bodyLengthLimit: body.configuration.bodyLengthLimit,
+        requestHandlerProvider = { body, clientCallbacks, responseBlock in
+            RequestHandler(
+                body.configuration,
                 initial: initialResult,
                 nextPartialResult: nextPartialResult,
+                clientCallbacks,
                 responseBlock: { partialResult in
                     body.catching { try responseBlock(partialResult) }
                 }
@@ -247,11 +277,12 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
     init(into initialResult: PartialResult,
          _ updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) -> Void)
     {
-        requestHandlerProvider = { body, responseBlock in
-            KvHttpReducingRequestHandler(
-                bodyLengthLimit: body.configuration.bodyLengthLimit,
+        requestHandlerProvider = { body, clientCallbacks, responseBlock in
+            RequestHandler(
+                body.configuration,
                 into: initialResult,
                 updateAccumulatingResult: updateAccumulatingResult,
+                clientCallbacks,
                 responseBlock: { partialResult in
                     body.catching { try responseBlock(partialResult) }
                 }
@@ -312,8 +343,59 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
     // MARK: : KvHttpRequestBodyInternal
 
     @usableFromInline
-    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        requestHandlerProvider(self, responseBlock)
+    func makeRequestHandler(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+        requestHandlerProvider(self, clientCallbacks, responseBlock)
+    }
+
+
+    // MARK: .RequestHandler
+
+    private class RequestHandler : KvHttpReducingRequestHandler<PartialResult> {
+
+        init(_ configuration: Configuration,
+             initial initialResult: PartialResult,
+             nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) -> PartialResult,
+             _ clientCallbacks: ClientCallbacks?,
+             responseBlock: @escaping KvHttpReducingRequestHandler<PartialResult>.ResponseBlock
+        ) {
+            self.clientCallbacks = clientCallbacks
+
+            super.init(bodyLengthLimit: configuration.bodyLengthLimit,
+                       initial: initialResult,
+                       nextPartialResult: nextPartialResult,
+                       responseBlock: responseBlock)
+        }
+
+
+        init(_ configuration: Configuration,
+             into initialResult: PartialResult,
+             updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) -> Void,
+             _ clientCallbacks: ClientCallbacks?,
+             responseBlock: @escaping KvHttpReducingRequestHandler<PartialResult>.ResponseBlock
+        ) {
+            self.clientCallbacks = clientCallbacks
+
+            super.init(bodyLengthLimit: configuration.bodyLengthLimit,
+                       into: initialResult,
+                       updateAccumulatingResult: updateAccumulatingResult,
+                       responseBlock: responseBlock)
+        }
+
+
+        private let clientCallbacks: ClientCallbacks?
+
+
+        // MARK: : KvHttpRequestHandler
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+            clientCallbacks?.onHttpIncident?(incident)
+        }
+
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
+            clientCallbacks?.onError?(error)
+        }
+
     }
 
 }
@@ -356,13 +438,38 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
     // MARK: : KvHttpRequestBodyInternal
 
     @usableFromInline
-    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        KvHttpCollectingBodyRequestHandler(
-            bodyLengthLimit: configuration.bodyLengthLimit,
-            responseBlock: { data in
-                self.catching { try responseBlock(data) }
-            }
-        )
+    func makeRequestHandler(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+        RequestHandler(configuration, clientCallbacks) { data in
+            self.catching { try responseBlock(data) }
+        }
+    }
+
+
+    // MARK: .RequestHandler
+
+    private class RequestHandler : KvHttpCollectingBodyRequestHandler {
+
+        init(_ configuration: Configuration, _ clientCallbacks: ClientCallbacks? , responseBlock: @escaping KvHttpCollectingBodyRequestHandler.ResponseBlock) {
+            self.clientCallbacks = clientCallbacks
+
+            super.init(bodyLengthLimit: configuration.bodyLengthLimit, responseBlock: responseBlock)
+        }
+
+
+        private let clientCallbacks: ClientCallbacks?
+
+
+        // MARK: : KvHttpRequestHandler
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+            clientCallbacks?.onHttpIncident?(incident)
+        }
+
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
+            clientCallbacks?.onError?(error)
+        }
+
     }
 
 }
@@ -407,25 +514,50 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
     // MARK: : KvHttpRequestBodyInternal
 
     @usableFromInline
-    func makeRequestHandler(responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        KvHttpJsonRequestHandler<Value>(
-            bodyLengthLimit: configuration.bodyLengthLimit,
-            responseBlock: { value in
-                switch value {
-                case .success(let payload):
-                    return self.catching {
-                        try responseBlock(payload)
-                    }
-#if DEBUG
-                case .failure(let error):
-                    return .badRequest.string("\(error)")
-#else // !DEBUG
-                case .failure:
-                    return .badRequest
-#endif // !DEBUG
+    func makeRequestHandler(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+        RequestHandler(configuration, clientCallbacks) { value in
+            switch value {
+            case .success(let payload):
+                return self.catching {
+                    try responseBlock(payload)
                 }
+#if DEBUG
+            case .failure(let error):
+                return .badRequest.string("\(error)")
+#else // !DEBUG
+            case .failure:
+                return .badRequest
+#endif // !DEBUG
             }
-        )
+        }
+    }
+
+
+    // MARK: .RequestHandler
+
+    private class RequestHandler : KvHttpJsonRequestHandler<Value> {
+
+        init(_ configuration: Configuration, _ clientCallbacks: ClientCallbacks?, responseBlock: @escaping KvHttpJsonRequestHandler<Value>.ResponseBlock) {
+            self.clientCallbacks = clientCallbacks
+
+            super.init(bodyLengthLimit: configuration.bodyLengthLimit, responseBlock: responseBlock)
+        }
+
+
+        private let clientCallbacks: ClientCallbacks?
+
+
+        // MARK: : KvHttpRequestHandler
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+            clientCallbacks?.onHttpIncident?(incident)
+        }
+
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
+            clientCallbacks?.onError?(error)
+        }
+
     }
 
 }

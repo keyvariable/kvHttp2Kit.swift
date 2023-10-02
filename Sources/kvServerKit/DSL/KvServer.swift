@@ -151,10 +151,6 @@ extension KvServer {
 
 
 
-// TODO: .catch(_:) modifier for all server errors.
-
-
-
 // MARK: - KvServerToken
 
 /// Provides life-cycle management of a server instance.

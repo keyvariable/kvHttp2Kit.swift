@@ -23,6 +23,8 @@
 
 import Foundation
 
+import NIOHTTP1
+
 
 
 // MARK: - KvHttpResponse
@@ -94,7 +96,17 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
 
     typealias Implementation = KvHttpResponseImplementationProtocol
-    fileprivate typealias ImplementationBlock = (KvHttpRequestBodyConfiguration?) -> Implementation
+
+    fileprivate typealias ImplementationBlock = (ImplementationConfiguration) -> Implementation
+
+
+    @usableFromInline
+    typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
+
+
+
+    @usableFromInline
+    var configuration: Configuration = .empty
 
 
 
@@ -120,8 +132,9 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     /// KvHttpResponse.static { .string(UUID().uuidString) }
     /// ```
     public static func `static`(content: @escaping () throws -> KvHttpResponseProvider) -> KvHttpResponse {
-        .init { baseBodyConfiguration in
-            KvHttpResponseImplementation(responseProvider: content)
+        .init { implementationConfiguration in
+            KvHttpResponseImplementation(clientCallbacks: implementationConfiguration.clientCallbacks,
+                                         responseProvider: content)
         }
     }
 
@@ -190,7 +203,135 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     // MARK: : KvResponseInternalProtocol
 
     func insert<A : KvResponseAccumulator>(to accumulator: A) {
-        accumulator.insert(implementationBlock(accumulator.responseGroupConfiguration?.httpRequestBody))
+        let configuration = ImplementationConfiguration(accumulator.responseGroupConfiguration, configuration)
+
+        accumulator.insert(implementationBlock(configuration))
+    }
+
+
+
+    // MARK: .ImplementationConfiguration
+
+    fileprivate struct ImplementationConfiguration {
+
+        let httpRequestBody: KvResponseGroupConfiguration.HttpRequestBody?
+        let clientCallbacks: ClientCallbacks?
+
+
+        init(_ responseGroupConfiguration: KvResponseGroupConfiguration?, _ responseConfiguration: Configuration?) {
+            self.httpRequestBody = responseGroupConfiguration?.httpRequestBody
+            self.clientCallbacks = .merged(responseGroupConfiguration?.clientCallbacks, addition: responseConfiguration?.clientCallbacks)
+        }
+
+    }
+
+
+
+    // MARK: .Incident
+
+    /// *KvHttpResponse* specific incidents.
+    public enum Incident : KvHttpIncident {
+
+        /// There are two or more declared responses for an HTTP request. Default status: 400 (Bad Request).
+        case ambiguousRequest
+        /// Processing of HTTP request headers has failed with associated error. Default statis: 400 (Bad Request).
+        case invalidHeaders(Error)
+        /// Request procissing has failed with associated error. Default status: 500 (Internal Server Error).
+        case processingFailed(Error)
+        /// There are no declared responses for an HTTP request. Default status: 404 (Not Found).
+        case responseNotFound
+
+
+        // MARK: : KvHttpIncident
+
+        @inlinable
+        public var defaultStatus: KvHttpResponseProvider.Status {
+            switch self {
+            case .ambiguousRequest:
+                return .badRequest
+            case .invalidHeaders(_):
+                return .badRequest
+            case .processingFailed(_):
+                return .internalServerError
+            case .responseNotFound:
+                return .notFound
+            }
+        }
+
+    }
+
+
+
+    // MARK: .Configuration
+
+    @usableFromInline
+    struct Configuration {
+
+        @usableFromInline
+        static let empty: Self = .init()
+
+
+        @usableFromInline
+        var clientCallbacks: ClientCallbacks?
+
+    }
+
+
+
+    // MARK: Modifiers
+
+    @inline(__always)
+    @usableFromInline
+    func modified(_ block: (inout Configuration) -> Void) -> KvHttpResponse {
+        var copy = self
+        block(&copy.configuration)
+        return copy
+    }
+
+
+
+    /// Declares handler of incidents in the receiver's context. It's a place to customize default reponse content.
+    ///
+    /// - Parameter block:  A block returning custom response content or `nil` for given *incident*.
+    ///                     If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
+    ///
+    /// Previously declared value is replaced.
+    ///
+    /// Below is an example where custom 413 (Payload Too Large) response is provided when request body exceeds limit:
+    ///
+    /// ```swift
+    /// KvHttpResponse.dynamic
+    ///    .requestBody(.data.bodyLengthLimit(1024))
+    ///    .content { .binary($0.requestBody ?? .init()) }
+    ///    .onIncident { incident in
+    ///        guard incident.defaultStatus == .payloadTooLarge else { return nil }
+    ///        return .payloadTooLarge.string("Payload is too large. Limit is 1024 bytes.")
+    ///    }
+    /// ```
+    ///
+    /// Incident handlers can be provided for responses in groups with ``KvResponseGroup/onHttpIncident(_:)``.
+    ///
+    /// See: ``onError(_:)``.
+    @inlinable
+    public func onIncident(_ block: @escaping (KvHttpIncident) -> KvHttpResponseProvider?) -> KvHttpResponse {
+        modified {
+            $0.clientCallbacks = .merged($0.clientCallbacks, addition: .init(onHttpIncident: block))
+        }
+    }
+
+
+    /// Declares callback for errors in the receiver's context.
+    ///
+    /// Previously declared value is replaced.
+    ///
+    /// Error callbacks can be provided for responses in groups with ``KvResponseGroup/onError(_:)``.
+    ///
+    /// See: ``onIncident(_:)``.
+    @inlinable
+    public func onError(_ block: @escaping (Error) -> Void) -> KvHttpResponse {
+        modified {
+            $0.clientCallbacks = .merged($0.clientCallbacks, addition: .init(onError: block))
+        }
     }
 
 }
@@ -201,7 +342,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
 extension KvHttpResponse {
 
-    /// Type of dynamic HTTP resopnse builder.
+    /// Type of dynamic HTTP response builder.
     ///
     /// See ``KvHttpResponse/dynamic`` for details.
     public struct DynamicResponse<QueryItemGroup, RequestHeaders, RequestBodyValue>
@@ -240,9 +381,6 @@ extension KvHttpResponse {
             @usableFromInline
             let requestBody: any KvHttpRequestBodyInternal
 
-            // TODO: error callbacks with ability to modify default response.
-            // TODO: .catch(_:) modifier for all channel and client errors.
-
 
             @usableFromInline
             init(queryItemGroup: QueryItemGroup, requestHeadCallback: @escaping RequestHeadCallback, requestBody: any KvHttpRequestBodyInternal) {
@@ -259,20 +397,21 @@ extension KvHttpResponse {
         /// Shorthand auxiliary method.
         private func makeImplementation<QueryParser>(
             _ queryParser: QueryParser,
-            _ baseBodyConfiguration: KvHttpRequestBodyConfiguration?,
+            _ implementationConfiguration: ImplementationConfiguration,
             _ callback: @escaping (Context) throws -> KvHttpResponseProvider
         ) -> KvHttpResponseImplementation<QueryParser, RequestHeaders, RequestBodyValue>
         where QueryParser : KvUrlQueryParserProtocol, QueryParser.Value == QueryItemGroup.Value
         {
             var body = configuration.requestBody
 
-            if let baseBodyConfiguration = baseBodyConfiguration {
+            if let baseBodyConfiguration = implementationConfiguration.httpRequestBody {
                 body = body.with(baseConfiguration: baseBodyConfiguration)
             }
 
             return KvHttpResponseImplementation(urlQueryParser: queryParser,
                                                 headCallback: configuration.requestHeadCallback,
                                                 body: body,
+                                                clientCallbacks: implementationConfiguration.clientCallbacks,
                                                 responseProvider: { try callback(($0, $1, $2)) })
         }
 
@@ -289,8 +428,8 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQuery
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
     public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
-        return .init { baseBodyConfiguration in
-            makeImplementation(KvEmptyUrlQueryParser(), baseBodyConfiguration, callback)
+        return .init { implementationConfiguration in
+            makeImplementation(KvEmptyUrlQueryParser(), implementationConfiguration, callback)
         }
     }
 
@@ -305,8 +444,8 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvRawUrlQueryIte
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
     public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
-        return .init { baseBodyConfiguration in
-            makeImplementation(KvRawUrlQueryParser(for: configuration.queryItemGroup), baseBodyConfiguration, callback)
+        return .init { implementationConfiguration in
+            makeImplementation(KvRawUrlQueryParser(for: configuration.queryItemGroup), implementationConfiguration, callback)
         }
     }
 
@@ -321,8 +460,8 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemIm
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
     public func content(_ callback: @escaping (Context) throws -> KvHttpResponseProvider) -> KvHttpResponse {
-        return .init { baseBodyConfiguration in
-            makeImplementation(KvUrlQueryParser(for: configuration.queryItemGroup), baseBodyConfiguration, callback)
+        return .init { implementationConfiguration in
+            makeImplementation(KvUrlQueryParser(for: configuration.queryItemGroup), implementationConfiguration, callback)
         }
     }
 

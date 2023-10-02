@@ -55,6 +55,8 @@ struct KvHttpResponseImplementation<QueryParser, Headers, BodyValue> : KvHttpRes
 where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
     typealias HeadCallback = (KvHttpServer.RequestHeaders) -> Result<Headers, Error>
+    typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
+
     typealias ResponseProvider = (QueryParser.Value, Headers, BodyValue) throws -> KvHttpResponseProvider
 
 
@@ -66,11 +68,13 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
     init(urlQueryParser: QueryParser,
          headCallback: @escaping HeadCallback,
          body: any KvHttpRequestBodyInternal,
+         clientCallbacks: ClientCallbacks?,
          responseProvider: @escaping ResponseProvider
     ) {
         self.queryParser = urlQueryParser
         self.headCallback = headCallback
         self.body = body
+        self.clientCallbacks = clientCallbacks
         self.responseProvider = responseProvider
     }
 
@@ -80,6 +84,9 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
     private let headCallback: HeadCallback
     private let body: any KvHttpRequestBodyInternal
+
+    private let clientCallbacks: ClientCallbacks?
+
     private let responseProvider: ResponseProvider
 
 
@@ -89,7 +96,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
     func makeProcessor() -> KvHttpRequestProcessorProtocol? {
         switch queryParser.parseResult() {
         case .success(let queryValue):
-            return Processor(queryValue, headCallback, body, responseProvider)
+            return Processor(queryValue, headCallback, body, clientCallbacks, responseProvider)
         case .failure:
             return nil
         }
@@ -104,11 +111,13 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
         init(_ queryValue: QueryParser.Value,
              _ headCallback: @escaping HeadCallback,
              _ body: any KvHttpRequestBodyInternal,
+             _ clientCallbacks: ClientCallbacks?,
              _ responseProvider: @escaping ResponseProvider
         ) {
             self.queryValue = queryValue
             self.headCallback = headCallback
             self.body = body
+            self.clientCallbacks = clientCallbacks
             self.responseProvider = responseProvider
         }
 
@@ -118,6 +127,9 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
         private let headCallback: HeadCallback
         private let body: any KvHttpRequestBodyInternal
+
+        private let clientCallbacks: ClientCallbacks?
+
         private let responseProvider: ResponseProvider
 
 
@@ -141,7 +153,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
             let queryValue = queryValue
             let responseProvider = responseProvider
 
-            return .success(body.makeRequestHandler { bodyValue in
+            return .success(body.makeRequestHandler(clientCallbacks) { bodyValue in
                 try responseProvider(queryValue, headers, bodyValue as! BodyValue)
             })
         }
@@ -164,10 +176,11 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 extension KvHttpResponseImplementation where QueryParser == KvEmptyUrlQueryParser, Headers == Void, BodyValue == KvHttpRequestVoidBodyValue {
 
     /// Initializes implementation for emptry URL query, requiring head-only request, providing no analysis of request headers.
-    init(responseProvider: @escaping () throws -> KvHttpResponseProvider) {
+    init(clientCallbacks: ClientCallbacks?, responseProvider: @escaping () throws -> KvHttpResponseProvider) {
         self.init(urlQueryParser: .init(),
                   headCallback: { _ in .success(()) },
                   body: KvHttpRequestProhibitedBody(),
+                  clientCallbacks: clientCallbacks,
                   responseProvider: { _, _, _ in try responseProvider() })
     }
 

@@ -126,7 +126,7 @@ extension KvUrlQueryItem where Value == Bool {
     ///
     /// If an URL query doesn't contain item named *name* then the resulting value is `false`.
     /// Also:
-    /// - `false` is retuned for "false", "FALSE", "False", "no", "NO", "No", "0";
+    /// - `false` is returned for "false", "FALSE", "False", "no", "NO", "No", "0";
     /// - `true` is returned for `nil`, "true", "TRUE", "True", "yes", "YES", "Yes", "1".
     @inlinable
     public static func bool(_ name: String) -> Self {

@@ -883,6 +883,116 @@ final class KvServerTests : XCTestCase {
 
     }
 
+
+
+    // MARK: - testOnHttpIncident()
+
+    func testOnHttpIncident() async throws {
+
+        struct IncidentServer : KvServer {
+
+            let configuration = KvServerTestKit.secureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvGroup {
+                        KvGroup("a") {
+                            greetingResponse
+                            KvGroup {
+                                KvHttpResponse.dynamic
+                                    .query(.void("count"))
+                                    .requestBody(.data.bodyLengthLimit(Self.bodyLimit))
+                                    .content { .string("\($0.requestBody?.count ?? 0)") }
+                                    .onIncident { incident in
+                                        guard incident.defaultStatus == .payloadTooLarge else { return nil }
+                                        return .payloadTooLarge.string(Self.payloadTooLargeString)
+                                    }
+                            }
+                            .httpMethods(.POST)
+
+                            KvGroup("b") {
+                                greetingResponse
+                            }
+                        }
+                        .onHttpIncident { incident in
+                            guard incident.defaultStatus == .notFound else { return nil }
+                            return .notFound.string(Self.notFoundString2)
+                        }
+
+                        KvGroup("c") {
+                            KvGroup("c") {
+                                greetingResponse
+                            }
+                        }
+                    }
+                    .onHttpIncident { incident in
+                        guard incident.defaultStatus == .notFound else { return nil }
+                        return .notFound.string(Self.notFoundString1)
+                    }
+
+                    KvGroup("d") {
+                        greetingResponse
+                    }
+                    .onHttpIncident { incident in
+                        guard incident.defaultStatus == .notFound else { return nil }
+                        return .notFound.string(Self.notFoundString3)
+                    }
+                }
+            }
+
+            private var greetingResponse: some KvResponse {
+                KvHttpResponse.static { .string(Self.greetingString) }
+            }
+
+            static let bodyLimit: UInt = 16
+
+            static func countResponseString(_ count: Int?) -> String { count.map(String.init(_:)) ?? "nil" }
+
+            static let greetingString = "Hello!"
+            static let notFoundString1 = "/"
+            static let notFoundString2 = "/a/"
+            static let notFoundString3 = "/d/"
+            static let payloadTooLargeString = "Body limit is \(bodyLimit) bytes."
+
+        }
+
+        try await Self.withRunningServer(of: IncidentServer.self, context: { KvServerTestKit.baseURL(for: $0.configuration) }) { baseURL in
+
+            func Assert404(path: String, response: String) async throws {
+                try await KvServerTestKit.assertResponse(
+                    baseURL, path: path,
+                    statusCode: .notFound, contentType: .text(.plain), expecting: response
+                )
+            }
+
+            func Assert413(path: String, contentLength: UInt, response: String) async throws {
+                try await KvServerTestKit.assertResponse(
+                    urlSession: .init(configuration: .ephemeral),
+                    baseURL, method: "POST", path: path, query: .raw("count"), body: contentLength > 0 ? Data(count: numericCast(contentLength)) : nil,
+                    statusCode: .payloadTooLarge, contentType: .text(.plain), expecting: response
+                )
+            }
+
+            try await Assert404(path: "/", response: IncidentServer.notFoundString1)
+
+            try await Assert404(path: "/a/b/x", response: IncidentServer.notFoundString2)
+            try await Assert404(path: "/a/x", response: IncidentServer.notFoundString2)
+
+            try await Assert404(path: "/c", response: IncidentServer.notFoundString1)
+            try await Assert404(path: "/c/c/x", response: IncidentServer.notFoundString1)
+            try await Assert404(path: "/c/x", response: IncidentServer.notFoundString1)
+
+            try await Assert404(path: "/d/x", response: IncidentServer.notFoundString3)
+            
+            try await Assert404(path: "/x", response: IncidentServer.notFoundString1)
+            try await Assert404(path: "/x/a", response: IncidentServer.notFoundString1)
+            try await Assert404(path: "/x/a/x", response: IncidentServer.notFoundString1)
+            try await Assert404(path: "/x/c/x", response: IncidentServer.notFoundString1)
+
+            try await Assert413(path: "/a", contentLength: IncidentServer.bodyLimit + 1, response: IncidentServer.payloadTooLargeString)
+        }
+    }
+
 }
 
 

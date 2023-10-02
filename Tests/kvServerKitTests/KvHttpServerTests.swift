@@ -355,7 +355,7 @@ extension KvHttpServerTests {
             override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
                 switch incident {
                 case .byteLimitExceeded:
-                    return incident.defaultResponse
+                    return .status(incident.defaultStatus)
                         .string(Constants.Echo.payloadTooLargeContent)
                 case .noResponse:
                     return super.httpClient(httpClient, didCatch: incident)

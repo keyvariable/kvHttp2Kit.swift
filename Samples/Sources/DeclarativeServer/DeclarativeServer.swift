@@ -113,6 +113,15 @@ struct DeclarativeServer : KvServer {
                         }
                 }
             }
+            /// Custom 404 usage response for "/random" path is provided with an incident handler.
+            .onHttpIncident { incident in
+                switch incident.defaultStatus {
+                case .notFound:
+                    return .notFound.string("Usage:\n  - /random/int[?from=1[&through=5]];\n  - /random/uuid[?string].")
+                default:
+                    return nil
+                }
+            }
 
             /// Path groups can contain separators.
             /// Declarations having common path prefixes or equal paths are correctly merged.
@@ -233,6 +242,15 @@ struct DeclarativeServer : KvServer {
             /// This response group provides contents of available images in the bundle.
             /// See it's implementation for the way to provide dynamic list of responses with `KvForEach()`.
             BundleImageResponses()
+        }
+        /// Custom global 404 response is provided with an incident handler.
+        .onHttpIncident { incident in
+            switch incident.defaultStatus {
+            case .notFound:
+                return .notFound.string("Unexpected request (404)\n\nSee implementation of `DeclarativeServer.body` for supported requests.")
+            default:
+                return nil
+            }
         }
 
     }

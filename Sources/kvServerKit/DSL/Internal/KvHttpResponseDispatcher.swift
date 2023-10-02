@@ -29,10 +29,6 @@ import kvKit
 
 class KvHttpResponseDispatcher {
 
-    typealias RequestProcessorResult = Match<KvHttpRequestProcessorProtocol>
-
-
-
     init?(from schema: Schema) {
         guard let rootNode = schema.build() else { return nil }
 
@@ -45,27 +41,66 @@ class KvHttpResponseDispatcher {
 
 
 
-    // MARK: .Context
+    // MARK: .Attributes
 
-    /// It's used to identify responses in a dispatcher.
-    class Context {
+    /// Conatiner for all dispach node attributes. They are designed to contain additions and to be accumulated while dispath tree is traversed.
+    ///
+    /// It's a class to minimize consumption of memory when a node has no attributes provided.
+    class Attributes {
 
-        let method: String
-        let url: URL
-        let urlComponents: URLComponents
-        /// Path components are not part of *URLComponents* so it's a stand-alone property.
-        let pathComponents: [String]
+        typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
 
 
-        init?(from head: KvHttpServer.RequestHead) {
-            guard let url = URL(string: head.uri),
-                  let urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            else { return nil }
+        var clientCallbacks: ClientCallbacks?
 
-            method = head.method.rawValue
-            self.url = url
-            self.urlComponents = urlComponents
-            pathComponents = url.pathComponents
+
+        /// - Important: Use ``from(_:)`` and ``merge(addition:into:)``.
+        private init() { }
+
+
+        /// - Important: Use ``from(_:)`` and ``merge(addition:into:)``.
+        private init(clientCallbacks: ClientCallbacks?) {
+            self.clientCallbacks = clientCallbacks
+        }
+
+
+        // MARK: Fabrics
+
+        static func from(_ responseGroupConfiguration: KvResponseGroupConfiguration) -> Attributes? {
+            var _context: Attributes? = nil
+
+            let context: () -> Attributes = {
+                _context ?? {
+                    _context = .init()
+                    return _context!
+                }()
+            }
+
+            if let clientCallbacks = responseGroupConfiguration.clientCallbacks {
+                context().clientCallbacks = clientCallbacks
+            }
+
+            return _context
+        }
+
+
+        // MARK: Operations
+
+        static func merge(addition: Attributes?, into base: inout Attributes?) {
+            guard let addition = addition else { return }
+
+            merge(addition: addition, into: &base)
+        }
+
+
+        static func merge(addition: Attributes, into base: inout Attributes?) {
+            switch base {
+            case .some(let base):
+                base.clientCallbacks = .merged(base.clientCallbacks, addition: addition.clientCallbacks)
+
+            case .none:
+                base = .init(clientCallbacks: addition.clientCallbacks)
+            }
         }
 
     }
@@ -129,11 +164,44 @@ class KvHttpResponseDispatcher {
 
 
 
-    // MARK: Operations
+    // MARK: .RequestProcessorResult
+
+    class RequestProcessorResult {
+
+        typealias Match = KvHttpResponseDispatcher.Match<KvHttpRequestProcessorProtocol>
+
+
+        private(set) var match: Match = .notFound
+        private(set) var resolvedAttributes: Attributes?
+
+
+        fileprivate init() { }
+
+
+        // MARK: Operations
+
+        fileprivate func collect(_ match: Match) {
+            self.match = self.match.union(with: match)
+        }
+
+
+        fileprivate func collect(_ attributes: Attributes) {
+            Attributes.merge(addition: attributes, into: &resolvedAttributes)
+        }
+
+    }
+
+
+
+    // MARK: Searching for Request Processors
 
     /// - Returns: A request implementation, error or `nil`. `Nil` is returned when none or multiple candidates are matching given *context*.
-    func requestProcessor(in context: Context) -> RequestProcessorResult {
-        rootNode.requestProcessor(in: context)
+    func requestProcessor(in reqeustContext: KvHttpRequestContext) -> RequestProcessorResult {
+        let result = RequestProcessorResult()
+
+        rootNode.accumulateRequestProcessors(for: reqeustContext, into: result)
+
+        return result
     }
 
 }
@@ -173,6 +241,11 @@ extension KvHttpResponseDispatcher {
 
         func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
             methods.insert(response, for: configuration)
+        }
+
+
+        func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
+            methods.insert(attributes, for: configuration)
         }
 
 
@@ -357,6 +430,13 @@ extension KvHttpResponseDispatcher {
                 }
             }
 
+
+            func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
+                Self.forEachKey(in: configuration.httpMethods) { method in
+                    child(for: method).insert(attributes, for: configuration)
+                }
+            }
+
         }
 
 
@@ -370,6 +450,13 @@ extension KvHttpResponseDispatcher {
                 }
             }
 
+
+            func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
+                Self.forEachKey(in: configuration.users) { user in
+                    child(for: user).insert(attributes, for: configuration)
+                }
+            }
+
         }
 
 
@@ -380,6 +467,13 @@ extension KvHttpResponseDispatcher {
             func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
                 Self.forEachHost(in: configuration) { host in
                     child(for: host).insert(response, for: configuration)
+                }
+            }
+
+
+            func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
+                Self.forEachHost(in: configuration) { host in
+                    child(for: host).insert(attributes, for: configuration)
                 }
             }
 
@@ -445,6 +539,13 @@ extension KvHttpResponseDispatcher {
             }
 
 
+            func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
+                let keys = PathNode.safePathComponens(Self.pathComponents(from: configuration))
+
+                child(for: keys).insert(attributes)
+            }
+
+
             // MARK: Auxiliaries
 
             private static func pathComponents(from configuration: KvResponseGroupConfiguration.Dispatching) -> [String] {
@@ -465,6 +566,8 @@ extension KvHttpResponseDispatcher {
 
             private var responses: [KvHttpResponseImplementationProtocol] = .init()
 
+            private var attributes: Attributes?
+
 
             // MARK: Operations
 
@@ -473,10 +576,13 @@ extension KvHttpResponseDispatcher {
             }
 
 
-            func build() -> Node? {
-                guard !responses.isEmpty else { return nil }
+            func insert(_ attributes: Attributes) {
+                Attributes.merge(addition: attributes, into: &self.attributes)
+            }
 
-                return QueryNode.with(responses)
+
+            func build() -> Node? {
+                ResponseNode.with(responses, attributes)
             }
 
         }
@@ -491,7 +597,7 @@ extension KvHttpResponseDispatcher {
 
 fileprivate protocol KvHttpResponseDispatcherNode {
 
-    func requestProcessor(in context: KvHttpResponseDispatcher.Context) -> KvHttpResponseDispatcher.RequestProcessorResult
+    func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: KvHttpResponseDispatcher.RequestProcessorResult)
 
 }
 
@@ -531,19 +637,19 @@ fileprivate protocol KvHttpResponseDispatcherDictionaryNode : KvHttpResponseDisp
     init(subnodes: [Key : KvHttpResponseDispatcherNode])
 
 
-    static func key(from context: KvHttpResponseDispatcher.Context) -> Key?
+    static func key(from requestContext: KvHttpRequestContext) -> Key?
 
 }
 
 
 extension KvHttpResponseDispatcherDictionaryNode {
 
-    func requestProcessor(in context: KvHttpResponseDispatcher.Context) -> KvHttpResponseDispatcher.RequestProcessorResult {
-        guard let key = Self.key(from: context),
+    func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: KvHttpResponseDispatcher.RequestProcessorResult) {
+        guard let key = Self.key(from: requestContext),
               let subnode = subnode(for: key)
-        else { return .notFound }
+        else { return }
 
-        return subnode.requestProcessor(in: context)
+        subnode.accumulateRequestProcessors(for: requestContext, into: accumulator)
     }
 
 }
@@ -568,22 +674,7 @@ fileprivate protocol KvHttpResponseDispatcherHierarchyNode : KvHttpResponseDispa
     init(childNodes: [Key : Self], subnode: KvHttpResponseDispatcherNode?)
 
 
-    static func keys(from context: KvHttpResponseDispatcher.Context) -> Keys
-
-
-    func subnode<S>(for keys: S) -> KvHttpResponseDispatcherNode? where S : Sequence, S.Element == Key
-
-}
-
-
-extension KvHttpResponseDispatcherHierarchyNode {
-
-    func requestProcessor(in context: KvHttpResponseDispatcher.Context) -> KvHttpResponseDispatcher.RequestProcessorResult {
-        guard let subnode = subnode(for: Self.keys(from: context))
-        else { return .notFound }
-
-        return subnode.requestProcessor(in: context)
-    }
+    static func keys(from requestContext: KvHttpRequestContext) -> Keys
 
 }
 
@@ -641,9 +732,9 @@ extension KvHttpResponseDispatcher {
 
         // MARK: : Node
 
-        func requestProcessor(in context: KvHttpResponseDispatcher.Context) -> RequestProcessorResult {
-            wildcardSubnode.requestProcessor(in: context)
-                .union(with: specificSubnodes.requestProcessor(in: context))
+        func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
+            wildcardSubnode.accumulateRequestProcessors(for: requestContext, into: accumulator)
+            specificSubnodes.accumulateRequestProcessors(for: requestContext, into: accumulator)
         }
 
     }
@@ -654,8 +745,8 @@ extension KvHttpResponseDispatcher {
 
     fileprivate class MethodNode : DictionaryContainer<String>, DictionaryNode {
 
-        static func key(from context: KvHttpResponseDispatcher.Context) -> String? {
-            context.method
+        static func key(from requestContext: KvHttpRequestContext) -> String? {
+            requestContext.method
         }
 
     }
@@ -666,8 +757,8 @@ extension KvHttpResponseDispatcher {
 
     fileprivate class UserNode : DictionaryContainer<String>, DictionaryNode {
 
-        static func key(from context: KvHttpResponseDispatcher.Context) -> String? {
-            context.url.user
+        static func key(from requestContext: KvHttpRequestContext) -> String? {
+            requestContext.url.user
         }
 
     }
@@ -678,8 +769,8 @@ extension KvHttpResponseDispatcher {
 
     fileprivate class HostDictionaryNode : DictionaryContainer<String>, DictionaryNode {
 
-        static func key(from context: KvHttpResponseDispatcher.Context) -> String? {
-            context.url.host
+        static func key(from requestContext: KvHttpRequestContext) -> String? {
+            requestContext.url.host
         }
 
     }
@@ -692,38 +783,53 @@ extension KvHttpResponseDispatcher {
     fileprivate class PathNode : HierarchyNode {
 
         typealias Key = String
+        typealias Subnode = ResponseNode.BaseNode
 
 
         required init(childNodes: [Key : PathNode], subnode: Node?) {
             self.childNodes = childNodes
-            self.subnode = subnode
+            self.subnode = subnode.map { $0 as! Subnode }
         }
 
 
         private let childNodes: [Key : PathNode]
 
-        private let subnode: Node?
+        private let subnode: Subnode?
 
 
         // MARK: : HierarchyNode
 
-        static func keys(from context: KvHttpResponseDispatcher.Context) -> [Key] {
-            context.pathComponents
+        static func keys(from requestContext: KvHttpRequestContext) -> [Key] {
+            requestContext.pathComponents
         }
 
 
-        func subnode<S>(for keys: S) -> Node? where S : Sequence, S.Element == Key {
-            var iterator = Self.safePathComponens(keys).makeIterator()
+        // MARK: : Node
+
+        func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: KvHttpResponseDispatcher.RequestProcessorResult) {
+
+            func ProcessAttributes(_ node: PathNode) {
+                guard let attributes = node.subnode?.attributes else { return }
+
+                accumulator.collect(attributes)
+            }
+
+
+            var iterator = Self.safePathComponens(requestContext.pathComponents).makeIterator()
             var node: PathNode = self
+
+            ProcessAttributes(node)
 
             while let component = iterator.next() {
                 guard let child = node.childNodes[component]
-                else { return nil }
+                else { return }
 
                 node = child
+
+                ProcessAttributes(node)
             }
 
-            return node.subnode
+            node.subnode?.accumulateRequestProcessors(for: requestContext, into: accumulator)
         }
 
 
@@ -739,10 +845,10 @@ extension KvHttpResponseDispatcher {
 
 
 
-    // MARK: .QueryNode
+    // MARK: .ResponseNode
 
     /// Selects matching response by query.
-    fileprivate class QueryNode {
+    fileprivate class ResponseNode {
 
         /// - Note: Use ``with(_:)`` fabric.
         private init() { }
@@ -750,7 +856,8 @@ extension KvHttpResponseDispatcher {
 
         // MARK: Fabrics
 
-        static func with<S>(_ responses: S) -> Node
+        /// - Note: This fabric returns instance of a dedicated subclass of ``Node`` class.
+        static func with<S>(_ responses: S, _ attributes: Attributes?) -> Node?
         where S : Sequence, S.Element == KvHttpResponseImplementationProtocol
         {
 
@@ -809,33 +916,39 @@ extension KvHttpResponseDispatcher {
                 }
             }
 
-            // - Note: all-nil case is not handled assuming it's never invoked for empty list of responses.
             switch (emptyQueryElement, entireQueryElements, serialQueryElements) {
             case (.some(let emptyQueryElement), .none, .none):
-                return EmptyQuery(emptyQueryElement)
+                return EmptyQuery(emptyQueryElement, attributes)
 
             case (.none, .none, .some(let serialQueryElements)):
                 switch serialQueryElements.count == 1 {
                 case true:
-                    return SerialQuery(serialQueryElements[0])
+                    return SerialQuery(serialQueryElements[0], attributes)
                 case false:
-                    return SerialQueries(serialQueryElements)
+                    return SerialQueries(serialQueryElements, attributes)
                 }
 
             case (.some(let emptyQueryElement), .none, .some(let serialQueryElements)):
-                return SerialQueries(Joined(serialQueryElements, AsSerial(emptyQueryElement)))
+                return SerialQueries(Joined(serialQueryElements, AsSerial(emptyQueryElement)), attributes)
 
 
             case (.none, .some(let entireQueryElements), .none):
                 switch entireQueryElements.count == 1 {
                 case true:
-                    return EntireQuery(entireQueryElements[0])
+                    return EntireQuery(entireQueryElements[0], attributes)
                 case false:
-                    return EntireQueries(entireQueryElements)
+                    return EntireQueries(entireQueryElements, attributes)
                 }
 
+            case (.none, .none, .none):
+                guard let attributes = attributes else { return nil }
+
+                return BaseNode(attributes)
+
             default:
-                return MixedQueries(serial: Joined(serialQueryElements, emptyQueryElement.map(AsSerial(_:))), entire: entireQueryElements ?? [ ])
+                return MixedQueries(serial: Joined(serialQueryElements, emptyQueryElement.map(AsSerial(_:))),
+                                    entire: entireQueryElements ?? [ ],
+                                    attributes)
             }
         }
 
@@ -853,7 +966,7 @@ extension KvHttpResponseDispatcher {
 
             // MARK: Operations
 
-            func makeProcessor() -> RequestProcessorResult {
+            func makeProcessor() -> RequestProcessorResult.Match {
                 switch processorBlock() {
                 case .some(let processor):
                     return .unambiguous(processor)
@@ -865,16 +978,38 @@ extension KvHttpResponseDispatcher {
         }
 
 
+        // MARK: .BaseNode
+
+        /// Dedicated node containing attributes but no responses. Also it's a base class for nodes having responses.
+        class BaseNode : Node {
+
+            let attributes: Attributes?
+
+
+            init(_ attributes: Attributes?) {
+                self.attributes = attributes
+            }
+
+
+            // MARK: : Node
+
+            func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) { }
+
+        }
+
+
         // MARK: .EmptyQuery
 
         /// Dedicated node optimized to handle single empty query parser.
-        private class EmptyQuery : Node {
+        private class EmptyQuery : BaseNode {
 
-            typealias Element = QueryNode.Element<KvEmptyUrlQueryParser>
+            typealias Element = ResponseNode.Element<KvEmptyUrlQueryParser>
 
 
-            init(_ queryElement: Element) {
+            init(_ queryElement: Element, _ attributes: Attributes?) {
                 self.queryElement = queryElement
+
+                super.init(attributes)
             }
 
 
@@ -883,11 +1018,11 @@ extension KvHttpResponseDispatcher {
 
             // MARK: : Node
 
-            func requestProcessor(in context: Context) -> RequestProcessorResult {
-                guard context.urlComponents.queryItems?.isEmpty != false
-                else { return .notFound }
+            override func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
+                guard requestContext.urlComponents.queryItems?.isEmpty != false
+                else { return }
 
-                return queryElement.makeProcessor()
+                accumulator.collect(queryElement.makeProcessor())
             }
 
         }
@@ -896,13 +1031,15 @@ extension KvHttpResponseDispatcher {
         // MARK: .EntireQuery
 
         /// Dedicated node optimized to handle single custom query parser.
-        private class EntireQuery : Node {
+        private class EntireQuery : BaseNode {
 
-            typealias Element = QueryNode.Element<KvEntireUrlQueryParser>
+            typealias Element = ResponseNode.Element<KvEntireUrlQueryParser>
 
 
-            init(_ queryElement: Element) {
+            init(_ queryElement: Element, _ attributes: Attributes?) {
                 self.queryElement = queryElement
+
+                super.init(attributes)
             }
 
 
@@ -911,13 +1048,13 @@ extension KvHttpResponseDispatcher {
 
             // MARK: : Node
 
-            func requestProcessor(in context: Context) -> RequestProcessorResult {
+            override func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
                 defer { queryElement.queryParser.reset() }
 
-                guard queryElement.queryParser.parse(context.urlComponents.queryItems) == .complete
-                else { return .notFound }
+                guard queryElement.queryParser.parse(requestContext.urlComponents.queryItems) == .complete
+                else { return }
 
-                return queryElement.makeProcessor()
+                accumulator.collect(queryElement.makeProcessor())
             }
 
         }
@@ -926,13 +1063,15 @@ extension KvHttpResponseDispatcher {
         // MARK: .SerialQuery
 
         /// Dedicated node optimized to handle single serial query parser.
-        private class SerialQuery : Node {
+        private class SerialQuery : BaseNode {
 
-            typealias Element = QueryNode.Element<KvSerialUrlQueryParser>
+            typealias Element = ResponseNode.Element<KvSerialUrlQueryParser>
 
 
-            init(_ queryElement: Element) {
+            init(_ queryElement: Element, _ attributes: Attributes?) {
                 self.queryElement = queryElement
+
+                super.init(attributes)
             }
 
 
@@ -941,31 +1080,30 @@ extension KvHttpResponseDispatcher {
 
             // MARK: : Node
 
-            func requestProcessor(in context: Context) -> RequestProcessorResult {
+            override func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
+
+                func Completion() {
+                    guard queryParser.status == .complete
+                    else { return }
+
+                    accumulator.collect(queryElement.makeProcessor())
+                }
+
+
                 let queryParser = queryElement.queryParser
 
-                guard let query = context.urlComponents.queryItems,
+                guard let query = requestContext.urlComponents.queryItems,
                       !query.isEmpty
-                else {
-                    switch queryParser.status == .complete {
-                    case true:
-                        return queryElement.makeProcessor()
-                    case false:
-                        return .notFound
-                    }
-                }
+                else { return Completion() }
 
                 defer { queryParser.reset() }
 
                 for queryItem in query {
                     guard queryParser.parse(queryItem) != .failure
-                    else { return .notFound }
+                    else { return }
                 }
 
-                guard queryParser.status == .complete
-                else { return .notFound }
-
-                return queryElement.makeProcessor()
+                Completion()
             }
 
         }
@@ -974,13 +1112,15 @@ extension KvHttpResponseDispatcher {
         // MARK: .EntireQueries
 
         /// Dedicated node optimized to handle responses with custom query parsers.
-        private class EntireQueries : Node {
+        private class EntireQueries : BaseNode {
 
             typealias Element = EntireQuery.Element
 
 
-            init(_ queryElements: [Element]) {
+            init(_ queryElements: [Element], _ attributes: Attributes?) {
                 self.queryElements = queryElements
+
+                super.init(attributes)
             }
 
 
@@ -989,12 +1129,14 @@ extension KvHttpResponseDispatcher {
 
             // MARK: : Node
 
-            func requestProcessor(in context: Context) -> RequestProcessorResult {
-                Self.withMatchResult(queryElements, in: context) { match in
+            override func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
+                let match = Self.withMatchResult(queryElements, in: requestContext) { match in
                     match.flatMap { processorBlock in
                         processorBlock()
                     }
                 }
+
+                accumulator.collect(match)
             }
 
 
@@ -1002,8 +1144,11 @@ extension KvHttpResponseDispatcher {
 
             /// - Parameter body: It's called with the result anyway, even if there are no candidates or several candidates.
             @inline(__always)
-            static func withMatchResult(_ elements: [Element], in context: Context, body: (Match<() -> RequestProcessorResult>) -> RequestProcessorResult) -> RequestProcessorResult {
-                let query = context.urlComponents.queryItems
+            static func withMatchResult(_ elements: [Element],
+                                        in requestContext: KvHttpRequestContext,
+                                        body: (Match<() -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
+            ) -> RequestProcessorResult.Match {
+                let query = requestContext.urlComponents.queryItems
 
                 switch match(in: elements, where: { $0.parse(query) }, onDiscard: { $0.reset() }) {
                 case .unambiguous(let element):
@@ -1026,13 +1171,15 @@ extension KvHttpResponseDispatcher {
         // MARK: .SerialQueries
 
         /// Dedicated node optimized to handle responses with structured query parsers.
-        private class SerialQueries : Node {
+        private class SerialQueries : BaseNode {
 
             typealias Element = SerialQuery.Element
 
 
-            init(_ queryElements: [Element]) {
+            init(_ queryElements: [Element], _ attributes: Attributes?) {
                 self.queryElements = queryElements
+
+                super.init(attributes)
             }
 
 
@@ -1041,12 +1188,14 @@ extension KvHttpResponseDispatcher {
 
             // MARK: : Node
 
-            func requestProcessor(in context: Context) -> RequestProcessorResult {
-                Self.withMatchResult(queryElements, in: context) { match in
+            override func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
+                let match = Self.withMatchResult(queryElements, in: requestContext) { match in
                     match.flatMap { processorBlock in
                         processorBlock()
                     }
                 }
+
+                accumulator.collect(match)
             }
 
 
@@ -1054,8 +1203,11 @@ extension KvHttpResponseDispatcher {
 
             /// - Parameter body: It's called with the result anyway, even if there are no candidates or several candidates.
             @inline(__always)
-            static func withMatchResult(_ elements: [Element], in context: Context, body: (Match<() -> RequestProcessorResult>) -> RequestProcessorResult) -> RequestProcessorResult {
-                guard let query = context.urlComponents.queryItems,
+            static func withMatchResult(_ elements: [Element],
+                                        in requestContext: KvHttpRequestContext,
+                                        body: (Match<() -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
+            ) -> RequestProcessorResult.Match {
+                guard let query = requestContext.urlComponents.queryItems,
                       !query.isEmpty
                 else {
                     // - Note: Empty query is not passed to query parsers so there is no need to reset the query parsers.
@@ -1083,7 +1235,7 @@ extension KvHttpResponseDispatcher {
                 }
 
 
-                func Finalize() -> RequestProcessorResult {
+                func Finalize() -> RequestProcessorResult.Match {
                     var iterator = candidateIndices
                         .lazy.map { elements[$0] }
                         .makeIterator()
@@ -1145,16 +1297,20 @@ extension KvHttpResponseDispatcher {
         }
 
 
+        // MARK: .MixedQueries
+
         /// Dedicated node optimized to handle responses with both custom and structured query parsers.
-        private class MixedQueries : Node {
+        private class MixedQueries : BaseNode {
 
             typealias EntireElement = Element<KvEntireUrlQueryParser>
             typealias SerialElement = Element<KvSerialUrlQueryParser>
 
 
-            init(serial serialElements: [SerialElement], entire entireElements: [EntireElement]) {
+            init(serial serialElements: [SerialElement], entire entireElements: [EntireElement], _ attributes: Attributes?) {
                 serialQueryElements = serialElements
                 entireQueryElements = entireElements
+
+                super.init(attributes)
             }
 
 
@@ -1164,14 +1320,16 @@ extension KvHttpResponseDispatcher {
 
             // MARK: : Node
 
-            func requestProcessor(in context: Context) -> RequestProcessorResult {
-                SerialQueries.withMatchResult(serialQueryElements, in: context) { match1 in
-                    EntireQueries.withMatchResult(entireQueryElements, in: context) { match2 in
+            override func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
+                let match = SerialQueries.withMatchResult(serialQueryElements, in: requestContext) { match1 in
+                    EntireQueries.withMatchResult(entireQueryElements, in: requestContext) { match2 in
                         match1.union(with: match2).flatMap { processorBlock in
                             processorBlock()
                         }
                     }
                 }
+
+                accumulator.collect(match)
             }
 
         }

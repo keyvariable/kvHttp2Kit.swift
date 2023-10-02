@@ -230,8 +230,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
         override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
             switch incident {
             case .byteLimitExceeded:
-                return incident.defaultResponse
-                    .string("Payload exceeds \(Constants.Echo.bodyLimit) byte limit.")
+                return .payloadTooLarge.string("Payload exceeds \(Constants.Echo.bodyLimit) byte limit.")
             case .noResponse:
                 return super.httpClient(httpClient, didCatch: incident)
             }

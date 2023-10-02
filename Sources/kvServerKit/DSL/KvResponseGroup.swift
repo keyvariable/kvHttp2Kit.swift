@@ -382,6 +382,53 @@ extension KvResponseGroup {
         }
     }
 
+
+    /// Declares handler of incidents in the receiver's context. It's a place to customize default reponse content.
+    ///
+    /// - Parameter block:  A block returning custom response or `nil` for given *incident*.
+    ///                     If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
+    ///
+    /// Previously declared value is replaced.
+    ///
+    /// Below is an example where custom 404 (Not Found) response is provided for any subpath of */a* path:
+    ///
+    /// ```swift
+    /// KvGroup("a") {
+    ///     responses
+    /// }
+    /// .onHttpIncident { incident in
+    ///     guard incident.defaultStatus == .notFound else { return nil }
+    ///     return .notFound
+    ///         .contentType(.text(.html))
+    ///         .string("Custom 404 HTML page")
+    /// }
+    /// ```
+    ///
+    /// Incident handlers can be provided for particular responses with ``KvHttpResponse/onIncident(_:)``.
+    ///
+    /// See: ``onError(_:)``.
+    @inlinable
+    public func onHttpIncident(_ block: @escaping (KvHttpIncident) -> KvHttpResponseProvider?) -> some KvResponseGroup {
+        modified {
+            $0.clientCallbacks = .merged($0.clientCallbacks, addition: .init(onHttpIncident: block))
+        }
+    }
+
+
+    /// Declares callback for errors in the receiver's context.
+    ///
+    /// Previously declared value is replaced.
+    ///
+    /// Error callbacks can be provided for particular responses with ``KvHttpResponse/onError(_:)``.
+    ///
+    /// See: ``onHttpIncident(_:)``.
+    @inlinable
+    public func onError(_ block: @escaping (Error) -> Void) -> some KvResponseGroup {
+        modified {
+            $0.clientCallbacks = .merged($0.clientCallbacks, addition: .init(onError: block))
+        }
+    }
+
 }
 
 
@@ -404,12 +451,21 @@ struct KvResponseGroupConfiguration {
     @usableFromInline
     var httpRequestBody: HttpRequestBody
 
+    /// - Note: It's not cascaded.
+    @usableFromInline
+    var clientCallbacks: ClientCallbacks?
+
 
     @usableFromInline
-    init(network: Network = .empty, dispatching: Dispatching = .empty, httpRequestBody: HttpRequestBody = .empty) {
+    init(network: Network = .empty,
+         dispatching: Dispatching = .empty,
+         httpRequestBody: HttpRequestBody = .empty,
+         clientCallbacks: ClientCallbacks? = nil
+    ) {
         self.network = network
         self.dispatching = dispatching
         self.httpRequestBody = httpRequestBody
+        self.clientCallbacks = clientCallbacks
     }
 
 
@@ -417,7 +473,9 @@ struct KvResponseGroupConfiguration {
     init(lhs: Self, rhs: Self) {
         self.init(network: .init(lhs: lhs.network, rhs: rhs.network),
                   dispatching: .init(lhs: lhs.dispatching, rhs: rhs.dispatching),
-                  httpRequestBody: .init(lhs: lhs.httpRequestBody, rhs: rhs.httpRequestBody))
+                  httpRequestBody: .init(lhs: lhs.httpRequestBody, rhs: rhs.httpRequestBody),
+                  clientCallbacks: rhs.clientCallbacks      // Client callbacks aren't cascaded.
+        )
     }
 
 
@@ -687,6 +745,52 @@ struct KvResponseGroupConfiguration {
 
     @usableFromInline
     typealias HttpRequestBody = KvHttpRequestBodyConfiguration
+
+
+    // MARK: .ClientCallbacks
+
+    @usableFromInline
+    struct ClientCallbacks {
+
+        /// Handles incidents.
+        @usableFromInline
+        var onHttpIncident: ((KvHttpIncident) -> KvHttpResponseProvider?)?
+
+        /// Handles errors from clients and requests.
+        @usableFromInline
+        var onError: ((Error) -> Void)?
+
+
+        @usableFromInline
+        init(onHttpIncident: ((KvHttpIncident) -> KvHttpResponseProvider?)? = nil,
+             onError: ((Error) -> Void)? = nil
+        ) {
+            self.onHttpIncident = onHttpIncident
+            self.onError = onError
+        }
+
+
+        // MARK: Operations
+
+        @inline(__always)
+        @usableFromInline
+        static func merged(_ base: ClientCallbacks?, addition: ClientCallbacks?) -> ClientCallbacks? {
+            guard let addition = addition else { return base }
+
+            return .merged(base, addition: addition)
+        }
+
+
+        @inline(__always)
+        @usableFromInline
+        static func merged(_ base: ClientCallbacks?, addition: ClientCallbacks) -> ClientCallbacks {
+            guard let base = base else { return addition }
+
+            return .init(onHttpIncident: addition.onHttpIncident ?? base.onHttpIncident,
+                         onError: addition.onError ?? base.onError)
+        }
+
+    }
 
 }
 
