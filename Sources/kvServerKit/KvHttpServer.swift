@@ -114,6 +114,16 @@ open class KvHttpServer {
 
     /// Starts server and all bound channels.
     ///
+    /// Servers usually run in the background and stop on process signals.
+    /// See ``KvServerStopSignals`` helper providing handling of stop process signals:
+    ///
+    /// ```swift
+    /// try server.start()
+    /// KvServerStopSignals.setCallback { signal in
+    ///     server.stop()
+    /// }
+    /// ```
+    ///
     /// See: ``waitWhileStarting()``, ``stop()``, ``stop(_:)``.
     public func start() throws {
         do {

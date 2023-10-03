@@ -21,6 +21,9 @@
 //  Created by Svyatoslav Popov on 09.06.2023.
 //
 
+import Foundation
+
+
 
 /// A type that represents behaviour of a server.
 ///
@@ -81,9 +84,9 @@ public protocol KvServer {
 
 extension KvServer {
 
-    /// Initializes and runs the server.
+    /// Initializes and runs the server until *SIGINT*, *SIGTERM*, *SIGQUIT* or *SIGHUP* process signal is received.
     ///
-    /// It's automatically called when application is launched if server implementation is annotated with
+    /// It's automatically provided as the process's entry point when server implementation is annotated with
     /// [@main](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/attributes/#main) attribute.
     ///
     /// ```swift
@@ -91,19 +94,30 @@ extension KvServer {
     /// struct ExampleServer : KvServer
     /// ```
     ///
-    /// See: ``start()``.
+    /// - Important: This method never returns. Use ``start()`` method to start server programmatically and manage it's execution.
     public static func main() {
         let token: KvServerToken
 
         do { token = try Self().start() }
-        catch { return print("Unable to start \(Self.self). \(error)") }
+        catch {
+            print("Unable to start \(Self.self). \(error)")
+            exit(-2)
+        }
+
+        KvServerStopSignals.setCallback { _ in
+            token.stop()
+        }
 
         switch token.waitUntilStopped() {
         case .success:
             break
+
         case .failure(let error):
             print("\(Self.self) stopped with error. \(error)")
+            exit(-1)
         }
+
+        exit(0)
     }
 
 }
@@ -120,6 +134,10 @@ extension KvServer {
     /// 
     /// ```swift
     /// let token = try ExampleServer().start()
+    ///
+    /// KvServerStopSignals.setCallback { _ in
+    ///     token.stop()
+    /// }
     ///
     /// try token.waitWhileStarting().get()
     /// CustomActions()

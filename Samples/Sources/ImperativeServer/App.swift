@@ -39,7 +39,7 @@ struct App {
         /// `http: .v2(ssl: ssl)` argument instructs the server to use secure HTTP/2.0 protocol.
         ///
         /// Port 8080 is used due to access to standard HTTP port 80 is probably denied.
-        /// Besides, real hosting providers usuasy provide specific addressa and port for internet connections.
+        /// Besides, real hosting providers usuasy provide specific address and port for internet connections.
         ///
         /// - Note: Host names can be used as addresses.
         let configurations = Host.current().addresses
@@ -49,10 +49,10 @@ struct App {
 
         try server.start()
 
-        // Code below is optional. It's a way to wait for all server's channels are started.
+        /// Code below is optional. It's a way to wait for all server's channels are started.
         do {
-            // `channel.waitWhileStarting()` below can fail due to channels may be is in *stopped* state until server is completely started.
-            // So we wait while server is starting and then wait while channels are starting.
+            /// `channel.waitWhileStarting()` below can fail due to channels may be is in *stopped* state until server is completely started.
+            /// So we wait while server is starting and then wait while channels are starting.
             try server.waitWhileStarting().get()
             try await server.forEachChannel { channel in
                 try channel.waitWhileStarting().get()
@@ -62,13 +62,14 @@ struct App {
             print("Server has started")
         }
 
-        // In this example server is operating until any key is pressed.
-        print("Press enter to stop server")
-        while getchar() < 0 { }
+        /// Servers usually run in the background and stop on process signals.
+        KvServerStopSignals.setCallback { _ in
+            server.stop()
+            print("Server is being stopped...")
+        }
+        
+        print("Press Ctrl+C or run `kill \(ProcessInfo.processInfo.processIdentifier)` command to stop server normally")
 
-        server.stop()
-
-        print("Server is being stopped...")
         try server.waitUntilStopped().get()
         print("Server has stopped")
     }
@@ -86,8 +87,8 @@ struct App {
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
             let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: resourceDirectory)!.path
 #else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            // - NOTE: Currently there is a bug in opensource `Bundle.module.url(forResource:withExtension:subdirectory:)`.
-            //         So assuming that application is launched with `swift run` shell command in directory containing the package file.
+            /// - NOTE: Currently there is a bug in opensource `Bundle.module.url(forResource:withExtension:subdirectory:)`.
+            ///         So assuming that application is launched with `swift run` shell command in directory containing the package file.
             let pemPath = "./Sources/ImperativeServer/\(resourceDirectory)/\(fileName).\(fileExtension)"
 #endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
 

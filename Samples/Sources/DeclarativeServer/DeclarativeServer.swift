@@ -30,8 +30,10 @@ import Foundation
 /// This sample server provides examples of various features of *kvServerKit* framework.
 /// It's implemented in declarative way.
 ///
-/// - Note: @main attribute.
+/// - Note: `@main` attribute.
 ///         See [documentation](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/attributes/#main) for details.
+///         When server is executed via `@main` attribute, it automatically stops when *SIGINT*, *SIGTERM*, *SIGQUIT* or *SIGHUP* process signal is received.
+///         E.g. *SIGINT* is sent when Ctrl+C is pressed, *SIGQUIT* on Ctrl+\\, *SIGTERM* is usually sent by `kill` command by default.
 @main
 struct DeclarativeServer : KvServer {
 
@@ -49,7 +51,7 @@ struct DeclarativeServer : KvServer {
         /// `http: .v2(ssl: ssl)` argument instructs the server to use secure HTTP/2.0 protocol.
         ///
         /// Port 8080 is used due to access to standard HTTP port 80 is probably denied.
-        /// Besides, real hosting providers usuasy provide specific addressa and port for internet connections.
+        /// Besides, real hosting providers usuasy provide specific address and port for internet connections.
         ///
         /// Host names can be used as addresses. For example:
         ///
