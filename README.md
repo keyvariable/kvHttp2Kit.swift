@@ -4,7 +4,8 @@
 
 - secure connections over HTTP/1.1 and HTTP/2.0;
 - imperative and declarative APIs;
-- validation of requests and various automatic customizable context-dependent responses, e.g. 400, 404, 413.
+- validation of requests and various automatic customizable context-dependent responses, e.g. 400, 404, 413;
+- automatic handling of HEAD method.
 
 *kvServerKit* uses [SwiftNIO](https://github.com/apple/swift-nio) framework to manage network connections and HTTP.
 
@@ -13,15 +14,14 @@
 
 Servers can be implemented with *declarative API* in a declarative way.
 *Declarative API* is designed to create compact, easy-to-read server implementations
-and to eliminate the need to write complex and boilerplate implementations for common tasks.
+and to eliminate the need to write complex and boilerplate code for common tasks.
 Some features:
 - fast routing and validation of requests;
 - fast parsing of URL query items and request bodies;
 - structured URL queries;
 - handlers for common request body types;
 - support of Punycode and percent-encoding for URLs;
-- convenient response content builder;
-- JSON for request and response bodies.
+- convenient response content builder.
 
 Just declare hierarchical list of responses, *kvServerKit* will do the rest. Responses can be declared in any order.
 *Declarative API* automatically starts declared network communication channels, builds routing trees to responses and URL query parsers.
@@ -50,14 +50,18 @@ for both `example.com` and `www.example.com` hosts:
 struct ExampleServer : KvServer {
     var body: some KvResponseGroup {
         let ssl: KvHttpChannel.Configuration.SSL = loadHttpsCertificate()
-    
+
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-            KvHttpResponse.static { .string("Hello, client") }
+            KvHttpResponse.static { .string { "Hello, client" } }
 
             KvGroup("echo") {
                 KvHttpResponse.dynamic
                     .requestBody(.data)
-                    .content { .binary($0.requestBody ?? Data()) }
+                    .content { ctx in
+                        guard let data: Data = ctx.requestBody else { return .badRequest }
+                        retrun .binary { data }
+                            .contentLength(data.count)
+                    }
             }
             .httpMethods(.POST)
 
@@ -65,15 +69,21 @@ struct ExampleServer : KvServer {
                 RandomValueResponseGroup()
             }
         }
+        .onHttpIncident { incident in
+            guard incident.defaultStatus == .notFound else { return nil }
+            return .notFound
+                .contentType(.text(.html))
+                .string { "Custom 404 HTML page" }
+        }
         .hosts("example.com")
         .subdomains(optional: "www")
     }
 }
-    
+
 struct RandomValueResponseGroup : KvResponseGroup {
     var body: KvResponseGroup {
         KvGroup("bool") {
-            KvHttpResponse.static { .string("\(Bool.random())") }
+            KvHttpResponse.static { .string { "\(Bool.random())" } }
         }
         KvGroup("int") {
             KvHttpResponse.dynamic
@@ -83,7 +93,7 @@ struct RandomValueResponseGroup : KvResponseGroup {
                     let lowerBound = from ?? .min, upperBound = through ?? .max
                     return lowerBound <= upperBound ? .success(lowerBound ... upperBound) : .failure
                 }
-                .content { .string("\(Int.random(in: $0.query))") }
+                .content { ctx in .string { "\(Int.random(in: ctx.query))" } }
         }
     }
 }

@@ -61,7 +61,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
         struct Greeting {
 
             static let path = "/"
-            static var content: String { "Hello! It's a sample server on imperative API of kvServerKit framework" }
+            static var content: String { "Hello! It's a sample server on imperative API from kvServerKit framework." }
 
         }
 
@@ -182,7 +182,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
 
         switch urlComponents.path {
         case Constants.Greeting.path:
-            return KvHttpRequest.HeadOnlyHandler(response: .string(Constants.Greeting.content))
+            return KvHttpRequest.HeadOnlyHandler(response: .string { Constants.Greeting.content })
 
         case Constants.Echo.path:
             return EchoRequestHandler()
@@ -199,7 +199,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
             break
         }
 
-        return KvHttpRequest.HeadOnlyHandler(response: .notFound.string("404: resource at «\(urlComponents.path)» not found."))
+        return KvHttpRequest.HeadOnlyHandler(response: .notFound.string { "404: resource at «\(urlComponents.path)» not found." })
     }
 
 
@@ -220,7 +220,8 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
             super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body in
                 guard let body = body else { return nil }
 
-                return .binary(body)
+                return .binary { body }
+                    .contentLength(body.count)
             }
         }
 
@@ -230,8 +231,8 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
         override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
             switch incident {
             case .byteLimitExceeded:
-                return .payloadTooLarge.string("Payload exceeds \(Constants.Echo.bodyLimit) byte limit.")
-            case .noResponse:
+                return .payloadTooLarge.string { "Payload exceeds \(Constants.Echo.bodyLimit) byte limit." }
+            case .noResponse, .responseBodyError(_):
                 return super.httpClient(httpClient, didCatch: incident)
             }
         }

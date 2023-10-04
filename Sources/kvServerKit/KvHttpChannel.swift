@@ -217,9 +217,9 @@ open class KvHttpChannel {
             /// Initializes instance with contents of PEM file containing private key and certificate chain.
             ///
             /// For example an SSL certificate and the key pair for HTTPS can be created this way:
-            /// ```
-            /// $ openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout private_key.pem -out certificate.pem
-            /// $ cat private_key.pem certificate.pem > https.pem
+            /// ```sh
+            /// openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout private_key.pem -out certificate.pem
+            /// cat private_key.pem certificate.pem > https.pem
             /// ```
             @inlinable
             public init(pemPath: String) throws {
@@ -279,6 +279,8 @@ open class KvHttpChannel {
 
     public enum ChannelError : LocalizedError {
 
+        /// ``KvHttpResponseProvider/BodyCallbackProvider`` has returned an error for an incident. Empty body is sent in this case.
+        case incidentResponseBodyError(Error)
         /// Unable to perform a task due to reference to server is not valid. Probably channel is not bound to a server.
         case missingServer
         /// Unable to perform a task due to the server is not running.
@@ -717,14 +719,14 @@ open class KvHttpChannel {
     /// - Note: Server closes connections with clients after incidents.
     ///
     /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
-    public enum ClientIncident : KvHttpChannelIncident {
+    public enum ClientIncident : KvHttpIncident {
 
         /// This incident is emitted when client's delegate returns no handler for a request.
         /// By default `.notFound` (404) status is returned.
         case noRequestHandler
 
 
-        // MARK: : KvHttpChannelIncident
+        // MARK: : KvHttpIncident
 
         /// Default HTTP status code submitted to a client when incident occurs.
         @inlinable
@@ -753,7 +755,7 @@ open class KvHttpChannel {
     /// - Note: Server closes connections with clients after incidents.
     ///
     /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
-    public enum RequestIncident : KvHttpChannelIncident {
+    public enum RequestIncident : KvHttpIncident {
 
         /// This incident is emitted when a request exceeds provided or default limit for a body.
         /// See ``KvHttpRequestHandler/bodyLengthLimit``, ``KvResponseGroup/httpBodyLengthLimit(_:)``, ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
@@ -762,6 +764,8 @@ open class KvHttpChannel {
         /// This incident is emitted when request handler returns `nil` response from ``KvHttpRequestHandler/httpClientDidReceiveEnd(_:)`` method.
         /// By default `.notFound` (404) status is returned.
         case noResponse
+        /// An error occured when an incident's response body was requested.
+        case responseBodyError(Error)
 
 
         // MARK: : KvHttpChannelIncident
@@ -774,6 +778,8 @@ open class KvHttpChannel {
                 return .payloadTooLarge
             case .noResponse:
                 return .notFound
+            case .responseBodyError(_):
+                return .internalServerError
             }
         }
 
@@ -889,7 +895,12 @@ open class KvHttpChannel {
         private let dispatchQueue: DispatchQueue = .init(label: "Channel Response Queue", target: .global())
 
 
-        private var requestProcessingState: RequestProcessingState = .idle
+        private var requestProcessingState: RequestProcessingState {
+            get { withLock { _requestProcessingState } }
+            set { withLock { _requestProcessingState = newValue } }
+        }
+        /// - Warning: Access must be protected by ``ChannelHandler``'s locking methods.
+        private var _requestProcessingState: RequestProcessingState = .idle
 
 
         /// Number of requests the responses have not been completely sent.
@@ -938,43 +949,122 @@ open class KvHttpChannel {
 
         // MARK: Operations
 
-        private func processIncident(_ incident: ClientIncident, context: ChannelHandlerContext, httpVersion: HTTPVersion, keepAlive: Bool?) {
+        private func processIncident(_ incident: ClientIncident,
+                                     isResponseComplete: Bool,
+                                     context: ChannelHandlerContext,
+                                     httpVersion: HTTPVersion,
+                                     httpMethod: HTTPMethod,
+                                     keepAlive: Bool?
+        ) {
             processIncident(incident,
+                            isResponseComplete: isResponseComplete,
                             context: context,
                             httpVersion: httpVersion,
+                            httpMethod: httpMethod,
                             keepAlive: keepAlive,
                             responseBlock: { $0.response(client: self) })
         }
 
 
-        private func processIncident(_ incident: RequestIncident, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext ) {
+        private func processIncident(_ incident: RequestIncident, isResponseComplete: Bool, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext ) {
             processIncident(incident,
+                            isResponseComplete: isResponseComplete,
                             context: channelContext,
                             httpVersion: requestContext.httpVersion,
+                            httpMethod: requestContext.httpMethod,
                             keepAlive: requestContext.keepAlive,
                             responseBlock: { $0.response(client: self, requestHandler: requestContext.handler) })
         }
 
 
+        /// - Parameter isResponseComplete: A boolean value incicating whether the response is completely received. If `false` then client is disconnected.
         private func processIncident<I>(_ incident: I,
+                                        isResponseComplete: Bool,
                                         context: ChannelHandlerContext,
                                         httpVersion: HTTPVersion,
+                                        httpMethod: HTTPMethod,
                                         keepAlive: Bool?,
                                         responseBlock: @escaping (I) -> KvHttpResponseProvider?
-        ) where I : KvHttpChannelIncident {
-            requestProcessingState = .stopped
-
+        ) where I : KvHttpIncident {
             dispatchQueue.async {
-                let response = (responseBlock(incident) ?? .status(incident.defaultStatus))
-                    .needsDisconnect()  // Clients are always disconnected after incidents.
-
-                self.channelWrite(response, context: context, httpVersion: httpVersion, keepAlive: keepAlive)
+                self.channelWrite(incident,
+                                  isResponseComplete: isResponseComplete,
+                                  context: context,
+                                  requestHandler: nil,
+                                  httpVersion: httpVersion,
+                                  httpMethod: httpMethod,
+                                  keepAlive: keepAlive,
+                                  responseBlock: responseBlock)
             }
         }
 
 
+        /// - Warning: This method must be used to access the body callback.
+        @inline(__always)
+        private static func responseBodyCallback(_ response: KvHttpResponseProvider, _ httpMethod: HTTPMethod) -> Result<KvHttpResponseProvider.BodyCallback?, Error> {
+            guard httpMethod != .HEAD else { return .success(nil) }
+
+            return response.bodyCallbackProvider?().map { $0 } ?? .success(nil)
+        }
+
+
         private func channelWrite(_ response: Response, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext) {
-            channelWrite(response, context: channelContext, httpVersion: requestContext.httpVersion, keepAlive: requestContext.keepAlive)
+            switch InternalChannelHandler.responseBodyCallback(response, requestContext.httpMethod) {
+            case .success(let bodyCallback):
+                channelWrite(response, bodyCallback, context: channelContext, httpVersion: requestContext.httpVersion, keepAlive: requestContext.keepAlive)
+
+            case .failure(let error):
+                channelWrite(RequestIncident.responseBodyError(error),
+                             isResponseComplete: true,
+                             context: channelContext,
+                             requestHandler: requestContext.handler,
+                             httpVersion: requestContext.httpVersion,
+                             httpMethod: requestContext.httpMethod,
+                             keepAlive: requestContext.keepAlive,
+                             responseBlock: { $0.response(client: self, requestHandler: requestContext.handler) })
+            }
+        }
+
+
+        private func channelWrite<I>(_ incident: I,
+                                     isResponseComplete: Bool,
+                                     context: ChannelHandlerContext,
+                                     requestHandler: KvHttpRequestHandler?,
+                                     httpVersion: HTTPVersion,
+                                     httpMethod: HTTPMethod,
+                                     keepAlive: Bool?,
+                                     responseBlock: (I) -> KvHttpResponseProvider?)
+        where I : KvHttpIncident
+        {
+            var response = responseBlock(incident) ?? .status(incident.defaultStatus)
+
+            if !isResponseComplete {
+                response = response.needsDisconnect()
+
+                requestProcessingState = .stopped
+            }
+
+            // Assuming this method is invoked on `.dispatchQueue`.
+            let bodyCallback: KvHttpResponseProvider.BodyCallback?
+            switch InternalChannelHandler.responseBodyCallback(response, httpMethod) {
+            case .success(let callback):
+                bodyCallback = callback
+
+            case .failure(let error):
+                bodyCallback = nil
+
+                do {
+                    let error = ChannelError.incidentResponseBodyError(error)
+
+                    requestHandler?.httpClient(self, didCatch: error)
+                    ?? delegate?.httpClient(self, didCatch: error)
+                }
+
+                // Content-length is cleared to prevent error in Swift-NIO when the length is not equal to 0 (missing body).
+                response.contentLength = nil
+            }
+
+            channelWrite(response, bodyCallback, context: context, httpVersion: httpVersion, keepAlive: keepAlive)
         }
 
 
@@ -982,7 +1072,14 @@ open class KvHttpChannel {
         ///                         Note that it's handled differently depending on version of HTTP protocol.
         ///
         /// - Note: This method decreases `_activeRequestCount`.
-        private func channelWrite(_ response: Response, context: ChannelHandlerContext, httpVersion: HTTPVersion, keepAlive: Bool?) {
+        ///
+        /// - Warning: Assuming this method is invoked on `.dispatchQueue`.
+        private func channelWrite(_ response: Response,
+                                  _ bodyCallback: KvHttpResponseProvider.BodyCallback?,
+                                  context: ChannelHandlerContext,
+                                  httpVersion: HTTPVersion,
+                                  keepAlive: Bool?
+        ) {
             context.eventLoop.execute {
                 let channel = context.channel
 
@@ -1015,7 +1112,7 @@ open class KvHttpChannel {
                 }()
 
                 // Body
-                if let bodyCallback = response.bodyCallback {
+                if let bodyCallback = bodyCallback {
                     do {
                         try self.withLock {
                             while true {
@@ -1170,26 +1267,26 @@ open class KvHttpChannel {
             }
 
 
-            switch requestProcessingState {
-            case .idle:
-                break   // OK
-            case .processing(_):
-                KvDebug.pause("Warning: new request is received but actual request is not complete")
-            case .stopped:
-                return  // Requests are ignored
-            }
-
             let httpVersion: HTTPVersion
             do {
                 lock()
                 defer { unlock() }
+
+                switch _requestProcessingState {
+                case .idle:
+                    break   // OK
+                case .processing(_):
+                    KvDebug.pause("Warning: new request is received but actual request is not complete")
+                case .stopped:
+                    return  // Requests are ignored
+                }
 
                 guard _requestLimit > 0 else {
                     // It is not threated as incident due to channel will close connection just after the last response.
                     // So response on incident will not be sent.
                     //
                     // Also `_requestLimit` is not decresed in ``handleRequestEnd(in:)`` to minimize locking of the handler.
-                    requestProcessingState = .stopped
+                    _requestProcessingState = .stopped
                     return
                 }
 
@@ -1202,7 +1299,7 @@ open class KvHttpChannel {
             let keepAlive = ExtractKeepAlive(head)
 
             guard let requestHandler = delegate?.httpClient(self, requestHandlerFor: head)
-            else { return processIncident(.noRequestHandler, context: context, httpVersion: httpVersion, keepAlive: keepAlive) }
+            else { return processIncident(.noRequestHandler, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method, keepAlive: keepAlive) }
 
             let bodyLengthLimit = requestHandler.bodyLengthLimit
 
@@ -1211,23 +1308,25 @@ open class KvHttpChannel {
                 break
             case .some(let contentLength):
                 guard contentLength <= bodyLengthLimit else {
-                    return processIncident(RequestIncident.byteLimitExceeded, context: context, httpVersion: httpVersion, keepAlive: keepAlive) {
+                    return processIncident(RequestIncident.byteLimitExceeded, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method, keepAlive: keepAlive) {
                         $0.response(client: self, requestHandler: requestHandler)
                     }
                 }
             }
 
             requestProcessingState = .processing(.init(httpVersion: httpVersion,
-                                                       handler: requestHandler,
-                                                       bodyLengthLimit: bodyLengthLimit,
-                                                       keepAlive: keepAlive))
+                                                        httpMethod: head.method,
+                                                        handler: requestHandler,
+                                                        bodyLengthLimit: bodyLengthLimit,
+                                                        keepAlive: keepAlive))
         }
 
 
         private func handleRequestBodyBytes(_ byteBuffer: inout ByteBuffer, in context: ChannelHandlerContext) {
             switch requestProcessingState {
             case .processing(var requestContext):
-                guard requestContext.bodyLengthLimit >= byteBuffer.readableBytes else { return processIncident(.byteLimitExceeded, in: context, requestContext) }
+                guard requestContext.bodyLengthLimit >= byteBuffer.readableBytes
+                else { return processIncident(.byteLimitExceeded, isResponseComplete: false, in: context, requestContext) }
 
                 let bytesRead: UInt = numericCast(byteBuffer.readWithUnsafeReadableBytes { pointer in
                     requestContext.handler.httpClient(self, didReceiveBodyBytes: pointer)
@@ -1254,7 +1353,7 @@ open class KvHttpChannel {
             case .processing(let requestContext):
                 dispatchQueue.async {
                     guard let response = requestContext.handler.httpClientDidReceiveEnd(self)
-                    else { return self.processIncident(.noResponse, in: context, requestContext) }
+                    else { return self.processIncident(.noResponse, isResponseComplete: true, in: context, requestContext) }
 
                     self.channelWrite(response, in: context, requestContext)
                 }
@@ -1288,6 +1387,7 @@ open class KvHttpChannel {
         private struct RequestContext {
 
             let httpVersion: HTTPVersion
+            let httpMethod: HTTPMethod
 
             /// Handler of a request.
             let handler: KvHttpRequestHandler
@@ -1317,15 +1417,6 @@ extension KvHttpChannel : Identifiable {
     public var id: ObjectIdentifier { .init(self) }
 
 }
-
-
-
-// MARK: - KvHttpChannelIncident
-
-/// A protocol all channel incidents conform to.
-///
-/// - Note: Server immediately closes a connection to a client after any channel incident.
-public protocol KvHttpChannelIncident : KvHttpIncident { }
 
 
 

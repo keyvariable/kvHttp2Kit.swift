@@ -44,7 +44,7 @@ final class KvServerTests : XCTestCase {
                 KvForEach(Self.configurations) { configuration in
                     NetworkGroup(with: configuration) {
                         KvHttpResponse.static {
-                            .string(Self.greeting(for: configuration))
+                            .string { Self.greeting(for: configuration) }
                         }
                     }
                 }
@@ -82,25 +82,25 @@ final class KvServerTests : XCTestCase {
                     KvGroup("a") {
                         KvGroup("b") {
                             KvGroup("c") {
-                                KvHttpResponse.static { .string("/a/b/c") }
+                                KvHttpResponse.static { .string { "/a/b/c" } }
                             }
                         }
                         KvGroup("б/") {
-                            KvHttpResponse.static { .string("/a/б") }
+                            KvHttpResponse.static { .string { "/a/б" } }
                         }
                     }
 
                     KvGroup("/a/b/d") {
                         KvGroup(httpMethods: .POST) {
-                            KvHttpResponse.static { .string("POST /a/b/d") }
+                            KvHttpResponse.static { .string { "POST /a/b/d" } }
                         }
                     }
 
                     KvGroup("///b/./c/..//b///e///./f/../") {
-                        KvHttpResponse.static { .string("/b/./c/../b/e/./f/..") }
+                        KvHttpResponse.static { .string { "/b/./c/../b/e/./f/.." } }
                     }
 
-                    KvHttpResponse.static { .string("/") }
+                    KvHttpResponse.static { .string { "/" } }
                 }
             }
 
@@ -183,7 +183,7 @@ final class KvServerTests : XCTestCase {
                 NetworkGroup(with: configuration) {
                     KvGroup("a") {
                         KvGroup {
-                            KvHttpResponse.static { .string(Self.greeting) }
+                            KvHttpResponse.static { .string { Self.greeting } }
                         }
                         .httpMethods(.DELETE)
                         .httpMethods(.GET, .PUT)
@@ -267,7 +267,7 @@ final class KvServerTests : XCTestCase {
 
             /// Empty query response.
             private var voidResponse: some KvResponse {
-                KvHttpResponse.static { .string("()") }
+                KvHttpResponse.static { .string { "()" } }
             }
 
             @KvResponseGroupBuilder
@@ -279,15 +279,15 @@ final class KvServerTests : XCTestCase {
             private var optionalIntResponse: some KvResponse {
                 KvHttpResponse.dynamic
                     .query(.optional("int", of: Int.self))
-                    .content {
-                        .string("\($0.query.map(String.init(_:)) ?? "nil") as Int?")
+                    .content { context in
+                        .string { "\(context.query.map(String.init(_:)) ?? "nil") as Int?" }
                     }
             }
 
             private var requiredStringResponse: some KvResponse {
                 KvHttpResponse.dynamic
                     .query(.required("string"))
-                    .content { .string("\"\($0.query)\"") }
+                    .content { context in .string { "\"\(context.query)\"" } }
             }
 
             /// Produces value of single query item if it's name is `echo`.
@@ -309,7 +309,7 @@ final class KvServerTests : XCTestCase {
                     }
                 }()
 
-                return r.content { .string($0.query.map { "\"\($0)\"" } ?? "nil") }
+                return r.content { context in .string { context.query.map { "\"\($0)\"" } ?? "nil" } }
             }
 
             /// Produces comma-separated list of query item names whether there are 2+ items.
@@ -319,7 +319,7 @@ final class KvServerTests : XCTestCase {
                         guard let query = query, query.count > 1 else { return .failure }
                         return .success(query.lazy.map({ $0.name }).joined(separator: ","))
                     }
-                    .content { .string($0.query) }
+                    .content { context in .string { context.query } }
             }
 
             /// Group of unambiguous responses.
@@ -331,17 +331,15 @@ final class KvServerTests : XCTestCase {
                     .content {
                         switch $0.query {
                         case (let from, .none):
-                            return .string("\(from) ...")
+                            return .string { "\(from) ..." }
                         case (let from, .some(let to)):
-                            return .string("\(from) ..< \(to)")
+                            return .string { "\(from) ..< \(to)" }
                         }
                     }
 
                 KvHttpResponse.dynamic
                     .query(.required("to", of: Float.self))
-                    .content {
-                        .string("..< \($0.query)")
-                    }
+                    .content { context in .string { "..< \(context.query)" } }
 
                 KvHttpResponse.dynamic
                     .query(.optional("from", of: Float.self))
@@ -349,9 +347,9 @@ final class KvServerTests : XCTestCase {
                     .content {
                         switch $0.query {
                         case (.none, let through):
-                            return .string("... \(through)")
+                            return .string { "... \(through)" }
                         case (.some(let from), let through):
-                            return .string("\(from) ... \(through)")
+                            return .string { "\(from) ... \(through)" }
                         }
                     }
             }
@@ -364,7 +362,7 @@ final class KvServerTests : XCTestCase {
                     .query(.required("b"))
                     .content {
                         let (a, b) = $0.query
-                        return .string("a: \"\(a)\", b: \"\(b)\"")
+                        return .string { "a: \"\(a)\", b: \"\(b)\"" }
                     }
 
                 KvHttpResponse.dynamic
@@ -372,7 +370,7 @@ final class KvServerTests : XCTestCase {
                     .query(.required("c"))
                     .content {
                         let (a, c) = $0.query
-                        return .string("a: \"\(a)\", c: \"\(c)\"")
+                        return .string { "a: \"\(a)\", c: \"\(c)\"" }
                     }
             }
 
@@ -490,7 +488,7 @@ final class KvServerTests : XCTestCase {
 
             private var httpsServer: some KvResponseGroup {
                 NetworkGroup(with: KvServerTestKit.secureHttpConfiguration()) {
-                    KvHttpResponse.static { .string(Self.greeting) }
+                    KvHttpResponse.static { .string { Self.greeting } }
                 }
             }
 
@@ -609,7 +607,7 @@ final class KvServerTests : XCTestCase {
                             .requestBody(.data)
                             .content { context in
                                 guard let data: Data = context.requestBody else { return .badRequest }
-                                return .binary(data)
+                                return .binary { data }
                             }
                     }
 
@@ -618,9 +616,7 @@ final class KvServerTests : XCTestCase {
                             .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
                                 buffer.reduce(accumulator, &+)
                             }))
-                            .content {
-                                .string("0x" + String($0.requestBody, radix: 16, uppercase: true))
-                            }
+                            .content { context in .string { "0x" + String(context.requestBody, radix: 16, uppercase: true) } }
                     }
                 }
                 .httpMethods(.POST)
@@ -661,14 +657,13 @@ final class KvServerTests : XCTestCase {
                                 .requestBody(.json(of: DateComponents.self))
                                 .content {
                                     guard let date = $0.requestBody.date else { return .badRequest }
-                                    return .string(ISO8601DateFormatter().string(from: date))
+                                    return .string { ISO8601DateFormatter().string(from: date) }
                                 }
                         }
                     }
                     KvGroup(httpMethods: .GET) {
                         KvHttpResponse.static {
-                            do { return try .json(echoDateComponents) }
-                            catch { return .internalServerError.string("\(error)") }
+                            .json { echoDateComponents }
                         }
                     }
                 }
@@ -737,16 +732,12 @@ final class KvServerTests : XCTestCase {
                     KvGroup("boolean") {
                         KvHttpResponse.dynamic
                             .query(.bool("value"))
-                            .content {
-                                .string("\($0.query)")
-                            }
+                            .content { context in .string { "\(context.query)" } }
                     }
                     KvGroup("void") {
                         KvHttpResponse.dynamic
                             .query(.void("value"))
-                            .content { _ in
-                                    .string("()")
-                            }
+                            .content { _ in .string { "()" } }
                     }
                 }
             }
@@ -782,7 +773,7 @@ final class KvServerTests : XCTestCase {
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("no_body") {
-                        KvHttpResponse.static { .string("0") }
+                        KvHttpResponse.static { .string { "0" } }
                     }
                     KvGroup("default_limit") {
                         response
@@ -811,8 +802,8 @@ final class KvServerTests : XCTestCase {
             private func response(body: KvHttpRequestDataBody) -> some KvResponse {
                 KvHttpResponse.dynamic
                     .requestBody(body)
-                    .content {
-                        .string("\($0.requestBody?.count ?? 0)")
+                    .content { context in
+                        .string { "\(context.requestBody?.count ?? 0)" }
                     }
             }
 
@@ -902,10 +893,10 @@ final class KvServerTests : XCTestCase {
                                 KvHttpResponse.dynamic
                                     .query(.void("count"))
                                     .requestBody(.data.bodyLengthLimit(Self.bodyLimit))
-                                    .content { .string("\($0.requestBody?.count ?? 0)") }
+                                    .content { context in .string { "\(context.requestBody?.count ?? 0)" } }
                                     .onIncident { incident in
                                         guard incident.defaultStatus == .payloadTooLarge else { return nil }
-                                        return .payloadTooLarge.string(Self.payloadTooLargeString)
+                                        return .payloadTooLarge.string { Self.payloadTooLargeString }
                                     }
                             }
                             .httpMethods(.POST)
@@ -916,7 +907,7 @@ final class KvServerTests : XCTestCase {
                         }
                         .onHttpIncident { incident in
                             guard incident.defaultStatus == .notFound else { return nil }
-                            return .notFound.string(Self.notFoundString2)
+                            return .notFound.string { Self.notFoundString2 }
                         }
 
                         KvGroup("c") {
@@ -927,7 +918,7 @@ final class KvServerTests : XCTestCase {
                     }
                     .onHttpIncident { incident in
                         guard incident.defaultStatus == .notFound else { return nil }
-                        return .notFound.string(Self.notFoundString1)
+                        return .notFound.string { Self.notFoundString1 }
                     }
 
                     KvGroup("d") {
@@ -935,13 +926,13 @@ final class KvServerTests : XCTestCase {
                     }
                     .onHttpIncident { incident in
                         guard incident.defaultStatus == .notFound else { return nil }
-                        return .notFound.string(Self.notFoundString3)
+                        return .notFound.string { Self.notFoundString3 }
                     }
                 }
             }
 
             private var greetingResponse: some KvResponse {
-                KvHttpResponse.static { .string(Self.greetingString) }
+                KvHttpResponse.static { .string { Self.greetingString } }
             }
 
             static let bodyLimit: UInt = 16
@@ -990,6 +981,48 @@ final class KvServerTests : XCTestCase {
             try await Assert404(path: "/x/c/x", response: IncidentServer.notFoundString1)
 
             try await Assert413(path: "/a", contentLength: IncidentServer.bodyLimit + 1, response: IncidentServer.payloadTooLargeString)
+        }
+    }
+
+
+
+    // MARK: - testHeadMethod()
+
+    func testHeadMethod() async throws {
+
+        struct HeadMethodServer : KvServer {
+
+            let configuration = KvServerTestKit.secureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvGroup("a") {
+                        KvHttpResponse.static { .string { "a" } }
+                    }
+                    KvGroup("b") {
+                        KvHttpResponse.static { .string({ "b" }).contentLength(1) }
+                    }
+                    .httpMethods(.GET)
+                }
+            }
+
+        }
+
+        try await Self.withRunningServer(of: HeadMethodServer.self, context: { KvServerTestKit.baseURL(for: $0.configuration) }) { baseURL in
+
+            func Assert(path: String, response: String) async throws {
+                try await KvServerTestKit.assertResponse(
+                    baseURL, method: "HEAD", path: path,
+                    contentType: .text(.plain), expecting: ""
+                )
+                try await KvServerTestKit.assertResponse(
+                    baseURL, path: path,
+                    contentType: .text(.plain), expecting: response
+                )
+            }
+
+            try await Assert(path: "a", response: "a")
+            try await Assert(path: "b", response: "b")
         }
     }
 

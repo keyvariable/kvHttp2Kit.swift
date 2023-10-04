@@ -38,13 +38,13 @@ import NIOHTTP1
 /// Below are simple examples of a static and dynamic responses:
 ///
 /// ```swift
-/// KvHttpResponse.static { .string(ISO8601DateFormatter().string(from: Date())) }
+/// KvHttpResponse.static { .string { ISO8601DateFormatter().string(from: Date()) } }
 ///
 /// KvHttpResponse.dynamic
 ///     .requestBody(.json(of: DateComponents.self))
 ///     .content {
 ///         guard let date = $0.requestBody.date else { return .badRequest }
-///         return .string(ISO8601DateFormatter().string(from: date))
+///         return .string { ISO8601DateFormatter().string(from: date) }
 ///     }
 /// ```
 ///
@@ -67,15 +67,15 @@ import NIOHTTP1
 ///     .content {
 ///         switch $0.query {
 ///         case (let from, .none):
-///             return .string("\(from) ...")
+///             return .string { "\(from) ..." }
 ///         case (let from, .some(let to)):
-///             return .string("\(from) ..< \(to)")
+///             return .string { "\(from) ..< \(to)" }
 ///         }
 ///     }
 /// KvHttpResponse.dynamic
 ///     .query(.required("to", of: Float.self))
-///     .content {
-///         .string("..< \($0.query)")
+///     .content { ctx in
+///         .string { "..< \(ctx.query)" }
 ///     }
 /// KvHttpResponse.dynamic
 ///     .query(.optional("from", of: Float.self))
@@ -83,9 +83,9 @@ import NIOHTTP1
 ///     .content {
 ///         switch $0.query {
 ///         case (.none, let through):
-///             return .string("... \(through)")
+///             return .string { "... \(through)" }
 ///         case (.some(let from), let through):
-///             return .string("\(from) ... \(through)")
+///             return .string { "\(from) ... \(through)" }
 ///         }
 ///     }
 /// ```
@@ -129,7 +129,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     /// Below is an example of a static HTTP response with standard text representation of a generated UUID:
     ///
     /// ```swift
-    /// KvHttpResponse.static { .string(UUID().uuidString) }
+    /// KvHttpResponse.static { .string { UUID().uuidString } }
     /// ```
     public static func `static`(content: @escaping () throws -> KvHttpResponseProvider) -> KvHttpResponse {
         .init { implementationConfiguration in
@@ -156,10 +156,10 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///
     ///         switch context.query {
     ///         case true:
-    ///             return .string(uuid.uuidString)
+    ///             return .string { uuid.uuidString }
     ///         case false:
     ///             return withUnsafeBytes(of: uuid, { buffer in
-    ///                 return .binary(buffer)
+    ///                 return .binary { buffer }
     ///             })
     ///         }
     ///     }
@@ -170,7 +170,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     /// ```swift
     /// KvHttpResponse.dynamic
     ///     .requestBody(.data)
-    ///     .content { .binary($0.requestBody ?? Data()) }
+    ///     .content { ctx in .binary { ctx.requestBody ?? Data() } }
     /// ```
     ///
     /// Initially response matches empty URL query and empty or missing HTTP request body.
@@ -187,7 +187,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///         let lowerBound = from ?? .min, upperBound = through ?? .max
     ///         return lowerBound <= upperBound ? .success(lowerBound ... upperBound) : .failure
     ///     }
-    ///     .content { .string("\(Int.random(in: $0.query))") }
+    ///     .content { ctx in .string { "\(Int.random(in: $0.query))" } }
     /// ```
     @inlinable
     public static var `dynamic`: InitialDynamicResponse { .init() }
@@ -302,7 +302,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     /// ```swift
     /// KvHttpResponse.dynamic
     ///    .requestBody(.data.bodyLengthLimit(1024))
-    ///    .content { .binary($0.requestBody ?? .init()) }
+    ///    .content { ctx in .binary { ctx.requestBody ?? .init() } }
     ///    .onIncident { incident in
     ///        guard incident.defaultStatus == .payloadTooLarge else { return nil }
     ///        return .payloadTooLarge.string("Payload is too large. Limit is 1024 bytes.")

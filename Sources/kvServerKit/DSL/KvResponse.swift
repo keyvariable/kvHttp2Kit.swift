@@ -49,7 +49,7 @@
 ///     private let formatter: Formatter
 ///
 ///     var body: some KvResponse {
-///         KvHttpResponse.static { .string(formatter.string(for: Date()!) }
+///         KvHttpResponse.static { .string { formatter.string(for: Date()! } }
 ///     }
 /// }
 /// ```

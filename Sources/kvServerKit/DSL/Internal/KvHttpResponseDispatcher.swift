@@ -639,17 +639,24 @@ fileprivate protocol KvHttpResponseDispatcherDictionaryNode : KvHttpResponseDisp
 
     static func key(from requestContext: KvHttpRequestContext) -> Key?
 
+    /// - Returns: Array of secondary keys. It's used when no response is provided for the primary key.
+    ///
+    /// E.g. GET HTTP method is secondary for HEAD method due to server should return the same headers for HEAD and GET methods.
+    /// So it's good to use the same pesponse for both methods.
+    static func secondaryKeys(for primaryKey: Key) -> [Key]
+
 }
 
 
 extension KvHttpResponseDispatcherDictionaryNode {
 
     func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: KvHttpResponseDispatcher.RequestProcessorResult) {
-        guard let key = Self.key(from: requestContext),
-              let subnode = subnode(for: key)
-        else { return }
+        guard let primaryKey = Self.key(from: requestContext) else { return }
 
-        subnode.accumulateRequestProcessors(for: requestContext, into: accumulator)
+        let subnode = (self.subnode(for: primaryKey)
+                       ?? Self.secondaryKeys(for: primaryKey).lazy.compactMap({ secondaryKey in self.subnode(for: secondaryKey) }).first)
+
+        subnode?.accumulateRequestProcessors(for: requestContext, into: accumulator)
     }
 
 }
@@ -743,10 +750,21 @@ extension KvHttpResponseDispatcher {
 
     // MARK: .MethodNode
 
-    fileprivate class MethodNode : DictionaryContainer<String>, DictionaryNode {
+    fileprivate class MethodNode : DictionaryContainer<KvHttpMethod>, DictionaryNode {
 
-        static func key(from requestContext: KvHttpRequestContext) -> String? {
+        static func key(from requestContext: KvHttpRequestContext) -> Key? {
             requestContext.method
+        }
+
+
+        static func secondaryKeys(for primaryKey: Key) -> [Key] {
+            switch primaryKey {
+            case .HEAD:
+                return [ .GET ]
+
+            default:
+                return [ ]
+            }
         }
 
     }
@@ -761,6 +779,9 @@ extension KvHttpResponseDispatcher {
             requestContext.url.user
         }
 
+
+        static func secondaryKeys(for primaryKey: Key) -> [Key] { [ ] }
+
     }
 
 
@@ -772,6 +793,9 @@ extension KvHttpResponseDispatcher {
         static func key(from requestContext: KvHttpRequestContext) -> String? {
             requestContext.url.host
         }
+
+
+        static func secondaryKeys(for primaryKey: Key) -> [Key] { [ ] }
 
     }
 

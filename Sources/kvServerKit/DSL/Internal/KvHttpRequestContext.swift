@@ -28,10 +28,10 @@ import Foundation
 /// It's used to identify responses in a dispatcher.
 class KvHttpRequestContext {
 
-    let method: String
+    let method: KvHttpMethod
     let url: URL
     let urlComponents: URLComponents
-    /// Path components are not part of *URLComponents* so it's a stand-alone property.
+    /// Path components are not part of *URLComponents*.
     let pathComponents: [String]
 
 
@@ -40,7 +40,7 @@ class KvHttpRequestContext {
               let urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
         else { return nil }
 
-        method = head.method.rawValue
+        method = head.method
         self.url = url
         self.urlComponents = urlComponents
         pathComponents = url.pathComponents

@@ -27,15 +27,16 @@
 ///
 /// Below is an example for various URL query item declarations:
 ///
-///     KvHttpResponse.dynamic
-///         .query(.required("int", of: Int.self))
-///         .query(.optional("string"))
-///         .query(.optional("float", of: Float.self))
-///         .query(.required("base64", parseBlock: { $0.flatMap { Data(base64Encoded: $0) } ?? .failure } ))
-///         .query(.bool("flag"))
-///         .query(.void("void"))
-///         .content(callback)
-///
+/// ```swift
+/// KvHttpResponse.dynamic
+///     .query(.required("int", of: Int.self))
+///     .query(.optional("string"))
+///     .query(.optional("float", of: Float.self))
+///     .query(.required("base64", parseBlock: { $0.flatMap { Data(base64Encoded: $0) } ?? .failure } ))
+///     .query(.bool("flag"))
+///     .query(.void("void"))
+///     .content(callback)
+/// ```
 public struct KvUrlQueryItem<Value> {
 
     @usableFromInline

@@ -60,7 +60,7 @@ struct DeclarativeServer : KvServer {
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
             /// Static responses ignore any request context like URL and HTTP method.
             KvHttpResponse.static {
-                .string("Hello! It's a sample server on declarative API of kvServerKit framework")
+                .string { "Hello! It's a sample server on declarative API from kvServerKit framework." }
             }
 
             /// Dynamic responses depend on request context.
@@ -70,7 +70,7 @@ struct DeclarativeServer : KvServer {
                 .query(.required("name"))
                 .content { context in
                     let name = context.query.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return .string("Hello, \(!name.isEmpty ? name : "client")!")
+                    return .string { "Hello, \(!name.isEmpty ? name : "client")!" }
                 }
 
             /// Groups with single unlabeled string argument provide paths to responses.
@@ -90,10 +90,8 @@ struct DeclarativeServer : KvServer {
                             let lowerBound = from ?? .min, upperBound = through ?? .max
                             return lowerBound <= upperBound ? .success(lowerBound ... upperBound) : .failure
                         }
-                        /// Now `$0.query` is the range.
-                        .content {
-                            .string("\(Int.random(in: $0.query))")
-                        }
+                        /// Now `context.query` is the range.
+                        .content { context in .string { "\(Int.random(in: context.query))" } }
                 }
 
                 KvGroup("uuid") {
@@ -106,10 +104,10 @@ struct DeclarativeServer : KvServer {
 
                             switch context.query {
                             case true:
-                                return .string(uuid.uuidString)
+                                return .string { uuid.uuidString }
                             case false:
                                 return withUnsafeBytes(of: uuid, { buffer in
-                                    return .binary(buffer)
+                                    return .binary { buffer }
                                 })
                             }
                         }
@@ -119,7 +117,7 @@ struct DeclarativeServer : KvServer {
             .onHttpIncident { incident in
                 switch incident.defaultStatus {
                 case .notFound:
-                    return .notFound.string("Usage:\n  - /random/int[?from=1[&through=5]];\n  - /random/uuid[?string].")
+                    return .notFound.string { "Usage:\n  - /random/int[?from=1[&through=5]];\n  - /random/uuid[?string]." }
                 default:
                     return nil
                 }
@@ -148,9 +146,7 @@ struct DeclarativeServer : KvServer {
                     .queryMap { queryItems in
                         (queryItems?.first).map { "\"\($0.value ?? "")\"" } ?? "nil"
                     }
-                    .content {
-                        .string($0.query)
-                    }
+                    .content { context in .string { context.query } }
             }
 
             /// Responses and response groups can be wrapped to types.
@@ -174,13 +170,13 @@ struct DeclarativeServer : KvServer {
                 KvGroup("echo") {
                     /// This response returns binary data provided in the request body.
                     KvHttpResponse.dynamic
-                        /// This modifier and the argument provide collecting of data before content is produced.
+                        /// This modifier and the argument provide collecting of data before it is processed.
                         ///
-                        /// - Note: The result is optional. Request is not discarded if it has no body.
+                        /// - Note: The resulting body value is optional. It's `nil` when request has no body.
                         .requestBody(.data)
                         .content { context in
                             guard let data: Data = context.requestBody else { return .badRequest }
-                            return .binary(data)
+                            return .binary({ data }).contentLength(data.count)
                         }
                 }
                 KvGroup("bytesum") {
@@ -193,9 +189,7 @@ struct DeclarativeServer : KvServer {
                         .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
                             buffer.reduce(accumulator, &+)
                         }))
-                        .content {
-                            .string("0x" + String($0.requestBody, radix: 16, uppercase: true))
-                        }
+                        .content { context in .string { "0x" + String(context.requestBody, radix: 16, uppercase: true) } }
                 }
             }
             /// Responses in the group above are provided for HTTP requests with POST method only.
@@ -223,20 +217,19 @@ struct DeclarativeServer : KvServer {
                             .requestBody(.json(of: DateComponents.self))
                             .content {
                                 guard let date = $0.requestBody.date else { return .badRequest }
-                                return .string(ISO8601DateFormatter().string(from: date))
+                                return .string { ISO8601DateFormatter().string(from: date) }
                             }
                     }
                 }
                 KvGroup(httpMethods: .GET) {
                     /// Returns JSON representation of current date.
                     KvHttpResponse.static {
-                        do {
-                            return try .json(Calendar.current.dateComponents(
+                        .json {
+                            Calendar.current.dateComponents(
                                 [ .calendar, .year, .month, .day, .hour, .minute, .second, .nanosecond, .timeZone ],
-                                from: Date())
+                                from: Date()
                             )
                         }
-                        catch { return .internalServerError.string("\(error)") }
                     }
                 }
             }
@@ -249,12 +242,11 @@ struct DeclarativeServer : KvServer {
         .onHttpIncident { incident in
             switch incident.defaultStatus {
             case .notFound:
-                return .notFound.string("Unexpected request (404)\n\nSee implementation of `DeclarativeServer.body` for supported requests.")
+                return .notFound.string { "Unexpected request (404)\n\nSee implementation of `DeclarativeServer.body` for supported requests." }
             default:
                 return nil
             }
         }
-
     }
 
 
@@ -287,12 +279,11 @@ struct DeclarativeServer : KvServer {
                 let count = context.query
 
                 // Note the way text responses with 400 status code are produced.
-                guard count >= 0 else { return .badRequest.string("Invalid argument: count (\(count)) is negative") }
-                guard count <= limit else { return .badRequest.string("Invalid argument: count (\(count)) is too large") }
+                guard count >= 0 else { return .badRequest.string { "Invalid argument: count (\(count)) is negative" } }
+                guard count <= limit else { return .badRequest.string { "Invalid argument: count (\(count)) is too large" } }
 
                 // Response is a JSON array.
-                do { return try .json((0..<count).lazy.map { _ in Int.random(in: .min ... .max) }) }
-                catch { return .internalServerError.string("Failed to encode JSON. \(error)") }
+                return .json { (0..<count).lazy.map { _ in Int.random(in: .min ... .max) } }
             }
     }
 
@@ -306,13 +297,13 @@ struct DeclarativeServer : KvServer {
             KvHttpResponse.dynamic
                 .query(.required("lhs", of: Double.self))
                 .query(.required("rhs", of: Double.self))
-                .content { .string("\($0.query.0 + $0.query.1)") }
+                .content { context in .string { "\(context.query.0 + context.query.1)" } }
         }
         KvGroup("sub") {
             KvHttpResponse.dynamic
                 .query(.required("lhs", of: Double.self))
                 .query(.required("rhs", of: Double.self))
-                .content { .string("\($0.query.0 - $0.query.1)") }
+                .content { context in .string { "\(context.query.0 - context.query.1)" } }
         }
     }
 
@@ -332,18 +323,16 @@ struct DeclarativeServer : KvServer {
                 .content {
                     switch $0.query {
                     case (let from, .none):
-                        return .string("\(from) ...")
+                        return .string { "\(from) ..." }
                     case (let from, .some(let to)):
-                        guard from <= to else { return .badRequest.string("Invalid arguments: `from` (\(from)) must be less than or equal to `to` (\(to))") }
-                        return .string("\(from) ..< \(to)")
+                        guard from <= to else { return .badRequest.string { "Invalid arguments: `from` (\(from)) must be less than or equal to `to` (\(to))" } }
+                        return .string { "\(from) ..< \(to)" }
                     }
                 }
 
             KvHttpResponse.dynamic
                 .query(.required("to", of: Value.self))
-                .content {
-                    .string("..< \($0.query)")
-                }
+                .content { context in .string { "..< \(context.query)" } }
 
             KvHttpResponse.dynamic
                 .query(.optional("from", of: Value.self))
@@ -351,10 +340,10 @@ struct DeclarativeServer : KvServer {
                 .content {
                     switch $0.query {
                     case (.none, let through):
-                        return .string("... \(through)")
+                        return .string { "... \(through)" }
                     case (.some(let from), let through):
-                        guard from <= through else { return .badRequest.string("Invalid arguments: `from` (\(from)) must be less than or equal to `through` (\(through))") }
-                        return .string("\(from) ... \(through)")
+                        guard from <= through else { return .badRequest.string { "Invalid arguments: `from` (\(from)) must be less than or equal to `through` (\(through))" } }
+                        return .string { "\(from) ... \(through)" }
                     }
                 }
         }

@@ -28,13 +28,38 @@ import NIOHTTP1
 
 
 
+// TODO: Apply consuming, borrowing, consume, copy keywords in Swift 5.9.
+
+/// Representation of HTTP responses.
+/// It's implemented in declarative way.
+/// It provides deferred access to body providers so, for example, the same declaration can be effectively used for both GET and HEAD methods.
+///
+/// Examples:
+///
+/// ```swift
+/// // Plain text response
+/// .string { "Test pesponse" }
+///
+/// // Raw byte response
+/// .binary { data }
+///     .contentLength(data.count)
+///
+/// // Status 404 response with content of an HTML file
+/// .notFound
+///     .contentType(.text(.html))
+///     .binary(InputStream(fileAtPath: pathToHTML)!)
+/// ```
 public struct KvHttpResponseProvider {
 
     public typealias Status = HTTPResponseStatus
 
     public typealias HeaderCallback = (inout HTTPHeaders) -> Void
 
+    /// Body callback is used to write body fragments to provided client's buffer.
+    /// Body callback returns number of actually written bytes or an error as a standard *Result*.
     public typealias BodyCallback = (UnsafeMutableRawBufferPointer) -> Result<Int, Error>
+    /// A block providing an optional ``BodyCallback`` or an error.
+    public typealias BodyCallbackProvider = () -> Result<BodyCallback, Error>
 
 
     /// HTTP response status code.
@@ -45,13 +70,14 @@ public struct KvHttpResponseProvider {
     @usableFromInline
     var customHeaderCallback: HeaderCallback?
 
-    /// It's used to write body fragments to the clients buffer.
+    /// This property is called just before response body is sent to a client.
+    /// Also it can be ignored, for example when HTTP method is *HEAD*.
     ///
-    /// The callback is passed with pointer to the buffer and the buffer size in bytes.
+    /// `Nil` value means that response has no body.
     ///
-    /// The callback returns number of actually written bytes or an error as a standard *Result*.
+    /// See ``BodyCallbackProvider`` and ``BodyCallback`` for details.
     @usableFromInline
-    var bodyCallback: BodyCallback?
+    var bodyCallbackProvider: BodyCallbackProvider?
 
     /// Optional value for `Content-Type` HTTP header in response. If `nil` then the header is not provided in response.
     @usableFromInline
@@ -72,14 +98,14 @@ public struct KvHttpResponseProvider {
          contentType: ContentType? = nil,
          contentLength: UInt64? = nil,
          options: Options = [ ],
-         bodyCallback: BodyCallback? = nil
+         bodyCallbackProvider: BodyCallbackProvider? = nil
     ) {
         self.status = status
         self.customHeaderCallback = customHeaderCallback
         self.contentType = contentType
         self.contentLength = contentLength
         self.options = options
-        self.bodyCallback = bodyCallback
+        self.bodyCallbackProvider = bodyCallbackProvider
     }
 
 
@@ -289,7 +315,7 @@ public struct KvHttpResponseProvider {
 
     @inline(__always)
     @usableFromInline
-    func map(_ transform: (inout Self) -> Void) -> Self {
+    func modified(_ transform: (inout Self) -> Void) -> Self {
         var copy = self
         transform(&copy)
         return copy
@@ -303,7 +329,21 @@ public struct KvHttpResponseProvider {
 
 extension KvHttpResponseProvider {
 
-    /// - Returns: An instance where body is provided via *callback*, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
+    /// - Returns:  An instance where body is provided via *provider*, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
+    ///             See``BodyCallbackProvider`` for details.
+    ///
+    /// - Important: *Provider* block can be ignored, for example when HTTP method is *HEAD*.
+    @inlinable
+    public static func bodyCallbackProvider(_ provider: @escaping BodyCallbackProvider) -> Self {
+        Self(contentType: .application(.octetStream))
+            .bodyCallbackProvider(provider)
+    }
+
+
+    /// - Returns:  An instance where body is provided via *callback*, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
+    ///             See``BodyCallback`` for details.
+    ///
+    /// - Important: *Callback* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func bodyCallback(_ callback: @escaping BodyCallback) -> Self {
         Self(contentType: .application(.octetStream))
@@ -323,9 +363,11 @@ extension KvHttpResponseProvider {
 
 extension KvHttpResponseProvider {
 
-    /// - Returns: An instance where body is taken from provided *bytes*, `contentType` is `.application(.octetStream)`, `contentLength` is equal to number of bytes in *data*, *status* is `.ok`.
+    /// - Returns: An instance where body is taken from provided *bytes* callback, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
+    ///
+    /// - Important: *Bytes* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public static func binary<D>(_ bytes: D) -> Self
+    public static func binary<D>(_ bytes: @escaping () throws -> D) -> Self
     where D : DataProtocol, D.Index == Int
     {
         Self().binary(bytes)
@@ -334,19 +376,23 @@ extension KvHttpResponseProvider {
 
     /// - Returns: An instance where body is taken from provided *stream*, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
     ///
-    /// - Note: Note that `contentLength` is used as read limit if provided.
+    /// - Important: *Sream* can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func binary(_ stream: InputStream) -> Self { Self().binary(stream) }
 
 
-    /// - Returns: An instance where body is JSON representation of given *payload*, `contentType` is `.application(.json)`, `contentLength` is equal to number of bytes in the representation, *status* is `.ok`.
+    /// - Returns: An instance where body is JSON representation of given *payload*, `contentType` is `.application(.json)`, *status* is `.ok`.
+    ///
+    /// - Important: *Payload* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public static func json<T : Encodable>(_ payload: T) throws -> Self { try Self().json(payload) }
+    public static func json<T : Encodable>(_ payload: @escaping () throws -> T) -> Self { Self().json(payload) }
 
 
-    /// - Returns: An instance where body is UTF8 representation of given *string*, `contentType` is `.text(.plain)`, `contentLength` is equal to number of bytes in the representation, *status* is `.ok`.
+    /// - Returns: An instance where body is UTF8 representation of given *string*, `contentType` is `.text(.plain)`, *status* is `.ok`.
+    ///
+    /// - Important: *String* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public static func string<S: StringProtocol>(_ string: S) -> Self { Self().string(string) }
+    public static func string<S: StringProtocol>(_ string: @escaping () throws -> S) -> Self { Self().string(string) }
 
 }
 
@@ -479,21 +525,34 @@ extension KvHttpResponseProvider {
 
 extension KvHttpResponseProvider {
 
-    /// - Returns: A copy where body is provided via *callback*.
+    /// - Returns: A copy where body is provided via *provider*. See``BodyCallbackProvider`` for details.
     ///
     /// - Note: `contentType`, `contentLength` and other properties are not changed.
+    ///
+    /// - Important: *Provider* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public func bodyCallback(_ callback: @escaping BodyCallback) -> Self { map { $0.bodyCallback = callback } }
+    public func bodyCallbackProvider(_ provider: @escaping BodyCallbackProvider) -> Self { modified {
+        $0.bodyCallbackProvider = provider
+    } }
+
+
+    /// - Returns: A copy where body is provided via *callback*. See``BodyCallback`` for details.
+    ///
+    /// - Note: `contentType`, `contentLength` and other properties are not changed.
+    ///
+    /// - Important: *Callback* block can be ignored, for example when HTTP method is *HEAD*.
+    @inlinable
+    public func bodyCallback(_ callback: @escaping BodyCallback) -> Self { bodyCallbackProvider { .success(callback) } }
 
 
     /// - Returns: A copy where *status* is changed to given value.
     @inlinable
-    public func status(_ status: Status) -> Self { map { $0.status = status } }
+    public func status(_ status: Status) -> Self { modified { $0.status = status } }
 
 
     /// - Returns:A copy where given block is appended to chain of callbacks to be invoked before HTTP headers are sent to client.
     @inlinable
-    public func headers(_ callback: @escaping HeaderCallback) -> Self { map {
+    public func headers(_ callback: @escaping HeaderCallback) -> Self { modified {
         switch $0.customHeaderCallback {
         case .none:
             $0.customHeaderCallback = callback
@@ -508,12 +567,12 @@ extension KvHttpResponseProvider {
 
     /// - Returns: A copy where `contentType` is changed to given *value*.
     @inlinable
-    public func contentType(_ value: ContentType) -> Self { map { $0.contentType = value } }
+    public func contentType(_ value: ContentType) -> Self { modified { $0.contentType = value } }
 
 
     /// - Returns: A copy where `contentLength` is changed to given *value*.
     @inlinable
-    public func contentLength(_ value: UInt64) -> Self { map { $0.contentLength = value } }
+    public func contentLength(_ value: UInt64) -> Self { modified { $0.contentLength = value } }
 
 
     /// Convenient method converting given *value* from any *BinaryInteger* value to *UInt64*.
@@ -530,55 +589,66 @@ extension KvHttpResponseProvider {
 
 extension KvHttpResponseProvider {
 
-    /// - Returns: A copy where body is taken from provided *bytes*, missing `contentType` is changed to `.application(.octetStream)`, missing `contentLength` is changed to number of bytes in *data*.
+    /// - Returns: A copy where body is taken from provided *bytes* callback, missing `contentType` is changed to `.application(.octetStream)`.
+    ///
+    /// - Important: *Bytes* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public func binary<D>(_ bytes: D) -> Self
+    public func binary<D>(_ bytes: @escaping () throws -> D) -> Self
     where D : DataProtocol, D.Index == Int
     {
-        map {
-            $0.bodyCallback = Self.dataBodyCallback(bytes)
+        modified {
+            $0.bodyCallbackProvider = { Result {
+                let data = try bytes()
+
+                return Self.dataBodyCallback(data)
+            } }
             $0.contentType = $0.contentType ?? .application(.octetStream)
-            $0.contentLength = $0.contentLength ?? numericCast(bytes.count)
         }
     }
 
 
     /// - Returns: A copy where body is taken from provided *stream*, missing `contentType` is changed to `.application(.octetStream)`.
     ///
-    /// - Note: Note that `contentLength` is used as read limit if provided.
-    ///
-    /// - Note: `contentLength` and other properties are not changed.
+    /// - Important: *Sream* can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func binary(_ stream: InputStream) -> Self {
-        map {
-            $0.bodyCallback = Self.streamBodyCallback(stream)
+        modified {
+            $0.bodyCallbackProvider = { .success(Self.streamBodyCallback(stream)) }
             $0.contentType = $0.contentType ?? .application(.octetStream)
         }
     }
 
 
-    /// - Returns: A copy where body is JSON representation of given *payload*, missing `contentType` is changed to `.application(.json)`, missing `contentLength` is changed to number of bytes in the representation.
+    /// - Returns: A copy where body is JSON representation of given *payload*, missing `contentType` is changed to `.application(.json)`.
+    ///
+    /// - Important: *Payload* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public func json<T : Encodable>(_ payload: T) throws -> Self {
-        let data = try JSONEncoder().encode(payload)
+    public func json<T : Encodable>(_ payload: @escaping () throws -> T) -> Self {
+        modified {
+            $0.bodyCallbackProvider = { Result {
+                let payload = try payload()
+                let data = try JSONEncoder().encode(payload)
 
-        return map {
-            $0.bodyCallback = Self.dataBodyCallback(data)
+                return Self.dataBodyCallback(data)
+            } }
             $0.contentType = $0.contentType ?? .application(.json)
-            $0.contentLength = $0.contentLength ?? numericCast(data.count)
         }
     }
 
 
-    /// - Returns: A copy where body is UTF8 representation of given *string*, missing`contentType` is changed to `.text(.plain)`, missing `contentLength` is equal to number of bytes in the representation.
+    /// - Returns: A copy where body is UTF8 representation of given *string*, missing`contentType` is changed to `.text(.plain)`.
+    ///
+    /// - Important: *String* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public func string<S: StringProtocol>(_ string: S) -> Self {
-        let data = string.data(using: .utf8)!
+    public func string<S: StringProtocol>(_ string: @escaping () throws -> S) -> Self {
+        modified {
+            $0.bodyCallbackProvider = { Result {
+                let string = try string()
+                let data = string.data(using: .utf8)!
 
-        return map {
-            $0.bodyCallback = Self.dataBodyCallback(data)
+                return Self.dataBodyCallback(data)
+            } }
             $0.contentType = $0.contentType ?? .text(.plain)
-            $0.contentLength = $0.contentLength ?? numericCast(data.count)
         }
     }
 
@@ -591,119 +661,119 @@ extension KvHttpResponseProvider {
 extension KvHttpResponseProvider {
 
     /// - Returns: A copy where *status* is chaned to`.ok`.
-    @inlinable public var ok: Self { map { $0.status = .ok } }
+    @inlinable public var ok: Self { modified { $0.status = .ok } }
     /// - Returns: A copy where *status* is chaned to`.created`.
-    @inlinable public var created: Self { map { $0.status = .created } }
+    @inlinable public var created: Self { modified { $0.status = .created } }
     /// - Returns: A copy where *status* is chaned to`.accepted`.
-    @inlinable public var accepted: Self { map { $0.status = .accepted } }
+    @inlinable public var accepted: Self { modified { $0.status = .accepted } }
     /// - Returns: A copy where *status* is chaned to`.nonAuthoritativeInformation`.
-    @inlinable public var nonAuthoritativeInformation: Self { map { $0.status = .nonAuthoritativeInformation } }
+    @inlinable public var nonAuthoritativeInformation: Self { modified { $0.status = .nonAuthoritativeInformation } }
     /// - Returns: A copy where *status* is chaned to`.noContent`.
-    @inlinable public var noContent: Self { map { $0.status = .noContent } }
+    @inlinable public var noContent: Self { modified { $0.status = .noContent } }
     /// - Returns: A copy where *status* is chaned to`.resetContent`.
-    @inlinable public var resetContent: Self { map { $0.status = .resetContent } }
+    @inlinable public var resetContent: Self { modified { $0.status = .resetContent } }
     /// - Returns: A copy where *status* is chaned to`.partialContent`.
-    @inlinable public var partialContent: Self { map { $0.status = .partialContent } }
+    @inlinable public var partialContent: Self { modified { $0.status = .partialContent } }
     /// - Returns: A copy where *status* is chaned to`.multiStatus`.
-    @inlinable public var multiStatus: Self { map { $0.status = .multiStatus } }
+    @inlinable public var multiStatus: Self { modified { $0.status = .multiStatus } }
     /// - Returns: A copy where *status* is chaned to`.alreadyReported`.
-    @inlinable public var alreadyReported: Self { map { $0.status = .alreadyReported } }
+    @inlinable public var alreadyReported: Self { modified { $0.status = .alreadyReported } }
     /// - Returns: A copy where *status* is chaned to`.imUsed`.
-    @inlinable public var imUsed: Self { map { $0.status = .imUsed } }
+    @inlinable public var imUsed: Self { modified { $0.status = .imUsed } }
     /// - Returns: A copy where *status* is chaned to`.multipleChoices`.
-    @inlinable public var multipleChoices: Self { map { $0.status = .multipleChoices } }
+    @inlinable public var multipleChoices: Self { modified { $0.status = .multipleChoices } }
     /// - Returns: A copy where *status* is chaned to`.movedPermanently`.
-    @inlinable public var movedPermanently: Self { map { $0.status = .movedPermanently } }
+    @inlinable public var movedPermanently: Self { modified { $0.status = .movedPermanently } }
     /// - Returns: A copy where *status* is chaned to`.found`.
-    @inlinable public var found: Self { map { $0.status = .found } }
+    @inlinable public var found: Self { modified { $0.status = .found } }
     /// - Returns: A copy where *status* is chaned to`.seeOther`.
-    @inlinable public var seeOther: Self { map { $0.status = .seeOther } }
+    @inlinable public var seeOther: Self { modified { $0.status = .seeOther } }
     /// - Returns: A copy where *status* is chaned to`.notModified`.
-    @inlinable public var notModified: Self { map { $0.status = .notModified } }
+    @inlinable public var notModified: Self { modified { $0.status = .notModified } }
     /// - Returns: A copy where *status* is chaned to`.useProxy`.
-    @inlinable public var useProxy: Self { map { $0.status = .useProxy } }
+    @inlinable public var useProxy: Self { modified { $0.status = .useProxy } }
     /// - Returns: A copy where *status* is chaned to`.temporaryRedirect`.
-    @inlinable public var temporaryRedirect: Self { map { $0.status = .temporaryRedirect } }
+    @inlinable public var temporaryRedirect: Self { modified { $0.status = .temporaryRedirect } }
     /// - Returns: A copy where *status* is chaned to`.permanentRedirect`.
-    @inlinable public var permanentRedirect: Self { map { $0.status = .permanentRedirect } }
+    @inlinable public var permanentRedirect: Self { modified { $0.status = .permanentRedirect } }
     /// - Returns: A copy where *status* is chaned to`.badRequest`.
-    @inlinable public var badRequest: Self { map { $0.status = .badRequest } }
+    @inlinable public var badRequest: Self { modified { $0.status = .badRequest } }
     /// - Returns: A copy where *status* is chaned to`.unauthorized`.
-    @inlinable public var unauthorized: Self { map { $0.status = .unauthorized } }
+    @inlinable public var unauthorized: Self { modified { $0.status = .unauthorized } }
     /// - Returns: A copy where *status* is chaned to`.paymentRequired`.
-    @inlinable public var paymentRequired: Self { map { $0.status = .paymentRequired } }
+    @inlinable public var paymentRequired: Self { modified { $0.status = .paymentRequired } }
     /// - Returns: A copy where *status* is chaned to`.forbidden`.
-    @inlinable public var forbidden: Self { map { $0.status = .forbidden } }
+    @inlinable public var forbidden: Self { modified { $0.status = .forbidden } }
     /// - Returns: A copy where *status* is chaned to`.notFound`.
-    @inlinable public var notFound: Self { map { $0.status = .notFound } }
+    @inlinable public var notFound: Self { modified { $0.status = .notFound } }
     /// - Returns: A copy where *status* is chaned to`.methodNotAllowed`.
-    @inlinable public var methodNotAllowed: Self { map { $0.status = .methodNotAllowed } }
+    @inlinable public var methodNotAllowed: Self { modified { $0.status = .methodNotAllowed } }
     /// - Returns: A copy where *status* is chaned to`.notAcceptable`.
-    @inlinable public var notAcceptable: Self { map { $0.status = .notAcceptable } }
+    @inlinable public var notAcceptable: Self { modified { $0.status = .notAcceptable } }
     /// - Returns: A copy where *status* is chaned to`.proxyAuthenticationRequired`.
-    @inlinable public var proxyAuthenticationRequired: Self { map { $0.status = .proxyAuthenticationRequired } }
+    @inlinable public var proxyAuthenticationRequired: Self { modified { $0.status = .proxyAuthenticationRequired } }
     /// - Returns: A copy where *status* is chaned to`.requestTimeout`.
-    @inlinable public var requestTimeout: Self { map { $0.status = .requestTimeout } }
+    @inlinable public var requestTimeout: Self { modified { $0.status = .requestTimeout } }
     /// - Returns: A copy where *status* is chaned to`.conflict`.
-    @inlinable public var conflict: Self { map { $0.status = .conflict } }
+    @inlinable public var conflict: Self { modified { $0.status = .conflict } }
     /// - Returns: A copy where *status* is chaned to`.gone`.
-    @inlinable public var gone: Self { map { $0.status = .gone } }
+    @inlinable public var gone: Self { modified { $0.status = .gone } }
     /// - Returns: A copy where *status* is chaned to`.lengthRequired`.
-    @inlinable public var lengthRequired: Self { map { $0.status = .lengthRequired } }
+    @inlinable public var lengthRequired: Self { modified { $0.status = .lengthRequired } }
     /// - Returns: A copy where *status* is chaned to`.preconditionFailed`.
-    @inlinable public var preconditionFailed: Self { map { $0.status = .preconditionFailed } }
+    @inlinable public var preconditionFailed: Self { modified { $0.status = .preconditionFailed } }
     /// - Returns: A copy where *status* is chaned to`.payloadTooLarge`.
-    @inlinable public var payloadTooLarge: Self { map { $0.status = .payloadTooLarge } }
+    @inlinable public var payloadTooLarge: Self { modified { $0.status = .payloadTooLarge } }
     /// - Returns: A copy where *status* is chaned to`.uriTooLong`.
-    @inlinable public var uriTooLong: Self { map { $0.status = .uriTooLong } }
+    @inlinable public var uriTooLong: Self { modified { $0.status = .uriTooLong } }
     /// - Returns: A copy where *status* is chaned to`.unsupportedMediaType`.
-    @inlinable public var unsupportedMediaType: Self { map { $0.status = .unsupportedMediaType } }
+    @inlinable public var unsupportedMediaType: Self { modified { $0.status = .unsupportedMediaType } }
     /// - Returns: A copy where *status* is chaned to`.rangeNotSatisfiable`.
-    @inlinable public var rangeNotSatisfiable: Self { map { $0.status = .rangeNotSatisfiable } }
+    @inlinable public var rangeNotSatisfiable: Self { modified { $0.status = .rangeNotSatisfiable } }
     /// - Returns: A copy where *status* is chaned to`.expectationFailed`.
-    @inlinable public var expectationFailed: Self { map { $0.status = .expectationFailed } }
+    @inlinable public var expectationFailed: Self { modified { $0.status = .expectationFailed } }
     /// - Returns: A copy where *status* is chaned to`.imATeapot`.
-    @inlinable public var imATeapot: Self { map { $0.status = .imATeapot } }
+    @inlinable public var imATeapot: Self { modified { $0.status = .imATeapot } }
     /// - Returns: A copy where *status* is chaned to`.misdirectedRequest`.
-    @inlinable public var misdirectedRequest: Self { map { $0.status = .misdirectedRequest } }
+    @inlinable public var misdirectedRequest: Self { modified { $0.status = .misdirectedRequest } }
     /// - Returns: A copy where *status* is chaned to`.unprocessableEntity`.
-    @inlinable public var unprocessableEntity: Self { map { $0.status = .unprocessableEntity } }
+    @inlinable public var unprocessableEntity: Self { modified { $0.status = .unprocessableEntity } }
     /// - Returns: A copy where *status* is chaned to`.locked`.
-    @inlinable public var locked: Self { map { $0.status = .locked } }
+    @inlinable public var locked: Self { modified { $0.status = .locked } }
     /// - Returns: A copy where *status* is chaned to`.failedDependency`.
-    @inlinable public var failedDependency: Self { map { $0.status = .failedDependency } }
+    @inlinable public var failedDependency: Self { modified { $0.status = .failedDependency } }
     /// - Returns: A copy where *status* is chaned to`.upgradeRequired`.
-    @inlinable public var upgradeRequired: Self { map { $0.status = .upgradeRequired } }
+    @inlinable public var upgradeRequired: Self { modified { $0.status = .upgradeRequired } }
     /// - Returns: A copy where *status* is chaned to`.preconditionRequired`.
-    @inlinable public var preconditionRequired: Self { map { $0.status = .preconditionRequired } }
+    @inlinable public var preconditionRequired: Self { modified { $0.status = .preconditionRequired } }
     /// - Returns: A copy where *status* is chaned to`.tooManyRequests`.
-    @inlinable public var tooManyRequests: Self { map { $0.status = .tooManyRequests } }
+    @inlinable public var tooManyRequests: Self { modified { $0.status = .tooManyRequests } }
     /// - Returns: A copy where *status* is chaned to`.requestHeaderFieldsTooLarge`.
-    @inlinable public var requestHeaderFieldsTooLarge: Self { map { $0.status = .requestHeaderFieldsTooLarge } }
+    @inlinable public var requestHeaderFieldsTooLarge: Self { modified { $0.status = .requestHeaderFieldsTooLarge } }
     /// - Returns: A copy where *status* is chaned to`.unavailableForLegalReasons`.
-    @inlinable public var unavailableForLegalReasons: Self { map { $0.status = .unavailableForLegalReasons } }
+    @inlinable public var unavailableForLegalReasons: Self { modified { $0.status = .unavailableForLegalReasons } }
     /// - Returns: A copy where *status* is chaned to`.internalServerError`.
-    @inlinable public var internalServerError: Self { map { $0.status = .internalServerError } }
+    @inlinable public var internalServerError: Self { modified { $0.status = .internalServerError } }
     /// - Returns: A copy where *status* is chaned to`.notImplemented`.
-    @inlinable public var notImplemented: Self { map { $0.status = .notImplemented } }
+    @inlinable public var notImplemented: Self { modified { $0.status = .notImplemented } }
     /// - Returns: A copy where *status* is chaned to`.badGateway`.
-    @inlinable public var badGateway: Self { map { $0.status = .badGateway } }
+    @inlinable public var badGateway: Self { modified { $0.status = .badGateway } }
     /// - Returns: A copy where *status* is chaned to`.serviceUnavailable`.
-    @inlinable public var serviceUnavailable: Self { map { $0.status = .serviceUnavailable } }
+    @inlinable public var serviceUnavailable: Self { modified { $0.status = .serviceUnavailable } }
     /// - Returns: A copy where *status* is chaned to`.gatewayTimeout`.
-    @inlinable public var gatewayTimeout: Self { map { $0.status = .gatewayTimeout } }
+    @inlinable public var gatewayTimeout: Self { modified { $0.status = .gatewayTimeout } }
     /// - Returns: A copy where *status* is chaned to`.httpVersionNotSupported`.
-    @inlinable public var httpVersionNotSupported: Self { map { $0.status = .httpVersionNotSupported } }
+    @inlinable public var httpVersionNotSupported: Self { modified { $0.status = .httpVersionNotSupported } }
     /// - Returns: A copy where *status* is chaned to`.variantAlsoNegotiates`.
-    @inlinable public var variantAlsoNegotiates: Self { map { $0.status = .variantAlsoNegotiates } }
+    @inlinable public var variantAlsoNegotiates: Self { modified { $0.status = .variantAlsoNegotiates } }
     /// - Returns: A copy where *status* is chaned to`.insufficientStorage`.
-    @inlinable public var insufficientStorage: Self { map { $0.status = .insufficientStorage } }
+    @inlinable public var insufficientStorage: Self { modified { $0.status = .insufficientStorage } }
     /// - Returns: A copy where *status* is chaned to`.loopDetected`.
-    @inlinable public var loopDetected: Self { map { $0.status = .loopDetected } }
+    @inlinable public var loopDetected: Self { modified { $0.status = .loopDetected } }
     /// - Returns: A copy where *status* is chaned to`.notExtended`.
-    @inlinable public var notExtended: Self { map { $0.status = .notExtended } }
+    @inlinable public var notExtended: Self { modified { $0.status = .notExtended } }
     /// - Returns: A copy where *status* is chaned to`.networkAuthenticationRequired`.
-    @inlinable public var networkAuthenticationRequired: Self { map { $0.status = .networkAuthenticationRequired } }
+    @inlinable public var networkAuthenticationRequired: Self { modified { $0.status = .networkAuthenticationRequired } }
 
 }
 
@@ -715,7 +785,7 @@ extension KvHttpResponseProvider {
 
     /// Sets or clears ``KvHttpResponseProvider/Options/needsDisconnect`` option.
     @inlinable public func needsDisconnect(_ value: Bool = true) -> Self {
-        map { value ? $0.options.formUnion(.needsDisconnect) : $0.options.subtract(.needsDisconnect) }
+        modified { value ? $0.options.formUnion(.needsDisconnect) : $0.options.subtract(.needsDisconnect) }
     }
 
 }

@@ -125,9 +125,9 @@ public func KvGroup<Methods, Content : KvResponseGroup>(
     httpMethods: Methods,
     @KvResponseGroupBuilder content: @escaping () -> Content
 ) -> some KvResponseGroup
-where Methods : Sequence, Methods.Element == KvResponseGroup.HttpMethod
+where Methods : Sequence, Methods.Element == KvHttpMethod
 {
-    KvModifiedResponseGroup(configuration: .init(dispatching: .init(httpMethods: Set(httpMethods.lazy.map { $0.rawValue }))), source: content)
+    KvModifiedResponseGroup(configuration: .init(dispatching: .init(httpMethods: Set(httpMethods))), source: content)
 }
 
 
@@ -158,7 +158,7 @@ where Methods : Sequence, Methods.Element == KvResponseGroup.HttpMethod
 /// See: ``KvResponseGroup/httpMethods(_:)-6fbma``.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
-    httpMethods: KvResponseGroup.HttpMethod...,
+    httpMethods: KvHttpMethod...,
     @KvResponseGroupBuilder content: @escaping () -> Content
 ) -> some KvResponseGroup {
     KvGroup(httpMethods: httpMethods, content: content)

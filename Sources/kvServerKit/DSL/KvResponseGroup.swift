@@ -113,8 +113,6 @@ extension KvResponseGroup {
 
     public typealias HTTP = KvHttpConfiguration
 
-    public typealias HttpMethod = HTTPMethod
-
 
     @usableFromInline
     typealias Configuration = KvModifiedResponseGroup.Configuration
@@ -200,10 +198,10 @@ extension KvResponseGroup {
     /// The result is the same as ``KvResponseGroup/httpMethods(_:)-6fbma``. See it's documentation for details.
     @inlinable
     public func httpMethods<Methods>(_ httpMethods: Methods) -> some KvResponseGroup
-    where Methods : Sequence, Methods.Element == HttpMethod
+    where Methods : Sequence, Methods.Element == KvHttpMethod
     {
         modified {
-            $0.dispatching.httpMethods.formUnion(httpMethods.lazy.map { $0.rawValue })
+            $0.dispatching.httpMethods.formUnion(httpMethods)
         }
     }
 
@@ -222,7 +220,7 @@ extension KvResponseGroup {
     ///
     /// See: ``KvGroup(httpMethods:content:)-29gzp``.
     @inlinable
-    public func httpMethods(_ httpMethods: HttpMethod...) -> some KvResponseGroup {
+    public func httpMethods(_ httpMethods: KvHttpMethod...) -> some KvResponseGroup {
         self.httpMethods(httpMethods)
     }
 
@@ -400,7 +398,7 @@ extension KvResponseGroup {
     ///     guard incident.defaultStatus == .notFound else { return nil }
     ///     return .notFound
     ///         .contentType(.text(.html))
-    ///         .string("Custom 404 HTML page")
+    ///         .string { "Custom 404 HTML page" }
     /// }
     /// ```
     ///
@@ -655,7 +653,7 @@ struct KvResponseGroupConfiguration {
 
         /// - Note: Empty set means any method.
         @usableFromInline
-        var httpMethods: Set<String>
+        var httpMethods: Set<KvHttpMethod>
 
         /// - Note: Empty set means any user.
         @usableFromInline
@@ -674,7 +672,7 @@ struct KvResponseGroupConfiguration {
 
 
         @usableFromInline
-        init(httpMethods: Set<String> = [ ],
+        init(httpMethods: Set<KvHttpMethod> = [ ],
              users: Set<String> = [ ],
              hosts: Set<String> = [ ],
              optionalSubdomains: Set<String> = [ ],

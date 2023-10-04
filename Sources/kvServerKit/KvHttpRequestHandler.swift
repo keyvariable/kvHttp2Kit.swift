@@ -45,6 +45,8 @@ public protocol KvHttpRequestHandler : AnyObject {
     /// Also you can return custom responses depending on default status.
     ///
     /// - Note: Server will close connection to the client just after the response will be submitted.
+    ///
+    /// - Important: Provided response should provide a valid optional body. If error occurs then server omits body.
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider?
 
     /// - Note: The client will continue to process requests.

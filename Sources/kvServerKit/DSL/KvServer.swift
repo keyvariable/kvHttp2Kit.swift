@@ -34,19 +34,28 @@ import Foundation
 /// struct ExampleServer : KvServer {
 ///     var body: some KvResponseGroup {
 ///         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-///             KvHttpResponse.static { .string("Hello, client") }
+///             KvHttpResponse.static { .string { "Hello, client" } }
 ///
 ///             KvGroup("echo") {
 ///                 KvHttpResponse.dynamic
 ///                     .requestBody(.data)
-///                     .content { .binary($0.requestBody ?? Data()) }
+///                     .content { ctx in
+///                         guard let data: Data = ctx.requestBody else { return .badRequest }
+///                         return .binary({ data }).contentLength(data.count)
+///                     }
 ///             }
 ///             .httpMethods(.POST)
 ///
 ///             KvGroup("uuid") {
 ///                 KvHttpResponse.static
-///                     .content { .string(UUID().uuidString) }
+///                     .content { .string { UUID().uuidString } }
 ///             }
+///         }
+///         .onHttpIncident { incident in
+///             guard incident.defaultStatus == .notFound else { return nil }
+///             return .notFound
+///                 .contentType(.text(.html))
+///                 .string { "Custom 404 HTML page" }
 ///         }
 ///         .hosts("example.com")
 ///         .subdomains(optional: "www")

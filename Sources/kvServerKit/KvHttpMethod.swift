@@ -15,41 +15,19 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvHttpRequest.swift
+//  KvHttpMethod.swift
 //  kvServerKit
 //
-//  Created by Svyatoslav Popov on 31.05.2023.
+//  Created by Svyatoslav Popov on 03.10.2023.
 //
 
 import NIOHTTP1
 
 
 
-public class KvHttpRequest {
-
-    private init() { }
+public typealias KvHttpMethod = HTTPMethod
 
 
+// MARK: : Hashable
 
-    // MARK: Typealiases
-
-    public typealias Method = HTTPMethod
-
-    public typealias Handler = KvHttpRequestHandler
-
-    public typealias CollectingBodyHandler = KvHttpCollectingBodyRequestHandler
-    public typealias HeadOnlyHandler = KvHttpHeadOnlyRequestHandler
-    public typealias JsonHandler = KvHttpJsonRequestHandler
-
-
-
-    // MARK: .Constants
-
-    public struct Constants {
-
-        /// Default limit for requests having body.
-        @inlinable public static var bodyLengthLimit: UInt { 16_384 /* 16 KiB */ }
-
-    }
-
-}
+extension KvHttpMethod : Hashable { }

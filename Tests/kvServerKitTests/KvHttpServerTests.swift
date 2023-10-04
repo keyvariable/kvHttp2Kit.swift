@@ -34,24 +34,7 @@ final class KvHttpServerTests : XCTestCase {
     // MARK: - testHttpServer()
 
     func testHttpServer() async throws {
-        let configurations = KvServerTestKit.testConfigurations
-
-        let server = ImperativeHttpServer(with: configurations)
-
-        try server.start()
-        defer {
-            server.stop()
-            try! server.waitUntilStopped().get()
-        }
-
-        // `channel.waitWhileStarting()` below can fail due to channels may be is in *stopped* state until server is completely started.
-        // So we wait while server is starting and then wait while channels are starting.
-        try server.waitWhileStarting().get()
-
-        try await server.forEachChannel { channel in
-            try channel.waitWhileStarting().get()
-            XCTAssertEqual(channel.state, .running)
-
+        try await onImperativeHttpServer(with: KvServerTestKit.testConfigurations) { channel in
             let configuration = channel.configuration
             let baseURL = KvServerTestKit.baseURL(for: configuration)
             let httpDescription = KvServerTestKit.description(of: configuration.http)
@@ -105,36 +88,80 @@ final class KvHttpServerTests : XCTestCase {
 
 
 
-    // MARK: - testByteLimitExceededIncident
+    // MARK: - testByteLimitExceededIncident()
 
     func testByteLimitExceededIncident() async throws {
-        let configuration = KvServerTestKit.secureHttpConfiguration()
-        let server = ImperativeHttpServer(with: configuration)
+        try await onImperativeHttpServer(with: KvServerTestKit.secureHttpConfiguration(), { channel in
+            let baseURL = KvServerTestKit.baseURL(for: channel.configuration)
 
-        try server.start()
-        defer {
-            server.stop()
-            try! server.waitUntilStopped().get()
-        }
+            // ##  Echo with exceeding body.
+            try await KvServerTestKit.assertResponse(
+                baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path,
+                body: .init(count: numericCast(ImperativeHttpServer.Constants.Echo.bodyLimit + 1)),
+                statusCode: .payloadTooLarge,
+                contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Echo.payloadTooLargeContent
+            )
+        })
+    }
 
-        // `channel.waitWhileStarting()` below can fail due to channels may be is in *stopped* state until server is completely started.
-        // So we wait while server is starting and then wait while channels are starting.
-        try server.waitWhileStarting().get()
-        // Waiting for the channel. Generalized code is used for example.
-        try await server.forEachChannel { channel in
-            try channel.waitWhileStarting().get()
-            XCTAssertEqual(channel.state, .running)
-        }
 
-        let baseURL = KvServerTestKit.baseURL(for: configuration)
 
-        // ##  Echo with exceeding body.
-        try await KvServerTestKit.assertResponse(
-            baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path,
-            body: .init(count: numericCast(ImperativeHttpServer.Constants.Echo.bodyLimit + 1)),
-            statusCode: .payloadTooLarge,
-            contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Echo.payloadTooLargeContent
-        )
+    // MARK: - testHeadMethod()
+
+    func testHeadMethod() async throws {
+        try await onImperativeHttpServer(with: KvServerTestKit.secureHttpConfiguration(), { channel in
+            let baseURL = KvServerTestKit.baseURL(for: channel.configuration)
+
+            // ##  Root
+            do {
+                try await KvServerTestKit.assertResponse(
+                    baseURL, method: "HEAD",
+                    contentType: .text(.plain), expecting: ""
+                )
+
+                try await KvServerTestKit.assertResponse(
+                    baseURL,
+                    contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Greeting.content
+                )
+            }
+
+            // ##  Echo
+            do {
+                let body = Data((0 ..< Int.random(in: (1 << 8)...(1 << 10)))
+                    .lazy.map { _ in UInt8.random(in: .min ... .max) })
+
+                try await KvServerTestKit.assertResponse(
+                    baseURL, method: "HEAD", path: ImperativeHttpServer.Constants.Echo.path, body: body,
+                    contentType: .application(.octetStream), expecting: ""
+                )
+
+                try await KvServerTestKit.assertResponse(
+                    baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path, body: body,
+                    contentType: .application(.octetStream), expecting: body
+                )
+            }
+
+            // ##  Echo with exceeding body.
+            do {
+                let data = Data(count: numericCast(ImperativeHttpServer.Constants.Echo.bodyLimit + 1))
+
+                try await KvServerTestKit.assertResponse(
+                    urlSession: .init(configuration: .ephemeral),
+                    baseURL, method: "HEAD", path: ImperativeHttpServer.Constants.Echo.path,
+                    body: data,
+                    statusCode: .payloadTooLarge,
+                    contentType: .text(.plain), expecting: ""
+                )
+
+                try await KvServerTestKit.assertResponse(
+                    urlSession: .init(configuration: .ephemeral),
+                    baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path,
+                    body: data,
+                    statusCode: .payloadTooLarge,
+                    contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Echo.payloadTooLargeContent
+                )
+            }
+        })
     }
 
 }
@@ -145,11 +172,42 @@ final class KvHttpServerTests : XCTestCase {
 
 extension KvHttpServerTests {
 
+    private func onImperativeHttpServer(with configuration: KvHttpChannel.Configuration, _ callback: (KvHttpChannel) async throws -> Void) async throws {
+        try await onImperativeHttpServer(with: CollectionOfOne(configuration), callback)
+    }
+
+
+    private func onImperativeHttpServer<C>(with configurations: C, _ callback: (KvHttpChannel) async throws -> Void) async throws
+    where C : Sequence, C.Element == KvHttpChannel.Configuration
+    {
+        let server = ImperativeHttpServer(with: configurations)
+
+        try server.start()
+        defer {
+            server.stop()
+            try! server.waitUntilStopped().get()
+        }
+
+        // `channel.waitWhileStarting()` below can fail due to channels may be is in *stopped* state until server is completely started.
+        // So we wait while server is starting and then wait while channels are starting.
+        try server.waitWhileStarting().get()
+
+        try await server.forEachChannel { channel in
+            // Waiting for the channel.
+            try channel.waitWhileStarting().get()
+            XCTAssertEqual(channel.state, .running)
+
+            try await callback(channel)
+        }
+    }
+
+
+
     // MARK: .ImperativeHttpServer
 
     private class ImperativeHttpServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClientDelegate {
 
-        init<S>(with configurations: S) where S : Sequence, S.Element == KvHttpChannel.Configuration {
+        init<C>(with configurations: C) where C : Sequence, C.Element == KvHttpChannel.Configuration {
             httpServer.delegate = self
 
             configurations.forEach {
@@ -306,7 +364,7 @@ extension KvHttpServerTests {
 
             switch urlComponents.path {
             case Constants.Greeting.path:
-                return KvHttpRequest.HeadOnlyHandler(response: .string(Constants.Greeting.content))
+                return KvHttpRequest.HeadOnlyHandler(response: .string { Constants.Greeting.content })
 
             case Constants.Echo.path:
                 return EchoRequestHandler()
@@ -323,7 +381,7 @@ extension KvHttpServerTests {
                 break
             }
 
-            return KvHttpRequest.HeadOnlyHandler(response: .notFound.string(Constants.NotFound.content))
+            return KvHttpRequest.HeadOnlyHandler(response: .notFound.string { Constants.NotFound.content })
         }
 
 
@@ -345,7 +403,8 @@ extension KvHttpServerTests {
                 super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body in
                     guard let body = body else { return nil }
 
-                    return .binary(body)
+                    return .binary { body }
+                        .contentLength(body.count)
                 }
             }
 
@@ -356,8 +415,8 @@ extension KvHttpServerTests {
                 switch incident {
                 case .byteLimitExceeded:
                     return .status(incident.defaultStatus)
-                        .string(Constants.Echo.payloadTooLargeContent)
-                case .noResponse:
+                        .string { Constants.Echo.payloadTooLargeContent }
+                case .noResponse, .responseBodyError(_):
                     return super.httpClient(httpClient, didCatch: incident)
                 }
             }

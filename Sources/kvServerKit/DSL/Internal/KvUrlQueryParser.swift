@@ -415,7 +415,7 @@ public class KvUrlQueryValueParser<Value> : KvUrlQueryValueParserInternalProtoco
 
     // MARK: Operations
 
-    /// - Note: Nil means missing required value.
+    /// - Note: `Nil` means missing required value.
     fileprivate func result() -> KvUrlQueryParseResult<Value>? { value ?? defaultBlock.map { block in .success(block()) } }
 
 
@@ -451,7 +451,7 @@ public class KvUrlQueryValueParser<Value> : KvUrlQueryValueParserInternalProtoco
 // TODO: Make it fileprivate or internal
 public struct KvUrlQueryValueContainer<Value> {
 
-    /// - Note: Nil means missing required value.
+    /// - Note: `Nil` means missing required value.
     fileprivate typealias ValueBlock = () -> KvUrlQueryParseResult<Value>?
 
     /// It's invoked with name of URL query item and the item's value parser.

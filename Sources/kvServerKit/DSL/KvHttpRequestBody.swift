@@ -60,7 +60,7 @@ extension KvHttpRequestBodyInternal {
         do { return try block() }
         catch {
 #if DEBUG
-            return .internalServerError.string("\(error)")
+            return .internalServerError.string { "\(error)" }
 #else // !DEBUG
             return .internalServerError
 #endif // !DEBUG
@@ -304,14 +304,15 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
     ///
     /// Below is an example of response returning plain text representation of cyclic sum of bytes in an HTTP request body.
     ///
-    ///     KvHttpResponse.dynamic
-    ///         .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
-    ///             buffer.reduce(accumulator, &+)
-    ///         }))
-    ///         .content {
-    ///             .string("0x" + String($0.requestBody, radix: 16, uppercase: true))
-    ///         }
-    ///
+    /// ```swift
+    /// KvHttpResponse.dynamic
+    ///     .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
+    ///         buffer.reduce(accumulator, &+)
+    ///     }))
+    ///     .content { ctx in
+    ///         .string { "0x" + String(ctx.requestBody, radix: 16, uppercase: true) }
+    ///     }
+    /// ```
     @inlinable
     public static func reduce(
         _ initialResult: Value,
@@ -427,10 +428,14 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
     ///
     /// Below is an example of an echo response:
     ///
-    ///     KvHttpResponse.dynamic
-    ///         .requestBody(.data)
-    ///         .content { .binary($0.requestBody ?? Data()) }
-    ///
+    /// ```swift
+    /// KvHttpResponse.dynamic
+    ///     .requestBody(.data)
+    ///     .content { ctx in
+    ///         guard let data: Data = ctx.requestBody else { return .badRequest }
+    ///         return .binary({ data }).contentLength(data.count)
+    ///     }
+    /// ```
     @inlinable
     public static var data: KvHttpRequestDataBody { KvHttpRequestDataBody() }
 
@@ -500,13 +505,14 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
     ///
     /// Below is an example of response decoding JSON respresentation of standard *DateComponents* and returning received date in ISO 8601 format.
     ///
-    ///     KvHttpResponse.dynamic
-    ///         .requestBody(.json(of: DateComponents.self))
-    ///         .content {
-    ///             guard let date = $0.requestBody.date else { return .badRequest }
-    ///             return .string(ISO8601DateFormatter().string(from: date))
-    ///         }
-    ///
+    /// ```swift
+    /// KvHttpResponse.dynamic
+    ///     .requestBody(.json(of: DateComponents.self))
+    ///     .content {
+    ///         guard let date = $0.requestBody.date else { return .badRequest }
+    ///         return .string { ISO8601DateFormatter().string(from: date) }
+    ///     }
+    /// ```
     @inlinable
     public static func json<T : Decodable>(of type: T.Type) -> KvHttpRequestJsonBody<T> { KvHttpRequestJsonBody<T>() }
 
@@ -523,7 +529,7 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
                 }
 #if DEBUG
             case .failure(let error):
-                return .badRequest.string("\(error)")
+                return .badRequest.string { "\(error)" }
 #else // !DEBUG
             case .failure:
                 return .badRequest
