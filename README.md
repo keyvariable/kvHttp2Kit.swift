@@ -4,6 +4,7 @@
 
 - secure connections over HTTP/1.1 and HTTP/2.0;
 - imperative and declarative APIs;
+- multithreaded request processing;
 - validation of requests and various automatic customizable context-dependent responses, e.g. 400, 404, 413;
 - automatic handling of HEAD method.
 
