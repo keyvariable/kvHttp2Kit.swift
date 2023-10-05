@@ -942,8 +942,6 @@ open class KvHttpChannel {
 
             static var responseBufferCapacity: Int { 1 << 14 }
 
-            static let connectionHeaderValues: Set<String> = [ "keep-alive", "close" ]
-
         }
 
 
@@ -953,15 +951,13 @@ open class KvHttpChannel {
                                      isResponseComplete: Bool,
                                      context: ChannelHandlerContext,
                                      httpVersion: HTTPVersion,
-                                     httpMethod: HTTPMethod,
-                                     keepAlive: Bool?
+                                     httpMethod: HTTPMethod
         ) {
             processIncident(incident,
                             isResponseComplete: isResponseComplete,
                             context: context,
                             httpVersion: httpVersion,
                             httpMethod: httpMethod,
-                            keepAlive: keepAlive,
                             responseBlock: { $0.response(client: self) })
         }
 
@@ -972,7 +968,6 @@ open class KvHttpChannel {
                             context: channelContext,
                             httpVersion: requestContext.httpVersion,
                             httpMethod: requestContext.httpMethod,
-                            keepAlive: requestContext.keepAlive,
                             responseBlock: { $0.response(client: self, requestHandler: requestContext.handler) })
         }
 
@@ -983,7 +978,6 @@ open class KvHttpChannel {
                                         context: ChannelHandlerContext,
                                         httpVersion: HTTPVersion,
                                         httpMethod: HTTPMethod,
-                                        keepAlive: Bool?,
                                         responseBlock: @escaping (I) -> KvHttpResponseProvider?
         ) where I : KvHttpIncident {
             dispatchQueue.async {
@@ -993,7 +987,6 @@ open class KvHttpChannel {
                                   requestHandler: nil,
                                   httpVersion: httpVersion,
                                   httpMethod: httpMethod,
-                                  keepAlive: keepAlive,
                                   responseBlock: responseBlock)
             }
         }
@@ -1011,7 +1004,7 @@ open class KvHttpChannel {
         private func channelWrite(_ response: Response, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext) {
             switch InternalChannelHandler.responseBodyCallback(response, requestContext.httpMethod) {
             case .success(let bodyCallback):
-                channelWrite(response, bodyCallback, context: channelContext, httpVersion: requestContext.httpVersion, keepAlive: requestContext.keepAlive)
+                channelWrite(response, bodyCallback, context: channelContext, httpVersion: requestContext.httpVersion)
 
             case .failure(let error):
                 channelWrite(RequestIncident.responseBodyError(error),
@@ -1020,7 +1013,6 @@ open class KvHttpChannel {
                              requestHandler: requestContext.handler,
                              httpVersion: requestContext.httpVersion,
                              httpMethod: requestContext.httpMethod,
-                             keepAlive: requestContext.keepAlive,
                              responseBlock: { $0.response(client: self, requestHandler: requestContext.handler) })
             }
         }
@@ -1032,7 +1024,6 @@ open class KvHttpChannel {
                                      requestHandler: KvHttpRequestHandler?,
                                      httpVersion: HTTPVersion,
                                      httpMethod: HTTPMethod,
-                                     keepAlive: Bool?,
                                      responseBlock: (I) -> KvHttpResponseProvider?)
         where I : KvHttpIncident
         {
@@ -1064,21 +1055,17 @@ open class KvHttpChannel {
                 response.contentLength = nil
             }
 
-            channelWrite(response, bodyCallback, context: context, httpVersion: httpVersion, keepAlive: keepAlive)
+            channelWrite(response, bodyCallback, context: context, httpVersion: httpVersion)
         }
 
 
-        /// - Parameter keepAlive:  An optional boolean value indicating whether `keep-alive` or `close` value is set for `Connection` header.
-        ///                         Note that it's handled differently depending on version of HTTP protocol.
-        ///
         /// - Note: This method decreases `_activeRequestCount`.
         ///
         /// - Warning: Assuming this method is invoked on `.dispatchQueue`.
         private func channelWrite(_ response: Response,
                                   _ bodyCallback: KvHttpResponseProvider.BodyCallback?,
                                   context: ChannelHandlerContext,
-                                  httpVersion: HTTPVersion,
-                                  keepAlive: Bool?
+                                  httpVersion: HTTPVersion
         ) {
             context.eventLoop.execute {
                 let channel = context.channel
@@ -1099,17 +1086,9 @@ open class KvHttpChannel {
                 }()
 
                 // Head
-                let head: HTTPResponseHead = {
-                    var head = HTTPResponseHead(version: httpVersion, status: response.status, headers: headers)
+                let head = HTTPResponseHead(version: httpVersion, status: response.status, headers: headers)
 
-                    if let keepAlive = keepAlive {
-                        head.headers.add(name: "Connection", value: keepAlive ? "close" : "keep-alive")
-                    }
-
-                    channel.write(self.wrapOutboundOut(HTTPServerResponsePart.head(head)), promise: nil)
-
-                    return head
-                }()
+                channel.write(self.wrapOutboundOut(HTTPServerResponsePart.head(head)), promise: nil)
 
                 // Body
                 if let bodyCallback = bodyCallback {
@@ -1140,7 +1119,6 @@ open class KvHttpChannel {
                                 self._activeRequestCount -= 1
 
                                 return (response.options.contains(.needsDisconnect)
-                                        || keepAlive == false
                                         || !head.isKeepAlive
                                         || self.channel?.isActive != true
                                         || (self._activeRequestCount <= 0 && (self._isIdleTimerFired || self._requestLimit <= 0)))
@@ -1241,32 +1219,6 @@ open class KvHttpChannel {
 
 
         private func handleRequestHead(_ head: HTTPRequestHead, in context: ChannelHandlerContext) {
-
-            func ExtractKeepAlive(_ head: HTTPRequestHead) -> Bool? {
-
-                func HasConnectionHeaders(_ head: HTTPRequestHead) -> Bool {
-                    head.headers[canonicalForm: "connection"]
-                        .lazy.map { $0.lowercased() }
-                        .contains(where: Constants.connectionHeaderValues.contains(_:))
-                }
-
-
-                // Handling of `connection` header.
-                switch head.version {
-                case .http1_0:
-                    // In HTTP 1.0 connections are closed by default. So when request has `keep-alive`, it should be mirrored in response.
-                    return HasConnectionHeaders(head) && head.isKeepAlive ? true : nil
-
-                case .http1_1:
-                    // In HTTP 1.1 connections are not closed by default. So when request has `close`, it should be mirrored in response.
-                    return HasConnectionHeaders(head) && !head.isKeepAlive ? false : nil
-
-                default:
-                    return nil
-                }
-            }
-
-
             let httpVersion: HTTPVersion
             do {
                 lock()
@@ -1296,10 +1248,8 @@ open class KvHttpChannel {
                 httpVersion = _httpVersion
             }
 
-            let keepAlive = ExtractKeepAlive(head)
-
             guard let requestHandler = delegate?.httpClient(self, requestHandlerFor: head)
-            else { return processIncident(.noRequestHandler, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method, keepAlive: keepAlive) }
+            else { return processIncident(.noRequestHandler, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method) }
 
             let bodyLengthLimit = requestHandler.bodyLengthLimit
 
@@ -1308,7 +1258,7 @@ open class KvHttpChannel {
                 break
             case .some(let contentLength):
                 guard contentLength <= bodyLengthLimit else {
-                    return processIncident(RequestIncident.byteLimitExceeded, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method, keepAlive: keepAlive) {
+                    return processIncident(RequestIncident.byteLimitExceeded, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method) {
                         $0.response(client: self, requestHandler: requestHandler)
                     }
                 }
@@ -1317,8 +1267,7 @@ open class KvHttpChannel {
             requestProcessingState = .processing(.init(httpVersion: httpVersion,
                                                         httpMethod: head.method,
                                                         handler: requestHandler,
-                                                        bodyLengthLimit: bodyLengthLimit,
-                                                        keepAlive: keepAlive))
+                                                        bodyLengthLimit: bodyLengthLimit))
         }
 
 
@@ -1394,12 +1343,6 @@ open class KvHttpChannel {
 
             /// Maximum number of bytes current request handler can process Number of received bytes passed to current `.requestHandler`.
             var bodyLengthLimit: UInt
-
-            /// An optional boolean value indicating whether `keep-alive` or `close` value is set for `Connection` header.
-            /// Also it's used to disconnect after submission of response.
-            ///
-            /// - Note: Actually `Connection` header is submitted in HTTP1 only.
-            var keepAlive: Bool?
 
         }
 
