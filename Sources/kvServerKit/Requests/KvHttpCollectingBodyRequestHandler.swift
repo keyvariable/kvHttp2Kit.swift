@@ -28,7 +28,7 @@ import Foundation
 /// Request handler collecting body fragments and then handling entire body.
 open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = (Data?) -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (Data?) throws -> KvHttpResponseProvider?
 
 
 
@@ -71,8 +71,8 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
-        return responseBlock(bodyData)
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+        return try responseBlock(bodyData)
     }
 
 

@@ -6,6 +6,7 @@
 - imperative and declarative APIs;
 - multithreaded request processing;
 - validation of requests and various automatic customizable context-dependent responses, e.g. 400, 404, 413;
+- automatic 304 and 412 responses for preconditions on ETag and modification date;
 - automatic handling of HEAD method.
 
 *kvServerKit* uses [SwiftNIO](https://github.com/apple/swift-nio) framework to manage network connections and HTTP.
@@ -53,7 +54,11 @@ struct ExampleServer : KvServer {
         let ssl: KvHttpChannel.Configuration.SSL = loadHttpsCertificate()
 
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-            KvHttpResponse.static { .string { "Hello, client" } }
+            do {
+                let indexURL = Bundle.module.url(forResource: "index", withExtension: "html")!
+
+                KvHttpResponse.static { try .file(at: indexURL).contentType(.text(.html)) }
+            }
 
             KvGroup("echo") {
                 KvHttpResponse.dynamic
@@ -72,9 +77,9 @@ struct ExampleServer : KvServer {
         }
         .onHttpIncident { incident in
             guard incident.defaultStatus == .notFound else { return nil }
-            return .notFound
+            return try .notFound
+                .file(resource: "404", extension: "html", bundle: .module)
                 .contentType(.text(.html))
-                .string { "Custom 404 HTML page" }
         }
         .hosts("example.com")
         .subdomains(optional: "www")
@@ -82,7 +87,7 @@ struct ExampleServer : KvServer {
 }
 
 struct RandomValueResponseGroup : KvResponseGroup {
-    var body: KvResponseGroup {
+    var body: some KvResponseGroup {
         KvGroup("bool") {
             KvHttpResponse.static { .string { "\(Bool.random())" } }
         }

@@ -31,7 +31,8 @@ protocol KvHttpResponseImplementationProtocol {
 
     var urlQueryParser: KvUrlQueryParserProtocol { get }
 
-    func makeProcessor() -> KvHttpRequestProcessorProtocol?
+
+    func makeProcessor(clientCallbacks: KvResponseGroupConfiguration.ClientCallbacks?) -> KvHttpRequestProcessorProtocol?
 
 }
 
@@ -44,6 +45,8 @@ protocol KvHttpRequestProcessorProtocol : AnyObject {
     func process(_ requestHeaders: KvHttpServer.RequestHeaders) -> Result<Void, Error>
 
     func makeRequestHandler() -> Result<KvHttpRequestHandler, Error>
+
+    func onIncident(_ incident: KvHttpIncident) -> KvHttpResponseProvider?
 
 }
 
@@ -93,10 +96,10 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
     // MARK: Operations
 
-    func makeProcessor() -> KvHttpRequestProcessorProtocol? {
+    func makeProcessor(clientCallbacks baseClientCallbacks: KvResponseGroupConfiguration.ClientCallbacks?) -> KvHttpRequestProcessorProtocol? {
         switch queryParser.parseResult() {
         case .success(let queryValue):
-            return Processor(queryValue, headCallback, body, clientCallbacks, responseProvider)
+            return Processor(queryValue, headCallback, body, .accumulate(clientCallbacks, into: baseClientCallbacks), responseProvider)
         case .failure:
             return nil
         }
@@ -156,6 +159,11 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
             return .success(body.makeRequestHandler(clientCallbacks) { bodyValue in
                 try responseProvider(queryValue, headers, bodyValue as! BodyValue)
             })
+        }
+
+
+        func onIncident(_ incident: KvHttpIncident) -> KvHttpResponseProvider? {
+            clientCallbacks?.onHttpIncident?(incident)
         }
 
 

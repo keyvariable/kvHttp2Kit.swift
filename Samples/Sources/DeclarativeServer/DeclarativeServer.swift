@@ -54,13 +54,23 @@ struct DeclarativeServer : KvServer {
         /// Besides, real hosting providers usuasy provide specific address and port for internet connections.
         ///
         /// Host names can be used as addresses. For example:
-        ///
-        ///     KvGroup(http: .v2(ssl: ssl), at: Host.current().names, on: [ 8080 ])
-        ///
+        /// ```swift
+        /// KvGroup(http: .v2(ssl: ssl), at: Host.current().names, on: [ 8080 ])
+        /// ```
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-            /// Static responses ignore any request context like URL and HTTP method.
-            KvHttpResponse.static {
-                .string { "Hello! It's a sample server on declarative API from kvServerKit framework." }
+            do {
+                /// Searching for a file once.
+                let indexURL = Bundle.module.url(forResource: "index", withExtension: "html", subdirectory: "Resources")!
+                /// Static responses ignore any request context like URL and HTTP method.
+                KvHttpResponse.static {
+                    /// Response content is taken from file at *indexURL*.
+                    /// `.file` response fabrics also privide values for Content-Length, ETag and Last-Modified headers.
+                    /// See documentation for `.file` fabrics.
+                    try .file(at: indexURL)
+                        /// By default `.file` fabric provides `.application(.octetStream)` content type.
+                        /// So content type is changed to `.text(.html)`.
+                        .contentType(.text(.html))
+                }
             }
 
             /// Dynamic responses depend on request context.
@@ -242,7 +252,9 @@ struct DeclarativeServer : KvServer {
         .onHttpIncident { incident in
             switch incident.defaultStatus {
             case .notFound:
-                return .notFound.string { "Unexpected request (404)\n\nSee implementation of `DeclarativeServer.body` for supported requests." }
+                return try .notFound
+                    .file(resource: "404", extension: "html", subdirectory: "Resources", bundle: .module)
+                    .contentType(.text(.html))
             default:
                 return nil
             }
@@ -389,10 +401,9 @@ struct DeclarativeServer : KvServer {
                     KvForEach(urls) { url in
                         KvGroup(url.lastPathComponent) {
                             KvHttpResponse.static {
-                                guard let stream = InputStream(url: url) else { return .internalServerError }
-                                // Use of file streams helps to reduce memory consumption and improve performance.
-                                // Note the way response is composed providing body from a stream and PNG content type.
-                                return .binary(stream).contentType(.image(.png))
+                                /// Use of `.file` fabric and modifier helps to reduce memory consumption and improve performance.
+                                /// Aslo consider `.binary`  fabric and modifier for input streams.
+                                try .file(at: url).contentType(.image(.png))
                             }
                         }
                     }

@@ -23,11 +23,14 @@
 
 protocol KvResponseAccumulator : AnyObject {
 
+    associatedtype NestedAccumulator : KvResponseAccumulator
+
+
     /// Resolved configuration of current response group.
     var responseGroupConfiguration: KvResponseGroupConfiguration? { get }
 
 
-    func with(_ configuration: KvResponseGroupConfiguration, body: (KvResponseAccumulator) -> Void)
+    func with(_ configuration: KvResponseGroupConfiguration, body: (NestedAccumulator) -> Void)
 
     func insert<HttpResponse>(_ response: HttpResponse) where HttpResponse : KvHttpResponseImplementationProtocol
 

@@ -396,9 +396,9 @@ extension KvResponseGroup {
     /// }
     /// .onHttpIncident { incident in
     ///     guard incident.defaultStatus == .notFound else { return nil }
-    ///     return .notFound
+    ///     return try .notFound
+    ///         .file(at: htmlFileURL)
     ///         .contentType(.text(.html))
-    ///         .string { "Custom 404 HTML page" }
     /// }
     /// ```
     ///
@@ -406,9 +406,9 @@ extension KvResponseGroup {
     ///
     /// See: ``onError(_:)``.
     @inlinable
-    public func onHttpIncident(_ block: @escaping (KvHttpIncident) -> KvHttpResponseProvider?) -> some KvResponseGroup {
+    public func onHttpIncident(_ block: @escaping (KvHttpIncident) throws -> KvHttpResponseProvider?) -> some KvResponseGroup {
         modified {
-            $0.clientCallbacks = .merged($0.clientCallbacks, addition: .init(onHttpIncident: block))
+            $0.clientCallbacks = .accumulate(.init(onHttpIncident: { try? block($0) }), into: $0.clientCallbacks)
         }
     }
 
@@ -423,7 +423,7 @@ extension KvResponseGroup {
     @inlinable
     public func onError(_ block: @escaping (Error) -> Void) -> some KvResponseGroup {
         modified {
-            $0.clientCallbacks = .merged($0.clientCallbacks, addition: .init(onError: block))
+            $0.clientCallbacks = .accumulate(.init(onError: block), into: $0.clientCallbacks)
         }
     }
 
@@ -434,7 +434,7 @@ extension KvResponseGroup {
 // MARK: - KvResponseGroupConfiguration
 
 @usableFromInline
-struct KvResponseGroupConfiguration {
+struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccumulationCascadable {
 
     @usableFromInline
     static let empty: Self = .init()
@@ -449,7 +449,6 @@ struct KvResponseGroupConfiguration {
     @usableFromInline
     var httpRequestBody: HttpRequestBody
 
-    /// - Note: It's not cascaded.
     @usableFromInline
     var clientCallbacks: ClientCallbacks?
 
@@ -467,12 +466,24 @@ struct KvResponseGroupConfiguration {
     }
 
 
+    // MARK: : KvCascadable
+
     @usableFromInline
-    init(lhs: Self, rhs: Self) {
-        self.init(network: .init(lhs: lhs.network, rhs: rhs.network),
-                  dispatching: .init(lhs: lhs.dispatching, rhs: rhs.dispatching),
-                  httpRequestBody: .init(lhs: lhs.httpRequestBody, rhs: rhs.httpRequestBody),
-                  clientCallbacks: rhs.clientCallbacks      // Client callbacks aren't cascaded.
+    static func overlay(_ addition: Self, over base: Self) -> Self {
+        .init(network: .overlay(addition.network, over: base.network),
+              dispatching: .overlay(addition.dispatching, over: base.dispatching),
+              httpRequestBody: .overlay(addition.httpRequestBody, over: base.httpRequestBody),
+              clientCallbacks: .overlay(addition.clientCallbacks, over: base.clientCallbacks)
+        )
+    }
+
+
+    @usableFromInline
+    static func accumulate(_ addition: Self, into base: Self) -> Self {
+        .init(network: .accumulate(addition.network, into: base.network),
+              dispatching: .accumulate(addition.dispatching, into: base.dispatching),
+              httpRequestBody: .accumulate(addition.httpRequestBody, into: base.httpRequestBody),
+              clientCallbacks: .accumulate(addition.clientCallbacks, into: base.clientCallbacks)
         )
     }
 
@@ -480,7 +491,7 @@ struct KvResponseGroupConfiguration {
     // MARK: .Network
 
     @usableFromInline
-    struct Network {
+    struct Network : KvDefaultOverlayCascadable, KvDefaultAccumulationCascadable {
 
         @usableFromInline
         typealias Address = String
@@ -515,10 +526,24 @@ struct KvResponseGroupConfiguration {
         }
 
 
+        // MARK: : KvCascadable
+
         @usableFromInline
-        init(lhs: Self, rhs: Self) {
-            // If `lhs` is non-emmpty then it's copied. Otherwise `rhs` is copied.
-            self = !lhs.isEmpty ? lhs : rhs
+        static func overlay(_ addition: Self, over base: Self) -> Self {
+            !base.isEmpty ? base : addition  // Addition are ignored when base is non-empty.
+        }
+
+
+        @usableFromInline
+        static func accumulate(_ addition: Self, into base: Self) -> Self {
+            var result = base
+
+            result.protocolIDs.merge(addition.protocolIDs, uniquingKeysWith: { base, addition in addition })
+            addition.httpEndpoints.configurations.forEach {
+                result.httpEndpoints.insert($0.value, for: $0.key)
+            }
+
+            return result
         }
 
 
@@ -645,7 +670,7 @@ struct KvResponseGroupConfiguration {
     // MARK: .Dispatching
 
     @usableFromInline
-    struct Dispatching {
+    struct Dispatching : KvDefaultOverlayCascadable, KvDefaultAccumulationCascadable {
 
         @usableFromInline
         static let empty: Self = .init()
@@ -686,27 +711,19 @@ struct KvResponseGroupConfiguration {
         }
 
 
+        // MARK: : KvCascadable
+
         @usableFromInline
-        init(lhs: Self, rhs: Self) {
-            self.init(httpMethods: lhs.httpMethods.union(rhs.httpMethods),
-                      users: lhs.users.union(rhs.users),
-                      hosts: lhs.hosts.union(rhs.hosts),
-                      optionalSubdomains: lhs.optionalSubdomains.union(rhs.optionalSubdomains),
-                      path: lhs.path + rhs.path)    // Assuming paths are safe and always have leading path separators
+        static func accumulate(_ addition: Self, into base: Self) -> Self {
+            .init(httpMethods: base.httpMethods.union(addition.httpMethods),
+                  users: base.users.union(addition.users),
+                  hosts: base.hosts.union(addition.hosts),
+                  optionalSubdomains: base.optionalSubdomains.union(addition.optionalSubdomains),
+                  path: base.path + addition.path)    // Assuming paths are safe and always have leading path separators
         }
 
 
         // MARK: Operations
-
-        @inline(__always)
-        @usableFromInline
-        static func merge<T>(lhs: T?, rhs: T?, transform: (T, T) -> T) -> T? {
-            guard let lhs = lhs else { return rhs }
-            guard let rhs = rhs else { return lhs }
-
-            return transform(lhs, rhs)
-        }
-
 
         /// - Returns: Non-empty value where missing leading URL path separator is added or empty string.
         @inline(__always)
@@ -748,7 +765,7 @@ struct KvResponseGroupConfiguration {
     // MARK: .ClientCallbacks
 
     @usableFromInline
-    struct ClientCallbacks {
+    struct ClientCallbacks : KvCascadable, KvReplacingOverlayCascadable, KvDefaultAccumulationCascadable {
 
         /// Handles incidents.
         @usableFromInline
@@ -768,24 +785,12 @@ struct KvResponseGroupConfiguration {
         }
 
 
-        // MARK: Operations
+        // MARK: : KvCascadable
 
-        @inline(__always)
         @usableFromInline
-        static func merged(_ base: ClientCallbacks?, addition: ClientCallbacks?) -> ClientCallbacks? {
-            guard let addition = addition else { return base }
-
-            return .merged(base, addition: addition)
-        }
-
-
-        @inline(__always)
-        @usableFromInline
-        static func merged(_ base: ClientCallbacks?, addition: ClientCallbacks) -> ClientCallbacks {
-            guard let base = base else { return addition }
-
-            return .init(onHttpIncident: addition.onHttpIncident ?? base.onHttpIncident,
-                         onError: addition.onError ?? base.onError)
+        static func accumulate(_ addition: Self, into base: Self) -> Self {
+            .init(onHttpIncident: addition.onHttpIncident ?? base.onHttpIncident,
+                  onError: addition.onError ?? base.onError)
         }
 
     }

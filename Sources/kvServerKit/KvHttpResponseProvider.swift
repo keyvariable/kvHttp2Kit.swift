@@ -37,17 +37,24 @@ import NIOHTTP1
 /// Examples:
 ///
 /// ```swift
-/// // Plain text response
+/// // Plain text response.
 /// .string { "Test pesponse" }
 ///
-/// // Raw byte response
+/// // Raw byte response.
 /// .binary { data }
 ///     .contentLength(data.count)
 ///
-/// // Status 404 response with content of an HTML file
-/// .notFound
+/// // JSON response.
+/// .json { Date() }
+///
+/// // Status 404 response with content of an HTML file.
+/// try .notFound
+///     .file(at: htmlFileURL)
 ///     .contentType(.text(.html))
-///     .binary(InputStream(fileAtPath: pathToHTML)!)
+///
+/// // PNG image from bundle.
+/// try .file(resource: "logo", extension: "png", subdirectory: "images", bundle: .module)
+///     .contentType(.image(.png))
 /// ```
 public struct KvHttpResponseProvider {
 
@@ -85,6 +92,13 @@ public struct KvHttpResponseProvider {
     /// Optional value for `Content-Length` HTTP header in response. If `nil` then the header is not provided in response.
     @usableFromInline
     var contentLength: UInt64?
+
+    /// Value for `ETag` response header.
+    @usableFromInline
+    var entityTag: EntityTag?
+    /// Value for `Last-Modified` response header.
+    @usableFromInline
+    var modificationDate: Date?
 
     /// Response options. E.g. disconnection flag.
     @usableFromInline
@@ -222,7 +236,7 @@ public struct KvHttpResponseProvider {
                 case .csv:
                     return ("text/csv", options: nil)
                 case .html:
-                    return ("text/html", options: nil)
+                    return ("text/html", options: "charset=UTF-8")
                 case .markdown:
                     return ("text/markdown", options: nil)
                 case .plain:
@@ -260,6 +274,114 @@ public struct KvHttpResponseProvider {
     }
 
 
+    // MARK: .EntityTag
+
+    /// Representation of HTTP entity tags.
+    public struct EntityTag {
+
+        /// Value of entity tag.
+        public let value: String
+        /// Options of entity tag. E.g. weak state.
+        public let options: Options
+
+
+        @usableFromInline
+        init(safeValue: String, options: Options = [ ]) {
+            self.value = safeValue
+            self.options = options
+        }
+
+
+        /// Initializes entity tag from a raw string.
+        ///
+        /// - Warning: It's recommended to avoid this initializer due to performance penalty. Initializer validates passed *value*. Use fabrics.
+        @inlinable
+        public init?(_ value: String, options: Options = [ ]) {
+            guard value.allSatisfy({ $0 != "\"" && $0 != "\0" }) else { return nil }
+
+            self.init(safeValue: value, options: options)
+        }
+
+
+        // MARK: Fabrics
+
+        /// - Returns: An instance where value is the result of `data.base64EncodedString()`.
+        ///
+        /// See: ``base64(withBytesOf:options:)``.
+        @inlinable
+        public static func base64(_ data: Data, options: Options = [ ]) -> Self {
+            .init(safeValue: data.base64EncodedString(), options: options)
+        }
+
+
+        /// - Returns: An instance where value is a Base64 representation of bytes of *x*.
+        ///
+        /// - Note: `Data.base64EncodedString()` method with default encoding options is used.
+        ///
+        /// See: ``base64(_:options:)``.
+        @inlinable
+        public static func base64<T>(withBytesOf x: T, options: Options = [ ]) -> Self {
+            withUnsafeBytes(of: x) { buffer in
+                return .base64(.init(bytesNoCopy: .init(mutating: buffer.baseAddress!), count: buffer.count, deallocator: .none), options: options)
+            }
+        }
+
+
+        /// - Returns: An instance where value is a hexademical representation of bytes from *data*.
+        @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+        @inlinable
+        public static func hex<Bytes>(_ bytes: Bytes, options: Options = [ ]) -> Self
+        where Bytes : Collection, Bytes.Element == UInt8
+        {
+            let digits: [UInt8] = [ 0x30/*0*/, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x61/*a*/, 0x62, 0x63, 0x64, 0x65, 0x66 ]
+            let count = 2 * bytes.count
+
+            return .init(
+                safeValue: String(unsafeUninitializedCapacity: count, initializingUTF8With: { buffer in
+                    bytes.enumerated().forEach { (offset, byte) in
+                        buffer[2 * offset    ] = digits[numericCast((byte >> 4) & 0x0F)]
+                        buffer[2 * offset + 1] = digits[numericCast( byte       & 0x0F)]
+                    }
+                    return count
+                }),
+                options: options
+            )
+        }
+
+
+        /// - Returns: An instance where value is a standard string representation of given UUID.
+        @inlinable
+        public static func uuid(_ value: UUID, options: Options = [ ]) -> Self {
+            .init(safeValue: value.uuidString, options: options)
+        }
+
+
+        // MARK: .Options
+
+        /// Options of entity tags. E.g. weak state.
+        public struct Options : OptionSet {
+
+            /// Weak state option constant.
+            public static let weak: Self = .init(rawValue: 1 << 0)
+
+
+            // MARK: : OptionSet
+
+            public let rawValue: UInt
+
+            @inlinable public init(rawValue: UInt) { self.rawValue = rawValue }
+        }
+
+
+        // MARK: Operations
+
+        /// HTTP representation of the receiver.
+        var httpRepresentation: String {
+            !options.contains(.weak) ? "\"\(value)\"" : "W/\"\(value)\""
+        }
+    }
+
+
     // MARK: .Options
 
     /// Response options. E.g. disconnection flag.
@@ -280,22 +402,6 @@ public struct KvHttpResponseProvider {
     // MARK: Auxiliaries
 
     @usableFromInline
-    static func streamBodyCallback(_ stream: InputStream) -> BodyCallback {
-        if stream.streamStatus == .notOpen {
-            stream.open()
-        }
-
-        return { buffer in
-            let bytesRead = stream.read(buffer.baseAddress!.assumingMemoryBound(to: UInt8.self), maxLength: buffer.count)
-
-            guard bytesRead >= 0 else { return .failure(KvError("Failed to read from response body stream: code = \(bytesRead), streamError = nil")) }
-
-            return .success(bytesRead)
-        }
-    }
-
-
-    @usableFromInline
     static func dataBodyCallback<D>(_ data: D) -> BodyCallback
     where D : DataProtocol, D.Index == Int
     {
@@ -313,12 +419,105 @@ public struct KvHttpResponseProvider {
     }
 
 
+    @usableFromInline
+    static func streamBodyCallback(_ stream: InputStream) -> BodyCallback {
+        if stream.streamStatus == .notOpen {
+            stream.open()
+        }
+
+        return { buffer in
+            let bytesRead = stream.read(buffer.baseAddress!.assumingMemoryBound(to: UInt8.self), maxLength: buffer.count)
+
+            guard bytesRead >= 0 else { return .failure(KvError("Failed to read from response body stream: code = \(bytesRead), streamError = nil")) }
+
+            return .success(bytesRead)
+        }
+    }
+
+
+    @usableFromInline
+    static func streamBodyCallbackProvider(_ url: URL) -> BodyCallbackProvider {
+        return {
+            guard let stream = InputStream(url: url) else { return .failure(KvHttpResponseError.unableToCreateInputStream(url)) }
+            return .success(Self.streamBodyCallback(stream))
+        }
+    }
+
+
     @inline(__always)
     @usableFromInline
     func modified(_ transform: (inout Self) -> Void) -> Self {
         var copy = self
         transform(&copy)
         return copy
+    }
+
+
+    @inline(__always)
+    @usableFromInline
+    func modified(_ transform: (inout Self) throws -> Void) rethrows -> Self {
+        var copy = self
+        try transform(&copy)
+        return copy
+    }
+
+
+    @inline(__always)
+    @usableFromInline
+    mutating func appendHeaderCallback(_ callback: @escaping HeaderCallback) {
+        switch customHeaderCallback {
+        case .none:
+            self.customHeaderCallback = callback
+        case .some(let customHeaderCallback):
+            self.customHeaderCallback = { headers in
+                customHeaderCallback(&headers)
+                callback(&headers)
+            }
+        }
+    }
+
+
+    // MARK: .ResolvedURL
+
+    @usableFromInline
+    struct ResolvedURL : Equatable {
+
+        @usableFromInline
+        let value: URL
+        @usableFromInline
+        let isFile: Bool
+
+
+        @usableFromInline
+        init(value: URL, isFile: Bool) {
+            self.value = value
+            self.isFile = isFile
+        }
+
+
+        @usableFromInline
+        init(for url: URL) throws {
+            guard url.isFileURL else { self.init(value: url, isFile: false); return }
+
+            var isDirectory: ObjCBool = false
+
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { throw KvHttpResponseError.fileDoesNotExist(url) }
+            guard isDirectory.boolValue else { self.init(value: url, isFile: true); return }
+
+            // Checking "./index.html".
+            var indexURL = url.appendingPathComponent("index.html")
+            if FileManager.default.fileExists(atPath: indexURL.path, isDirectory: &isDirectory), !isDirectory.boolValue {
+                self.init(value: indexURL, isFile: true); return
+            }
+            // Checking "./index".
+            indexURL.deletePathExtension()
+            if FileManager.default.fileExists(atPath: indexURL.path, isDirectory: &isDirectory), !isDirectory.boolValue {
+                self.init(value: indexURL, isFile: true); return
+            }
+
+            throw KvHttpResponseError.unableToFindIndexFile(directoryURL: url)
+        }
+
     }
 
 }
@@ -365,7 +564,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns: An instance where body is taken from provided *bytes* callback, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
     ///
-    /// - Important: *Bytes* block can be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *Bytes* block may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func binary<D>(_ bytes: @escaping () throws -> D) -> Self
     where D : DataProtocol, D.Index == Int
@@ -376,21 +575,58 @@ extension KvHttpResponseProvider {
 
     /// - Returns: An instance where body is taken from provided *stream*, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
     ///
-    /// - Important: *Sream* can be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *Sream* can may ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func binary(_ stream: InputStream) -> Self { Self().binary(stream) }
 
 
+    /// - Returns: An instance initialized with contents at given *url*.
+    ///
+    /// Contents of the resulting instance:
+    /// - body is content at *url*;
+    /// - content type is `.application(.octetStream)`;
+    /// - content length, entity tag and modification date are provided when the scheme is "file:" and the attributes are availabe.
+    ///
+    /// Directory URLs having "file:" scheme are replaced with the index files (index.html or index).
+    /// If there is no index file in directory then ``KvHttpResponseError/unableToFindIndexFile(directoryURL:)`` is thrown.
+    ///
+    /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
+    ///         This implenetation prevents double access to file system and monitoring of changes at URL.
+    ///
+    /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
+    @inlinable
+    public static func file(at url: URL) throws -> Self {
+        let resolvedURL = try ResolvedURL(for: url)
+
+        return try Self().file(atResolvedURL: resolvedURL.value, isFile: resolvedURL.isFile)
+    }
+
+
+    /// Invokes ``file(at:)-swift.type.method`` fabric with URL of a resource file with given parameters.
+    ///``KvHttpResponseError/unableToFindBundleResource(name:extension:subdirectory:bundle:)`` is thrown for missing resources.
+    ///
+    /// - Parameter bundle: If `nil` is passed then `Bundle.main` is used.
+    @inlinable
+    public static func file(resource: String, extension: String? = nil, subdirectory: String? = nil, bundle: Bundle? = nil) throws -> Self {
+        let bundle = bundle ?? .main
+
+        guard let url = bundle.url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory)
+        else { throw KvHttpResponseError.unableToFindBundleResource(name: resource, extension: `extension`, subdirectory: subdirectory, bundle: bundle) }
+
+        return try .file(at: url)
+    }
+
+
     /// - Returns: An instance where body is JSON representation of given *payload*, `contentType` is `.application(.json)`, *status* is `.ok`.
     ///
-    /// - Important: *Payload* block can be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *Payload* block may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func json<T : Encodable>(_ payload: @escaping () throws -> T) -> Self { Self().json(payload) }
 
 
     /// - Returns: An instance where body is UTF8 representation of given *string*, `contentType` is `.text(.plain)`, *status* is `.ok`.
     ///
-    /// - Important: *String* block can be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *String* block may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func string<S: StringProtocol>(_ string: @escaping () throws -> S) -> Self { Self().string(string) }
 
@@ -552,17 +788,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns:A copy where given block is appended to chain of callbacks to be invoked before HTTP headers are sent to client.
     @inlinable
-    public func headers(_ callback: @escaping HeaderCallback) -> Self { modified {
-        switch $0.customHeaderCallback {
-        case .none:
-            $0.customHeaderCallback = callback
-        case .some(let customHeaderCallback):
-            $0.customHeaderCallback = { headers in
-                customHeaderCallback(&headers)
-                callback(&headers)
-            }
-        }
-    } }
+    public func headers(_ callback: @escaping HeaderCallback) -> Self { modified { $0.appendHeaderCallback(callback) } }
 
 
     /// - Returns: A copy where `contentType` is changed to given *value*.
@@ -581,6 +807,23 @@ extension KvHttpResponseProvider {
     @inlinable
     public func contentLength<T>(_ value: T) -> Self where T : BinaryInteger { contentLength(numericCast(value) as UInt64) }
 
+
+    /// - Returns: A copy where entity tag is changed to given *value*.
+    ///
+    /// Provided value is used as value of `ETag` response header and to process `If-Match` and `If-None-Match` request headers.
+    /// For example, response is automatically replaced with 304 (Not Modified) when request contains `If-None-Match` header with the matching value.
+    @inlinable
+    public func entityTag(_ value: EntityTag) -> Self { modified { $0.entityTag = value } }
+
+    /// - Returns: A copy where modification date is changes to given *value*.
+    ///
+    /// - Note: It's recommended to prefer ``entityTag(_:)`` instead if possible.
+    ///
+    /// Provided value is used as value of `Last-Modified` response header and to process `If-Modified-Since` and `If-Unmodified-Since` request headers.
+    /// For example, response is automatically replaced with 304 (Not Modified) when request contains `If-Modified-Since` header with a later date.
+    @inlinable
+    public func modificationDate(_ value: Date) -> Self { modified { $0.modificationDate = value } }
+
 }
 
 
@@ -591,7 +834,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns: A copy where body is taken from provided *bytes* callback, missing `contentType` is changed to `.application(.octetStream)`.
     ///
-    /// - Important: *Bytes* block can be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *Bytes* block may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func binary<D>(_ bytes: @escaping () throws -> D) -> Self
     where D : DataProtocol, D.Index == Int
@@ -609,7 +852,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns: A copy where body is taken from provided *stream*, missing `contentType` is changed to `.application(.octetStream)`.
     ///
-    /// - Important: *Sream* can be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *Sream* may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func binary(_ stream: InputStream) -> Self {
         modified {
@@ -619,9 +862,66 @@ extension KvHttpResponseProvider {
     }
 
 
+    /// - Returns: A copy where contents are taken from file at given *url*.
+    ///
+    /// Following changes are applied:
+    /// - body is content at *url*;
+    /// - unset content type is changed to `.application(.octetStream)`;
+    /// - content length, entity tag and modification date are updated when the scheme is "file:" and the attributes are availabe.
+    ///
+    /// Directory URLs having "file:" scheme are replaced with the index files (index.html or index).
+    /// If there is no index file in directory then ``KvHttpResponseError/unableToFindIndexFile(directoryURL:)`` is thrown.
+    ///
+    /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
+    ///         This implenetation prevents double access to file system and monitoring of changes at URL.
+    ///
+    /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
+    @inlinable
+    public func file(at url: URL) throws -> Self {
+        let resolvedURL = try ResolvedURL(for: url)
+
+        return try self.file(atResolvedURL: resolvedURL.value, isFile: resolvedURL.isFile)
+    }
+
+
+    /// Invokes ``file(at:)-swift.method`` modifier with URL of a resource file with given parameters.
+    ///``KvHttpResponseError/unableToFindBundleResource(name:extension:subdirectory:bundle:)`` is thrown for missing resources.
+    ///
+    /// - Parameter bundle: If `nil` is passed then `Bundle.main` is used.
+    @inlinable
+    public func file(resource: String, extension: String? = nil, subdirectory: String? = nil, bundle: Bundle? = nil) throws -> Self {
+        let bundle = bundle ?? .main
+
+        guard let url = bundle.url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory)
+        else { throw KvHttpResponseError.unableToFindBundleResource(name: resource, extension: `extension`, subdirectory: subdirectory, bundle: bundle) }
+
+        return try self.file(at: url)
+    }
+
+
+    @inline(__always)
+    @usableFromInline
+    func file(atResolvedURL url: URL, isFile: Bool) throws -> Self { try modified {
+        if isFile {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            
+            if let modificationDate = attributes[.modificationDate] as? Date {
+                $0.modificationDate = modificationDate
+                $0.entityTag = .base64(withBytesOf: modificationDate.timeIntervalSince1970)
+            }
+            if let size = attributes[.size] as? UInt64 {
+                $0.contentLength = size
+            }
+        }
+
+        $0.bodyCallbackProvider = Self.streamBodyCallbackProvider(url)
+        $0.contentType = $0.contentType ?? .application(.octetStream)
+    } }
+
+
     /// - Returns: A copy where body is JSON representation of given *payload*, missing `contentType` is changed to `.application(.json)`.
     ///
-    /// - Important: *Payload* block can be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *Payload* block may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func json<T : Encodable>(_ payload: @escaping () throws -> T) -> Self {
         modified {
@@ -638,7 +938,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns: A copy where body is UTF8 representation of given *string*, missing`contentType` is changed to `.text(.plain)`.
     ///
-    /// - Important: *String* block can be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *String* block may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func string<S: StringProtocol>(_ string: @escaping () throws -> S) -> Self {
         modified {

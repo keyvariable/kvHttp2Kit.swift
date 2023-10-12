@@ -114,12 +114,16 @@ final class KvHttpServerTests : XCTestCase {
 
             // ##  Root
             do {
+                let urlSession = URLSession(configuration: .ephemeral)
+
                 try await KvServerTestKit.assertResponse(
+                    urlSession: urlSession,
                     baseURL, method: "HEAD",
                     contentType: .text(.plain), expecting: ""
                 )
 
                 try await KvServerTestKit.assertResponse(
+                    urlSession: urlSession,
                     baseURL,
                     contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Greeting.content
                 )
@@ -130,12 +134,16 @@ final class KvHttpServerTests : XCTestCase {
                 let body = Data((0 ..< Int.random(in: (1 << 8)...(1 << 10)))
                     .lazy.map { _ in UInt8.random(in: .min ... .max) })
 
+                let urlSession = URLSession(configuration: .ephemeral)
+
                 try await KvServerTestKit.assertResponse(
+                    urlSession: urlSession,
                     baseURL, method: "HEAD", path: ImperativeHttpServer.Constants.Echo.path, body: body,
                     contentType: .application(.octetStream), expecting: ""
                 )
 
                 try await KvServerTestKit.assertResponse(
+                    urlSession: urlSession,
                     baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path, body: body,
                     contentType: .application(.octetStream), expecting: body
                 )
@@ -416,7 +424,7 @@ extension KvHttpServerTests {
                 case .byteLimitExceeded:
                     return .status(incident.defaultStatus)
                         .string { Constants.Echo.payloadTooLargeContent }
-                case .noResponse, .responseBodyError(_):
+                default:
                     return super.httpClient(httpClient, didCatch: incident)
                 }
             }

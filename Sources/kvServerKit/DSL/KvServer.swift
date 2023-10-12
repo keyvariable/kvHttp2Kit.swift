@@ -53,9 +53,9 @@ import Foundation
 ///         }
 ///         .onHttpIncident { incident in
 ///             guard incident.defaultStatus == .notFound else { return nil }
-///             return .notFound
-///                 .contentType(.text(.html))
-///                 .string { "Custom 404 HTML page" }
+///             return try .notFound
+///                 .file(at: htmlFileURL)
+///                 .contentType(.text(.html))                 
 ///         }
 ///         .hosts("example.com")
 ///         .subdomains(optional: "www")

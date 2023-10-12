@@ -53,28 +53,11 @@ protocol KvHttpRequestBodyInternal : KvHttpRequestBody {
 }
 
 
-extension KvHttpRequestBodyInternal {
-
-    /// It's designated to unwrap result of *ResponseBlock*.
-    fileprivate func catching(_ block: () throws -> KvHttpResponseProvider) -> KvHttpResponseProvider {
-        do { return try block() }
-        catch {
-#if DEBUG
-            return .internalServerError.string { "\(error)" }
-#else // !DEBUG
-            return .internalServerError
-#endif // !DEBUG
-        }
-    }
-
-}
-
-
 
 // MARK: - KvHttpRequestBodyConfiguration
 
 @usableFromInline
-struct KvHttpRequestBodyConfiguration {
+struct KvHttpRequestBodyConfiguration : KvDefaultOverlayCascadable, KvDefaultAccumulationCascadable {
 
     @usableFromInline
     static let empty: Self = .init()
@@ -95,9 +78,11 @@ struct KvHttpRequestBodyConfiguration {
     }
 
 
+    // MARK: : KvCascadable
+
     @usableFromInline
-    init(lhs: Self, rhs: Self) {
-        self.init(bodyLengthLimit: rhs._bodyLengthLimit ?? lhs._bodyLengthLimit)
+    static func accumulate(_ addition: Self, into base: Self) -> Self {
+        .init(bodyLengthLimit: addition._bodyLengthLimit ?? base._bodyLengthLimit)
     }
 
 }
@@ -138,7 +123,7 @@ public struct KvHttpRequestProhibitedBody : KvHttpRequestBodyInternal {
     @usableFromInline
     func makeRequestHandler(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
         RequestHandler(clientCallbacks) {
-            self.catching { try responseBlock(.init()) }
+            try responseBlock(.init())
         }
     }
 
@@ -211,7 +196,7 @@ extension KvHttpRequestRequiredBodyInternal {
     @usableFromInline
     func with(baseConfiguration: Configuration) -> Self {
         var copy = self
-        copy.configuration = .init(lhs: baseConfiguration, rhs: copy.configuration)
+        copy.configuration = .overlay(copy.configuration, over: baseConfiguration)
         return copy
     }
 
@@ -265,9 +250,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
                 initial: initialResult,
                 nextPartialResult: nextPartialResult,
                 clientCallbacks,
-                responseBlock: { partialResult in
-                    body.catching { try responseBlock(partialResult) }
-                }
+                responseBlock: responseBlock
             )
         }
     }
@@ -283,9 +266,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
                 into: initialResult,
                 updateAccumulatingResult: updateAccumulatingResult,
                 clientCallbacks,
-                responseBlock: { partialResult in
-                    body.catching { try responseBlock(partialResult) }
-                }
+                responseBlock: responseBlock
             )
         }
     }
@@ -355,7 +336,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
 
         init(_ configuration: Configuration,
              initial initialResult: PartialResult,
-             nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) -> PartialResult,
+             nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) throws -> PartialResult,
              _ clientCallbacks: ClientCallbacks?,
              responseBlock: @escaping KvHttpReducingRequestHandler<PartialResult>.ResponseBlock
         ) {
@@ -370,7 +351,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
 
         init(_ configuration: Configuration,
              into initialResult: PartialResult,
-             updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) -> Void,
+             updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) throws -> Void,
              _ clientCallbacks: ClientCallbacks?,
              responseBlock: @escaping KvHttpReducingRequestHandler<PartialResult>.ResponseBlock
         ) {
@@ -444,9 +425,7 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
 
     @usableFromInline
     func makeRequestHandler(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        RequestHandler(configuration, clientCallbacks) { data in
-            self.catching { try responseBlock(data) }
-        }
+        RequestHandler(configuration, clientCallbacks, responseBlock: responseBlock)
     }
 
 
@@ -521,21 +500,7 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
 
     @usableFromInline
     func makeRequestHandler(_ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
-        RequestHandler(configuration, clientCallbacks) { value in
-            switch value {
-            case .success(let payload):
-                return self.catching {
-                    try responseBlock(payload)
-                }
-#if DEBUG
-            case .failure(let error):
-                return .badRequest.string { "\(error)" }
-#else // !DEBUG
-            case .failure:
-                return .badRequest
-#endif // !DEBUG
-            }
-        }
+        RequestHandler(configuration, clientCallbacks, responseBlock: responseBlock)
     }
 
 

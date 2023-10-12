@@ -127,6 +127,7 @@ class KvServerTestKit {
     static func assertResponse(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
+        onRequest: ((inout URLRequest) -> Void)? = nil,
         statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
         message: @escaping @autoclosure () -> String = "",
         bodyBlock: ((Data, URLRequest, () -> String) throws -> Void)? = nil
@@ -158,6 +159,7 @@ class KvServerTestKit {
         if let body = body {
             request.httpBody = body
         }
+        onRequest?(&request)
 
         let message = { [ "\(request)", message() ].joined(separator: ". ") }
         let (data, response) = try await queryDataIgnoringCertificate(for: request, in: urlSession)
@@ -177,11 +179,12 @@ class KvServerTestKit {
     static func assertResponse(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
+        onRequest: ((inout URLRequest) -> Void)? = nil,
         statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
         expecting expected: String,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
             let result = String(data: data, encoding: .utf8)
             XCTAssertEqual(result, expected, message())
         }
@@ -191,11 +194,12 @@ class KvServerTestKit {
     static func assertResponse(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
+        onRequest: ((inout URLRequest) -> Void)? = nil,
         statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .application(.octetStream),
         expecting expected: Data,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
             XCTAssertEqual(data, expected, message())
         }
     }
@@ -204,11 +208,12 @@ class KvServerTestKit {
     static func assertResponseJSON<T : Decodable & Equatable>(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
+        onRequest: ((inout URLRequest) -> Void)? = nil,
         statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .application(.json),
         expecting expected: T,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
             let result = try JSONDecoder().decode(T.self, from: data)
             XCTAssertEqual(result, expected, message())
         }
@@ -243,6 +248,82 @@ class KvServerTestKit {
             completionHandler(.useCredential, urlCredential)
         }
 
+    }
+
+}
+
+
+
+// MARK: DSL Auxiliaries
+
+extension KvServerTestKit {
+
+    static func withRunningServer<S, T>(of serverType: S.Type, context contextBlock: (S) -> T, body: (T) async throws -> Void) async throws
+    where S : KvServer
+    {
+        let context: T
+        let token: KvServerToken
+        do {
+            let server = serverType.init()
+
+            context = contextBlock(server)
+            token = try server.start()
+        }
+
+
+        try token.waitWhileStarting().get()
+
+        try await body(context)
+    }
+
+
+    static func withRunningServer<S>(of serverType: S.Type, body: () async throws -> Void) async throws
+    where S : KvServer
+    {
+        try await withRunningServer(of: S.self, context: { _ in }, body: body)
+    }
+
+
+
+    // MARK: .NetworkGroup
+
+    /// Applies given configuration to given content.
+    struct NetworkGroup<Configurations, Content> : KvResponseGroup
+    where Configurations : Sequence, Configurations.Element == KvHttpChannel.Configuration,
+          Content : KvResponseGroup
+    {
+
+        let configurations: Configurations
+
+        @KvResponseGroupBuilder
+        let content: () -> Content
+
+
+        init(with configurations: Configurations, @KvResponseGroupBuilder content: @escaping () -> Content) {
+            self.configurations = configurations
+            self.content = content
+        }
+
+
+        // MARK: : KvResponseGroup
+
+        var body: some KvResponseGroup {
+            KvGroup(httpEndpoints: configurations.lazy.map { ($0.endpoint, .init(http: $0.http, connection: $0.connection)) },
+                    content: content)
+        }
+
+    }
+
+}
+
+
+
+// MARK: .NetworkGroup + CollectionOfOne
+
+extension KvServerTestKit.NetworkGroup where Configurations == CollectionOfOne<KvHttpChannel.Configuration> {
+
+    init(with configuration: KvHttpChannel.Configuration, @KvResponseGroupBuilder content: @escaping () -> Content) {
+        self.init(with: CollectionOfOne(configuration), content: content)
     }
 
 }

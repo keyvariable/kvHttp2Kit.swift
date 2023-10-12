@@ -15,36 +15,38 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvHttpRequestContext.swift
+//  KvRFC9110.swift
 //  kvServerKit
 //
-//  Created by Svyatoslav Popov on 30.09.2023.
+//  Created by Svyatoslav Popov on 12.10.2023.
 //
 
 import Foundation
 
 
 
-/// It's used to identify responses in a dispatcher.
-@usableFromInline
-class KvHttpRequestContext {
+/// Collection of auxliaries related to RFC9110 standard.
+public struct KvRFC9110 {
 
-    let method: KvHttpMethod
-    let url: URL
-    let urlComponents: URLComponents
-    /// Path components are not part of *URLComponents*.
-    let pathComponents: [String]
+    private init() { }
+
+}
 
 
-    init?(from head: KvHttpServer.RequestHead) {
-        guard let url = URL(string: head.uri),
-              let urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        else { return nil }
 
-        method = head.method
-        self.url = url
-        self.urlComponents = urlComponents
-        pathComponents = url.pathComponents
+// MARK: Dates
+
+extension KvRFC9110 {
+
+    /// - Returns: An instance of ``Foundation/DateFormatter`` configured to operate with RFC9110 dates. E.g. Last-Modified or If-Modified-Since.
+    public static func makeDateFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(abbreviation: "GMT")!
+        formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss z"
+
+        return formatter
     }
 
 }

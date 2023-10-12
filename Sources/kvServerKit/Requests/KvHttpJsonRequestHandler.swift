@@ -30,7 +30,7 @@ import Foundation
 /// - Note: Requests having no body are ignored and `nil` response are returned.
 open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = (Result<T, Error>) -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (T) throws -> KvHttpResponseProvider?
 
 
 
@@ -41,11 +41,8 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
         underlying = .init(bodyLengthLimit: bodyLengthLimit, responseBlock: { data in
             guard let data = data else { return nil }
 
-            let result = Result {
-                try JSONDecoder().decode(T.self, from: data)
-            }
-
-            return responseBlock(result)
+            let value = try JSONDecoder().decode(T.self, from: data)
+            return try responseBlock(value)
         })
     }
 
@@ -75,8 +72,8 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
-        return underlying.httpClientDidReceiveEnd(httpClient)
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+        return try underlying.httpClientDidReceiveEnd(httpClient)
     }
 
 

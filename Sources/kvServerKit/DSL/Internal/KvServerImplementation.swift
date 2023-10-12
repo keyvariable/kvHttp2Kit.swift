@@ -110,7 +110,7 @@ extension KvServerImplementation {
 
         // MARK: Operations
 
-        func makeAccumulator() -> KvResponseAccumulator { Accumulator(self) }
+        func makeAccumulator() -> Accumulator { Accumulator(self) }
 
 
         func httpChannels(for configuration: KvResponseGroup.Configuration?) -> [HttpChannel] {
@@ -125,7 +125,7 @@ extension KvServerImplementation {
 
         // MARK: .Accumulator
 
-        private class Accumulator : KvResponseAccumulator {
+        class Accumulator : KvResponseAccumulator {
 
             weak var schema: Schema!
 
@@ -145,8 +145,8 @@ extension KvServerImplementation {
 
             // MARK: : KvResponseAccumulator
 
-            func with(_ configuration: KvResponseGroup.Configuration, body: (KvResponseAccumulator) -> Void) {
-                let newConfiguration = self.responseGroupConfiguration.map { KvResponseGroup.Configuration(lhs: $0, rhs: configuration) } ?? configuration
+            func with(_ configuration: KvResponseGroup.Configuration, body: (Accumulator) -> Void) {
+                let newConfiguration = KvResponseGroup.Configuration.overlay(configuration, over: self.responseGroupConfiguration)
 
                 let isHttpConfigurationChanged = newConfiguration.network.httpEndpoints != self.responseGroupConfiguration?.network.httpEndpoints
 
@@ -537,21 +537,22 @@ extension KvServerImplementation.HttpServer {
 
             // Dispatching request
             let dispatchingResult = dispatcher.requestProcessor(in: requestContext)
-            let onIndicent = dispatchingResult.resolvedAttributes?.clientCallbacks?.onHttpIncident
+            var onIncident = dispatchingResult.resolvedAttributes?.clientCallbacks?.onHttpIncident
 
 
-            func RequestHandler(for incident: KvHttpResponse.Incident) -> KvHttpRequestHandler {
-                KvHttpHeadOnlyRequestHandler { onIndicent?(incident) ?? .status(incident.defaultStatus) }
+            func RequestHandler(for incident: KvHttpResponse.Incident, callback: ((KvHttpIncident) -> KvHttpResponseProvider?)?) -> KvHttpRequestHandler {
+                KvHttpHeadOnlyRequestHandler { callback?(incident) ?? .status(incident.defaultStatus) }
             }
 
 
             switch dispatchingResult.match {
             case .unambiguous(let value):
                 requestProcessor = value
+                onIncident = requestProcessor.onIncident(_:)
             case .notFound:
-                return RequestHandler(for: .responseNotFound)
+                return RequestHandler(for: .responseNotFound, callback: onIncident)
             case .ambiguous:
-                return RequestHandler(for: .ambiguousRequest)
+                return RequestHandler(for: .ambiguousRequest, callback: onIncident)
             }
 
             // Custom processing of headers
@@ -559,7 +560,7 @@ extension KvServerImplementation.HttpServer {
             case .success:
                 break
             case .failure(let error):
-                return RequestHandler(for: .invalidHeaders(error))
+                return RequestHandler(for: .invalidHeaders(error), callback: onIncident)
             }
 
             // Creation of a request processor
@@ -567,7 +568,7 @@ extension KvServerImplementation.HttpServer {
             case .success(let requestHandler):
                 return requestHandler
             case .failure(let error):
-                return RequestHandler(for: .processingFailed(error))
+                return RequestHandler(for: .processingFailed(error), callback: onIncident)
             }
         }
 

@@ -28,7 +28,7 @@
 /// See: ``init(bodyLengthLimit:initial:nextPartialResult:responseBlock:)``, ``init(bodyLengthLimit:into:updateAccumulatingResult:responseBlock:)``.
 open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = (PartialResult) -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (PartialResult) throws -> KvHttpResponseProvider?
 
 
 
@@ -38,10 +38,10 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
 
     @usableFromInline
-    let bodyCallback: (UnsafeRawBufferPointer) -> Void
+    let bodyCallback: (UnsafeRawBufferPointer) throws -> Void
 
     @usableFromInline
-    let responseBlock: () -> KvHttpResponseProvider?
+    let responseBlock: () throws -> KvHttpResponseProvider?
 
 
 
@@ -54,17 +54,17 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     @inlinable
     public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit,
                 initial initialResult: PartialResult,
-                nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) -> PartialResult,
+                nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) throws -> PartialResult,
                 responseBlock: @escaping ResponseBlock)
     {
         var partialResult = initialResult
 
         self.bodyLengthLimit = bodyLengthLimit
         self.bodyCallback = { bytes in
-            partialResult = nextPartialResult(partialResult, bytes)
+            partialResult = try nextPartialResult(partialResult, bytes)
         }
         self.responseBlock = {
-            responseBlock(partialResult)
+            try responseBlock(partialResult)
         }
     }
 
@@ -78,17 +78,17 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     @inlinable
     public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit,
                 into initialResult: PartialResult,
-                updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) -> Void,
+                updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) throws -> Void,
                 responseBlock: @escaping ResponseBlock)
     {
         var partialResult = initialResult
 
         self.bodyLengthLimit = bodyLengthLimit
         self.bodyCallback = { bytes in
-            updateAccumulatingResult(&partialResult, bytes)
+            try updateAccumulatingResult(&partialResult, bytes)
         }
         self.responseBlock = {
-            responseBlock(partialResult)
+            try responseBlock(partialResult)
         }
     }
 
@@ -98,8 +98,8 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) {
-        bodyCallback(bytes)
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) throws {
+        try bodyCallback(bytes)
     }
 
 
@@ -109,8 +109,8 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
-        return responseBlock()
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+        return try responseBlock()
     }
 
 

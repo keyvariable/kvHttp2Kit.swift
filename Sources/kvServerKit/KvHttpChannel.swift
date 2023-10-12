@@ -761,9 +761,14 @@ open class KvHttpChannel {
         /// See ``KvHttpRequestHandler/bodyLengthLimit``, ``KvResponseGroup/httpBodyLengthLimit(_:)``, ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
         /// By default `.payloadTooLarge` (413) status is returned.
         case byteLimitExceeded
+        /// Failed to process a request header. Details are in *message* associated value.
+        /// By default `.badRequest` (400) status is returned.
+        case invalidHeader(_ message: String)
         /// This incident is emitted when request handler returns `nil` response from ``KvHttpRequestHandler/httpClientDidReceiveEnd(_:)`` method.
         /// By default `.notFound` (404) status is returned.
         case noResponse
+        /// This incident is emitted when error occurs while processing request body bytes or request end.
+        case requestProcessingError(Error)
         /// An error occured when an incident's response body was requested.
         case responseBodyError(Error)
 
@@ -776,8 +781,12 @@ open class KvHttpChannel {
             switch self {
             case .byteLimitExceeded:
                 return .payloadTooLarge
+            case .invalidHeader:
+                return .badRequest
             case .noResponse:
                 return .notFound
+            case .requestProcessingError(_):
+                return .internalServerError
             case .responseBodyError(_):
                 return .internalServerError
             }
@@ -936,6 +945,9 @@ open class KvHttpChannel {
         }()
 
 
+        private let dateFormatterRFC9110 = KvRFC9110.makeDateFormatter()
+
+
         // MARK: .Constants
 
         private struct Constants {
@@ -995,13 +1007,27 @@ open class KvHttpChannel {
         /// - Warning: This method must be used to access the body callback.
         @inline(__always)
         private static func responseBodyCallback(_ response: KvHttpResponseProvider, _ httpMethod: HTTPMethod) -> Result<KvHttpResponseProvider.BodyCallback?, Error> {
-            guard httpMethod != .HEAD else { return .success(nil) }
+            guard httpMethod != .HEAD,
+                  response.status != .notModified
+            else { return .success(nil) }
 
             return response.bodyCallbackProvider?().map { $0 } ?? .success(nil)
         }
 
 
+        /// - Returns: `Nil` or replacement response whether the preconditions are met.
+        private func processPreconditions(for response: Response, in requestContext: RequestContext) -> Response? {
+            requestContext.preconditions.process(
+                for: response,
+                in: .init(method: requestContext.httpMethod,
+                          dateFormatterRFC9110: dateFormatterRFC9110)
+            )
+        }
+
+
         private func channelWrite(_ response: Response, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext) {
+            let response = processPreconditions(for: response, in: requestContext) ?? response
+
             switch InternalChannelHandler.responseBodyCallback(response, requestContext.httpMethod) {
             case .success(let bodyCallback):
                 channelWrite(response, bodyCallback, context: channelContext, httpVersion: requestContext.httpVersion)
@@ -1078,6 +1104,12 @@ open class KvHttpChannel {
                     }
                     if let contentLength = response.contentLength {
                         headers.add(name: "Content-Length", value: String(contentLength))
+                    }
+                    if let value = response.entityTag {
+                        headers.add(name: "ETag", value: value.httpRepresentation)
+                    }
+                    if let modificationDate = response.modificationDate {
+                        headers.add(name: "Last-Modified", value: self.dateFormatterRFC9110.string(from: modificationDate))
                     }
 
                     response.customHeaderCallback?(&headers)
@@ -1251,23 +1283,47 @@ open class KvHttpChannel {
             guard let requestHandler = delegate?.httpClient(self, requestHandlerFor: head)
             else { return processIncident(.noRequestHandler, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method) }
 
+
+            func ProcessIncident(_ incident: RequestIncident) {
+                processIncident(incident, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method) {
+                    $0.response(client: self, requestHandler: requestHandler)
+                }
+            }
+
+
+            var preconditions = KvHttpRequestPreconditions()
+
             let bodyLengthLimit = requestHandler.bodyLengthLimit
 
-            switch head.headers.first(name: "Content-Length").flatMap(UInt.init(_:)) {
-            case .none:
-                break
-            case .some(let contentLength):
-                guard contentLength <= bodyLengthLimit else {
-                    return processIncident(RequestIncident.byteLimitExceeded, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method) {
-                        $0.response(client: self, requestHandler: requestHandler)
-                    }
+            for header in head.headers {
+                // TODO: Optimize selection by header name.
+                switch header.name.lowercased() {
+                case "content-length":
+                    guard let contentLength = UInt(header.value) else { return ProcessIncident(.invalidHeader("Invalid value of Content-Length header: \(header.value)")) }
+                    guard contentLength <= bodyLengthLimit else { return ProcessIncident(.byteLimitExceeded) }
+
+                case "if-match":
+                    preconditions.entityTag = .ifMatch(header.value)
+
+                case "if-modified-since":
+                    preconditions.modificationDate = .ifModifiedSince(header.value)
+
+                case "if-none-match":
+                    preconditions.entityTag = .ifNoneMatch(header.value)
+
+                case "if-unmodified-since":
+                    preconditions.modificationDate = .ifUnmodifiedSince(header.value)
+
+                default:
+                    break
                 }
             }
 
             requestProcessingState = .processing(.init(httpVersion: httpVersion,
-                                                        httpMethod: head.method,
-                                                        handler: requestHandler,
-                                                        bodyLengthLimit: bodyLengthLimit))
+                                                       httpMethod: head.method,
+                                                       preconditions: preconditions,
+                                                       handler: requestHandler,
+                                                       bodyLengthLimit: bodyLengthLimit))
         }
 
 
@@ -1277,10 +1333,14 @@ open class KvHttpChannel {
                 guard requestContext.bodyLengthLimit >= byteBuffer.readableBytes
                 else { return processIncident(.byteLimitExceeded, isResponseComplete: false, in: context, requestContext) }
 
-                let bytesRead: UInt = numericCast(byteBuffer.readWithUnsafeReadableBytes { pointer in
-                    requestContext.handler.httpClient(self, didReceiveBodyBytes: pointer)
-                    return pointer.count
-                })
+                let bytesRead: UInt
+                do {
+                    bytesRead = try numericCast(byteBuffer.readWithUnsafeReadableBytes { pointer in
+                        try requestContext.handler.httpClient(self, didReceiveBodyBytes: pointer)
+                        return pointer.count
+                    })
+                }
+                catch { return processIncident(.requestProcessingError(error), isResponseComplete: false, in: context, requestContext) }
 
                 assert(requestContext.bodyLengthLimit >= bytesRead)
 
@@ -1301,8 +1361,11 @@ open class KvHttpChannel {
             switch requestProcessingState {
             case .processing(let requestContext):
                 dispatchQueue.async {
-                    guard let response = requestContext.handler.httpClientDidReceiveEnd(self)
-                    else { return self.processIncident(.noResponse, isResponseComplete: true, in: context, requestContext) }
+                    let response: Response?
+                    do { response = try requestContext.handler.httpClientDidReceiveEnd(self) }
+                    catch { return self.processIncident(.requestProcessingError(error), isResponseComplete: true, in: context, requestContext) }
+
+                    guard let response = response else { return self.processIncident(.noResponse, isResponseComplete: true, in: context, requestContext) }
 
                     self.channelWrite(response, in: context, requestContext)
                 }
@@ -1337,6 +1400,8 @@ open class KvHttpChannel {
 
             let httpVersion: HTTPVersion
             let httpMethod: HTTPMethod
+
+            let preconditions: KvHttpRequest.Preconditions
 
             /// Handler of a request.
             let handler: KvHttpRequestHandler

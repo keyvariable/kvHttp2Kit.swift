@@ -220,7 +220,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
         init(_ responseGroupConfiguration: KvResponseGroupConfiguration?, _ responseConfiguration: Configuration?) {
             self.httpRequestBody = responseGroupConfiguration?.httpRequestBody
-            self.clientCallbacks = .merged(responseGroupConfiguration?.clientCallbacks, addition: responseConfiguration?.clientCallbacks)
+            self.clientCallbacks = .accumulate(responseConfiguration?.clientCallbacks, into: responseGroupConfiguration?.clientCallbacks)
         }
 
     }
@@ -313,9 +313,9 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///
     /// See: ``onError(_:)``.
     @inlinable
-    public func onIncident(_ block: @escaping (KvHttpIncident) -> KvHttpResponseProvider?) -> KvHttpResponse {
+    public func onIncident(_ block: @escaping (KvHttpIncident) throws -> KvHttpResponseProvider?) -> KvHttpResponse {
         modified {
-            $0.clientCallbacks = .merged($0.clientCallbacks, addition: .init(onHttpIncident: block))
+            $0.clientCallbacks = .accumulate(.init(onHttpIncident: { try? block($0) }), into: $0.clientCallbacks)
         }
     }
 
@@ -330,7 +330,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     @inlinable
     public func onError(_ block: @escaping (Error) -> Void) -> KvHttpResponse {
         modified {
-            $0.clientCallbacks = .merged($0.clientCallbacks, addition: .init(onError: block))
+            $0.clientCallbacks = .accumulate(.init(onError: block), into: $0.clientCallbacks)
         }
     }
 

@@ -15,36 +15,29 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvHttpRequestContext.swift
+//  KvHttpResponseError.swift
 //  kvServerKit
 //
-//  Created by Svyatoslav Popov on 30.09.2023.
+//  Created by Svyatoslav Popov on 06.10.2023.
 //
 
 import Foundation
 
 
 
-/// It's used to identify responses in a dispatcher.
-@usableFromInline
-class KvHttpRequestContext {
+/// Errors related to processing of HTTP responses.
+public enum KvHttpResponseError : LocalizedError, Equatable {
 
-    let method: KvHttpMethod
-    let url: URL
-    let urlComponents: URLComponents
-    /// Path components are not part of *URLComponents*.
-    let pathComponents: [String]
+    /// File at URL doesn't exist.
+    case fileDoesNotExist(URL)
 
+    /// Unable to create input stream for URL.
+    case unableToCreateInputStream(URL)
 
-    init?(from head: KvHttpServer.RequestHead) {
-        guard let url = URL(string: head.uri),
-              let urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        else { return nil }
+    /// Unable to get URL of a resource in bundle.
+    case unableToFindBundleResource(name: String, extension: String?, subdirectory: String?, bundle: Bundle)
 
-        method = head.method
-        self.url = url
-        self.urlComponents = urlComponents
-        pathComponents = url.pathComponents
-    }
+    /// Unable to find index file in directory at *directoryURL*.
+    case unableToFindIndexFile(directoryURL: URL)
 
 }

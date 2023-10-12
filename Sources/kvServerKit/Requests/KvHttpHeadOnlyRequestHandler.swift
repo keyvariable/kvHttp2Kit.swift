@@ -24,7 +24,7 @@
 /// Simple handler for requests having no body. It just sends response passed to the initializer.
 open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = () -> KvHttpResponseProvider?
+    public typealias ResponseBlock = () throws -> KvHttpResponseProvider?
 
 
 
@@ -65,8 +65,8 @@ open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
-        return responseBlock()
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+        return try responseBlock()
     }
 
 

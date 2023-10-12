@@ -26,7 +26,7 @@
 /// Note that the body limits are applied.
 public class KvHttpIgnoringBodyRequestHandler : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = () -> KvHttpResponseProvider?
+    public typealias ResponseBlock = () throws -> KvHttpResponseProvider?
 
 
 
@@ -63,8 +63,8 @@ public class KvHttpIgnoringBodyRequestHandler : KvHttpRequestHandler {
     ///
     /// See ``KvHttpRequestHandler``.
     @inlinable
-    public func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) -> KvHttpResponseProvider? {
-        return responseBlock()
+    public func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+        return try responseBlock()
     }
 
 

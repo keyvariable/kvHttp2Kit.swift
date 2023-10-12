@@ -96,7 +96,7 @@ class KvHttpResponseDispatcher {
         static func merge(addition: Attributes, into base: inout Attributes?) {
             switch base {
             case .some(let base):
-                base.clientCallbacks = .merged(base.clientCallbacks, addition: addition.clientCallbacks)
+                base.clientCallbacks = .accumulate(addition.clientCallbacks, into: base.clientCallbacks)
 
             case .none:
                 base = .init(clientCallbacks: addition.clientCallbacks)
@@ -274,7 +274,7 @@ extension KvHttpResponseDispatcher {
 
             // MARK: Operations
 
-            /// Correctry enumerates keys in optional sequences. Body is called with whildcard key (`nil`) when *keys* are missing or empty.
+            /// Correctly enumerates keys in optional sequences. Body is called with wildcard key (`nil`) when *keys* are missing or empty.
             static func forEachKey<S>(in keys: S?, body: (Key?) -> Void) where S : Sequence, S.Element == Key {
                 guard var iterator = keys?.makeIterator() else { return body(nil) }
 
@@ -977,7 +977,7 @@ extension KvHttpResponseDispatcher {
         }
 
 
-        private typealias ProcessorBlock = () -> KvHttpRequestProcessorProtocol?
+        private typealias ProcessorBlock = (Attributes.ClientCallbacks?) -> KvHttpRequestProcessorProtocol?
 
 
         // MARK: .Element
@@ -990,8 +990,8 @@ extension KvHttpResponseDispatcher {
 
             // MARK: Operations
 
-            func makeProcessor() -> RequestProcessorResult.Match {
-                switch processorBlock() {
+            func makeProcessor(_ clientCallbacks: Attributes.ClientCallbacks?) -> RequestProcessorResult.Match {
+                switch processorBlock(clientCallbacks) {
                 case .some(let processor):
                     return .unambiguous(processor)
                 case .none:
@@ -1046,7 +1046,7 @@ extension KvHttpResponseDispatcher {
                 guard requestContext.urlComponents.queryItems?.isEmpty != false
                 else { return }
 
-                accumulator.collect(queryElement.makeProcessor())
+                accumulator.collect(queryElement.makeProcessor(accumulator.resolvedAttributes?.clientCallbacks))
             }
 
         }
@@ -1078,7 +1078,7 @@ extension KvHttpResponseDispatcher {
                 guard queryElement.queryParser.parse(requestContext.urlComponents.queryItems) == .complete
                 else { return }
 
-                accumulator.collect(queryElement.makeProcessor())
+                accumulator.collect(queryElement.makeProcessor(accumulator.resolvedAttributes?.clientCallbacks))
             }
 
         }
@@ -1110,7 +1110,7 @@ extension KvHttpResponseDispatcher {
                     guard queryParser.status == .complete
                     else { return }
 
-                    accumulator.collect(queryElement.makeProcessor())
+                    accumulator.collect(queryElement.makeProcessor(accumulator.resolvedAttributes?.clientCallbacks))
                 }
 
 
@@ -1156,7 +1156,7 @@ extension KvHttpResponseDispatcher {
             override func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
                 let match = Self.withMatchResult(queryElements, in: requestContext) { match in
                     match.flatMap { processorBlock in
-                        processorBlock()
+                        processorBlock(accumulator.resolvedAttributes?.clientCallbacks)
                     }
                 }
 
@@ -1168,9 +1168,10 @@ extension KvHttpResponseDispatcher {
 
             /// - Parameter body: It's called with the result anyway, even if there are no candidates or several candidates.
             @inline(__always)
-            static func withMatchResult(_ elements: [Element],
-                                        in requestContext: KvHttpRequestContext,
-                                        body: (Match<() -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
+            static func withMatchResult(
+                _ elements: [Element],
+                in requestContext: KvHttpRequestContext,
+                body: (Match<(Attributes.ClientCallbacks?) -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
             ) -> RequestProcessorResult.Match {
                 let query = requestContext.urlComponents.queryItems
 
@@ -1215,7 +1216,7 @@ extension KvHttpResponseDispatcher {
             override func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
                 let match = Self.withMatchResult(queryElements, in: requestContext) { match in
                     match.flatMap { processorBlock in
-                        processorBlock()
+                        processorBlock(accumulator.resolvedAttributes?.clientCallbacks)
                     }
                 }
 
@@ -1229,7 +1230,7 @@ extension KvHttpResponseDispatcher {
             @inline(__always)
             static func withMatchResult(_ elements: [Element],
                                         in requestContext: KvHttpRequestContext,
-                                        body: (Match<() -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
+                                        body: (Match<(Attributes.ClientCallbacks?) -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
             ) -> RequestProcessorResult.Match {
                 guard let query = requestContext.urlComponents.queryItems,
                       !query.isEmpty
@@ -1348,7 +1349,7 @@ extension KvHttpResponseDispatcher {
                 let match = SerialQueries.withMatchResult(serialQueryElements, in: requestContext) { match1 in
                     EntireQueries.withMatchResult(entireQueryElements, in: requestContext) { match2 in
                         match1.union(with: match2).flatMap { processorBlock in
-                            processorBlock()
+                            processorBlock(accumulator.resolvedAttributes?.clientCallbacks)
                         }
                     }
                 }

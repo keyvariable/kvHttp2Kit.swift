@@ -199,11 +199,20 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
             break
         }
 
-        return KvHttpRequest.HeadOnlyHandler(response: .notFound.string { "404: resource at «\(urlComponents.path)» not found." })
+        return nil
     }
 
 
-    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? { nil }
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
+        switch incident.defaultStatus {
+        case .notFound:
+            return try? .notFound
+                .file(resource: "404", extension: "html", subdirectory: "Resources", bundle: .module)
+                .contentType(.text(.html))
+        default:
+            return nil
+        }
+    }
 
 
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
@@ -232,7 +241,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
             switch incident {
             case .byteLimitExceeded:
                 return .payloadTooLarge.string { "Payload exceeds \(Constants.Echo.bodyLimit) byte limit." }
-            case .noResponse, .responseBodyError(_):
+            default:
                 return super.httpClient(httpClient, didCatch: incident)
             }
         }

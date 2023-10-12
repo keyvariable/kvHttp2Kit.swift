@@ -42,6 +42,9 @@ public class KvHttpRequest {
     public typealias JsonHandler = KvHttpJsonRequestHandler
 
 
+    typealias Preconditions = KvHttpRequestPreconditions
+
+
 
     // MARK: .Constants
 
