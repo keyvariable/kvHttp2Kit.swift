@@ -169,6 +169,77 @@ final class KvResponseGroupTests : XCTestCase {
 
 
 
+    // MARK: - testSubpathResponse()
+
+    func testSubpathResponse() async throws {
+
+        struct SubpathResponseServer : KvServer {
+
+            let configuration = TestKit.insecureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvHttpResponse.static { .string { "-" } }
+
+                    KvGroup("a") {
+                        KvHttpResponse.static { .string { "-a" } }
+
+                        KvGroup("b") {
+                            KvHttpResponse.static { .string { "-a-b" } }
+                        }
+                    }
+
+                    KvGroup("c") {
+                        KvHttpResponse.dynamic
+                            .subpath
+                            .content { context in .string { "/" + context.subpath.joined } }
+                    }
+                    KvGroup("c") {
+                        KvHttpResponse.dynamic
+                            .query(.required("separator"))
+                            .subpath
+                            .content { context in
+                                let separator = context.query
+                                return .string { separator + context.subpath.components.joined(separator: separator) }
+                            }
+                    }
+                }
+            }
+        }
+
+        try await TestKit.withRunningServer(of: SubpathResponseServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
+            try await TestKit.assertResponse(baseURL, path: "", expecting: "-")
+            try await TestKit.assertResponse(baseURL, path: "a", expecting: "-a")
+            try await TestKit.assertResponse(baseURL, path: "a/", expecting: "-a")
+            try await TestKit.assertResponse(baseURL, path: "a/b", expecting: "-a-b")
+            try await TestKit.assertResponse(baseURL, path: "a/b/", expecting: "-a-b")
+
+            try await TestKit.assertResponse(baseURL, path: "a/c", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "a/c/", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "b", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "b/", statusCode: .notFound, expecting: "")
+
+            try await TestKit.assertResponse(baseURL, path: "c", expecting: "/")
+            try await TestKit.assertResponse(baseURL, path: "c/", expecting: "/")
+            try await TestKit.assertResponse(baseURL, path: "c/a", expecting: "/a")
+            try await TestKit.assertResponse(baseURL, path: "c/a/", expecting: "/a")
+            try await TestKit.assertResponse(baseURL, path: "///c////a////", expecting: "/a")
+            try await TestKit.assertResponse(baseURL, path: "c/a/b/index.html", expecting: "/a/b/index.html")
+
+            do {
+                let query: TestKit.Query = .items([ .init(name: "separator", value: "+") ])
+                try await TestKit.assertResponse(baseURL, path: "c", query: query, expecting: "+")
+                try await TestKit.assertResponse(baseURL, path: "c/", query: query, expecting: "+")
+                try await TestKit.assertResponse(baseURL, path: "c/a", query: query, expecting: "+a")
+                try await TestKit.assertResponse(baseURL, path: "c/a/", query: query, expecting: "+a")
+                try await TestKit.assertResponse(baseURL, path: "///c////a////", query: query, expecting: "+a")
+                try await TestKit.assertResponse(baseURL, path: "c/a/b/index.html", query: query, expecting: "+a+b+index.html")
+            }
+        }
+    }
+
+
+
     // MARK: - testResponseGroupModifiers()
 
     func testResponseGroupModifiers() async throws {
@@ -197,7 +268,7 @@ final class KvResponseGroupTests : XCTestCase {
         }
 
         try await TestKit.withRunningServer(of: ModifiedResponseGroupServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
-            try await TestKit.assertResponse(baseURL, path: "a/b/c/d/e", contentType: .text(.plain), expecting: ModifiedResponseGroupServer.greeting)
+            try await TestKit.assertResponse(baseURL, path: "a/b/c/d/e", expecting: ModifiedResponseGroupServer.greeting)
         }
     }
 

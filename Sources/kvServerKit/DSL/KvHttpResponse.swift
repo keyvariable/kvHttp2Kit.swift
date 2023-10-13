@@ -345,12 +345,16 @@ extension KvHttpResponse {
     /// Type of dynamic HTTP response builder.
     ///
     /// See ``KvHttpResponse/dynamic`` for details.
-    public struct DynamicResponse<QueryItemGroup, RequestHeaders, RequestBodyValue>
-    where QueryItemGroup : KvUrlQueryItemGroup
+    public struct DynamicResponse<QueryItemGroup, RequestHeaders, RequestBodyValue, Subpath>
+    where QueryItemGroup : KvUrlQueryItemGroup,
+          Subpath : KvUrlSubpathProtocol
     {
 
         /// Type representing processed content of the HTTP request. It's passed to the response's content callback.
-        public typealias Context = (query: QueryItemGroup.Value, requestHeaders: RequestHeaders, requestBody: RequestBodyValue)
+        public typealias Context = (query: QueryItemGroup.Value,
+                                    requestHeaders: RequestHeaders,
+                                    requestBody: RequestBodyValue,
+                                    subpath: Subpath)
 
 
         @usableFromInline
@@ -399,7 +403,7 @@ extension KvHttpResponse {
             _ queryParser: QueryParser,
             _ implementationConfiguration: ImplementationConfiguration,
             _ callback: @escaping (Context) throws -> KvHttpResponseProvider
-        ) -> KvHttpResponseImplementation<QueryParser, RequestHeaders, RequestBodyValue>
+        ) -> KvHttpResponseImplementation<QueryParser, RequestHeaders, RequestBodyValue, Subpath>
         where QueryParser : KvUrlQueryParserProtocol, QueryParser.Value == QueryItemGroup.Value
         {
             var body = configuration.requestBody
@@ -412,7 +416,7 @@ extension KvHttpResponse {
                                                 headCallback: configuration.requestHeadCallback,
                                                 body: body,
                                                 clientCallbacks: implementationConfiguration.clientCallbacks,
-                                                responseProvider: { try callback(($0, $1, $2)) })
+                                                responseProvider: { try callback(($0, $1, $2, $3)) })
         }
 
     }
@@ -470,7 +474,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemIm
 
 // MARK: Initializaion
 
-public typealias InitialDynamicResponse = KvHttpResponse.DynamicResponse<KvEmptyUrlQueryItemGroup, KvHttpRequestIgnoredHeaders, KvHttpRequestVoidBodyValue>
+public typealias InitialDynamicResponse = KvHttpResponse.DynamicResponse<KvEmptyUrlQueryItemGroup, KvHttpRequestIgnoredHeaders, KvHttpRequestVoidBodyValue, KvUnavailableUrlSubpath>
 
 
 extension InitialDynamicResponse {
@@ -491,7 +495,7 @@ extension KvHttpResponse.DynamicResponse {
 
     @usableFromInline
     @inline(__always)
-    func map<Q, H, B>(_ transform: (Configuration) -> KvHttpResponse.DynamicResponse<Q, H, B>.Configuration) -> KvHttpResponse.DynamicResponse<Q, H, B>
+    func map<Q, H, B, S>(_ transform: (Configuration) -> KvHttpResponse.DynamicResponse<Q, H, B, S>.Configuration) -> KvHttpResponse.DynamicResponse<Q, H, B, S>
     where Q : KvUrlQueryItemGroup
     {
         .init(with: transform(configuration))
@@ -500,7 +504,7 @@ extension KvHttpResponse.DynamicResponse {
 
     @usableFromInline
     @inline(__always)
-    func mapQuery<Q>(_ transform: (QueryItemGroup) -> Q) -> KvHttpResponse.DynamicResponse<Q, RequestHeaders, RequestBodyValue>
+    func mapQuery<Q>(_ transform: (QueryItemGroup) -> Q) -> KvHttpResponse.DynamicResponse<Q, RequestHeaders, RequestBodyValue, Subpath>
     where Q : KvUrlQueryItemGroup
     {
         map { .init(queryItemGroup: transform($0.queryItemGroup), requestHeadCallback: $0.requestHeadCallback, requestBody: $0.requestBody) }
@@ -513,7 +517,7 @@ extension KvHttpResponse.DynamicResponse {
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQueryItemGroup {
 
-    public typealias MappingRaw<T> = KvHttpResponse.DynamicResponse<KvRawUrlQueryItemGroup<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingRaw<T> = KvHttpResponse.DynamicResponse<KvRawUrlQueryItemGroup<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -525,7 +529,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQuery
     ///
     /// - Note: Initially response matches empty URL query.
     @inlinable
-    public func query<T>(_ item: KvUrlQueryItem<T>) -> KvHttpResponse.DynamicResponse<KvUrlQueryItemGroupOfOne<T>, RequestHeaders, RequestBodyValue> {
+    public func query<T>(_ item: KvUrlQueryItem<T>) -> KvHttpResponse.DynamicResponse<KvUrlQueryItemGroupOfOne<T>, RequestHeaders, RequestBodyValue, Subpath> {
         mapQuery { _ in .init(item) }
     }
 
@@ -568,9 +572,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQuery
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfOneProtocol {
 
-    public typealias AmmendedUpToTwo<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToTwo<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingOne<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingOne<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -612,9 +616,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 // TODO: Apply parameter packs from Swift 5.9.
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfTwoProtocol {
 
-    public typealias AmmendedUpToThree<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToThree<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingTwo<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingTwo<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -655,9 +659,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfThreeProtocol {
 
-    public typealias AmmendedUpToFour<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToFour<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingThree<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingThree<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -698,9 +702,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfFourProtocol {
 
-    public typealias AmmendedUpToFive<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToFive<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingFour<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingFour<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -741,9 +745,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfFiveProtocol {
 
-    public typealias AmmendedUpToSix<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToSix<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingFive<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingFive<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -784,9 +788,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfSixProtocol {
 
-    public typealias AmmendedUpToSeven<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToSeven<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingSix<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingSix<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -827,9 +831,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfSevenProtocol {
 
-    public typealias AmmendedUpToEight<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToEight<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingSeven<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingSeven<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -870,9 +874,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfEightProtocol {
 
-    public typealias AmmendedUpToNine<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToNine<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingEight<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingEight<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -913,9 +917,9 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfNineProtocol {
 
-    public typealias AmmendedUpToTen<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue>
+    public typealias AmmendedUpToTen<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath>
 
-    public typealias MappingNine<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingNine<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Appends a structured URL query item to the receiver's context.
@@ -956,7 +960,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGroupOfTenProtocol {
 
-    public typealias MappingTen<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue>
+    public typealias MappingTen<T> = KvHttpResponse.DynamicResponse<QueryItemGroup.Mapped<T>, RequestHeaders, RequestBodyValue, Subpath>
 
 
     /// Replaces query value in the context with the result of transformation.
@@ -1013,7 +1017,7 @@ extension KvHttpResponse.DynamicResponse where RequestHeaders == KvHttpRequestIg
 
 extension KvHttpResponse.DynamicResponse {
 
-    public typealias HandlingRequestHeaders<H> = KvHttpResponse.DynamicResponse<QueryItemGroup, H, RequestBodyValue>
+    public typealias HandlingRequestHeaders<H> = KvHttpResponse.DynamicResponse<QueryItemGroup, H, RequestBodyValue, Subpath>
 
 
     /// Adds additional transformation of HTTP request headers.
@@ -1044,7 +1048,7 @@ extension KvHttpResponse.DynamicResponse {
 
 extension KvHttpResponse.DynamicResponse where RequestBodyValue == KvHttpRequestVoidBodyValue {
 
-    public typealias HandlingRequestBody<B> = KvHttpResponse.DynamicResponse<QueryItemGroup, RequestHeaders, B>
+    public typealias HandlingRequestBody<B> = KvHttpResponse.DynamicResponse<QueryItemGroup, RequestHeaders, B, Subpath>
 
 
     /// Adds processing of HTTP request body.
@@ -1084,6 +1088,35 @@ extension KvHttpResponse.DynamicResponse where RequestBodyValue == KvHttpRequest
     @inlinable
     public func requestBody<B>(_ requestBody: KvHttpRequestReducingBody<B>) -> HandlingRequestBody<B> {
         map { .init(queryItemGroup: $0.queryItemGroup, requestHeadCallback: $0.requestHeadCallback, requestBody: requestBody) }
+    }
+
+}
+
+
+// MARK: Subpath Modifiers
+
+extension KvHttpResponse.DynamicResponse where Subpath == KvUnavailableUrlSubpath {
+
+    /// Adds processing of URL subpaths.
+    ///
+    /// For example if response is declared at "/a/b" path then it's returned for "/a/b" path and any subpath.
+    /// The subpath is provided as instance if ``KvUrlSubpath`` at ``KvHttpResponse/DynamicResponse/Context``.`subpath`.
+    ///
+    /// Below is a simple example returning the subpath:
+    /// ```swift
+    /// struct Server : KvServer {
+    ///     var body: some KvResponseGroup {
+    ///     KvGroup("a/b") {
+    ///         KvHttpResponse.dynamic
+    ///             .subpath
+    ///             .content { ctx in .string { ctx.subpath.joined } }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    @inlinable
+    public var subpath: KvHttpResponse.DynamicResponse<QueryItemGroup, RequestHeaders, RequestBodyValue, KvUrlSubpath> {
+        map { .init(queryItemGroup: $0.queryItemGroup, requestHeadCallback: $0.requestHeadCallback, requestBody: $0.requestBody) }
     }
 
 }

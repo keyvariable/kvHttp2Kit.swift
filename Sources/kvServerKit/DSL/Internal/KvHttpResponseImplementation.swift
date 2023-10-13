@@ -25,6 +25,21 @@ import Foundation
 
 
 
+// MARK: KvHttpResponseContext
+
+struct KvHttpResponseContext {
+
+    typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
+
+
+    var subpathComponents: ArraySlice<String>
+
+    var clientCallbacks: ClientCallbacks?
+
+}
+
+
+
 // MARK: - KvHttpResponseImplementationProtocol
 
 protocol KvHttpResponseImplementationProtocol {
@@ -32,7 +47,7 @@ protocol KvHttpResponseImplementationProtocol {
     var urlQueryParser: KvUrlQueryParserProtocol { get }
 
 
-    func makeProcessor(clientCallbacks: KvResponseGroupConfiguration.ClientCallbacks?) -> KvHttpRequestProcessorProtocol?
+    func makeProcessor(in responseContext: KvHttpResponseContext) -> KvHttpRequestProcessorProtocol?
 
 }
 
@@ -52,15 +67,26 @@ protocol KvHttpRequestProcessorProtocol : AnyObject {
 
 
 
+// MARK: - KvHttpSubpathResponseImplementation
+
+/// Protocol for `KvHttpResponseImplementation` where `Subpath` is `KvUrlSubpath`.
+protocol KvHttpSubpathResponseImplementation { }
+
+
+
 // MARK: - KvHttpResponseImplementation
 
-struct KvHttpResponseImplementation<QueryParser, Headers, BodyValue> : KvHttpResponseImplementationProtocol
-where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
+struct KvHttpResponseImplementation<QueryParser, Headers, BodyValue, Subpath> : KvHttpResponseImplementationProtocol
+where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
+      Subpath : KvUrlSubpathProtocol
+{
 
     typealias HeadCallback = (KvHttpServer.RequestHeaders) -> Result<Headers, Error>
     typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
 
-    typealias ResponseProvider = (QueryParser.Value, Headers, BodyValue) throws -> KvHttpResponseProvider
+    typealias ResponseContext = KvHttpResponseContext
+
+    typealias ResponseProvider = (QueryParser.Value, Headers, BodyValue, Subpath) throws -> KvHttpResponseProvider
 
 
 
@@ -96,10 +122,13 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
     // MARK: Operations
 
-    func makeProcessor(clientCallbacks baseClientCallbacks: KvResponseGroupConfiguration.ClientCallbacks?) -> KvHttpRequestProcessorProtocol? {
+    func makeProcessor(in responseContext: ResponseContext) -> KvHttpRequestProcessorProtocol? {
         switch queryParser.parseResult() {
         case .success(let queryValue):
-            return Processor(queryValue, headCallback, body, .accumulate(clientCallbacks, into: baseClientCallbacks), responseProvider)
+            var responseContext = responseContext
+            responseContext.clientCallbacks = .accumulate(clientCallbacks, into: responseContext.clientCallbacks)
+            return Processor(queryValue, headCallback, body, responseContext, responseProvider)
+
         case .failure:
             return nil
         }
@@ -114,13 +143,13 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
         init(_ queryValue: QueryParser.Value,
              _ headCallback: @escaping HeadCallback,
              _ body: any KvHttpRequestBodyInternal,
-             _ clientCallbacks: ClientCallbacks?,
+             _ responseContext: ResponseContext,
              _ responseProvider: @escaping ResponseProvider
         ) {
             self.queryValue = queryValue
             self.headCallback = headCallback
             self.body = body
-            self.clientCallbacks = clientCallbacks
+            self.responseContext = responseContext
             self.responseProvider = responseProvider
         }
 
@@ -131,7 +160,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
         private let headCallback: HeadCallback
         private let body: any KvHttpRequestBodyInternal
 
-        private let clientCallbacks: ClientCallbacks?
+        private let responseContext: ResponseContext
 
         private let responseProvider: ResponseProvider
 
@@ -154,16 +183,18 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
             guard let headers = headers else { return .failure(ProcessError.noHeaders) }
 
             let queryValue = queryValue
+            let responseContext = responseContext
+
             let responseProvider = responseProvider
 
-            return .success(body.makeRequestHandler(clientCallbacks) { bodyValue in
-                try responseProvider(queryValue, headers, bodyValue as! BodyValue)
+            return .success(body.makeRequestHandler(responseContext.clientCallbacks) { bodyValue in
+                try responseProvider(queryValue, headers, bodyValue as! BodyValue, Subpath(with: responseContext.subpathComponents))
             })
         }
 
 
         func onIncident(_ incident: KvHttpIncident) -> KvHttpResponseProvider? {
-            clientCallbacks?.onHttpIncident?(incident)
+            responseContext.clientCallbacks?.onHttpIncident?(incident)
         }
 
 
@@ -179,9 +210,16 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider {
 
 
 
-// MARK: Simple Response Case
+extension KvHttpResponseImplementation : KvHttpSubpathResponseImplementation where Subpath == KvUrlSubpath {
+    // MARK: : KvHttpSubpathResponseImplementation
+}
 
-extension KvHttpResponseImplementation where QueryParser == KvEmptyUrlQueryParser, Headers == Void, BodyValue == KvHttpRequestVoidBodyValue {
+
+
+extension KvHttpResponseImplementation
+where QueryParser == KvEmptyUrlQueryParser, Headers == Void, BodyValue == KvHttpRequestVoidBodyValue, Subpath == KvUnavailableUrlSubpath
+{
+    // MARK: Simple Response Case
 
     /// Initializes implementation for emptry URL query, requiring head-only request, providing no analysis of request headers.
     init(clientCallbacks: ClientCallbacks?, responseProvider: @escaping () throws -> KvHttpResponseProvider) {
@@ -189,7 +227,7 @@ extension KvHttpResponseImplementation where QueryParser == KvEmptyUrlQueryParse
                   headCallback: { _ in .success(()) },
                   body: KvHttpRequestProhibitedBody(),
                   clientCallbacks: clientCallbacks,
-                  responseProvider: { _, _, _ in try responseProvider() })
+                  responseProvider: { _, _, _, _ in try responseProvider() })
     }
 
 }

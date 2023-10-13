@@ -33,7 +33,7 @@ class KvHttpRequestContext {
     let url: URL
     let urlComponents: URLComponents
     /// Path components are not part of *URLComponents*.
-    let pathComponents: [String]
+    let pathComponents: ArraySlice<String>
 
 
     init?(from head: KvHttpServer.RequestHead) {
@@ -44,7 +44,21 @@ class KvHttpRequestContext {
         method = head.method
         self.url = url
         self.urlComponents = urlComponents
-        pathComponents = url.pathComponents
+        pathComponents = KvHttpRequestContext.normalizedPathComponents(from: url)
+    }
+
+
+    // MARK: Auxiliaries
+
+    private static func normalizedPathComponents(from url: URL) -> ArraySlice<String> {
+        let c = url.pathComponents
+
+        guard !c.isEmpty else { return [ ] }
+
+        let lowerBound = c.startIndex.advanced(by: c.first! != "/" ? 0 : 1)
+        let upperBound = c.endIndex.advanced(by: c.count <= 1 || c.last! != "/" ? 0 : -1)
+
+        return c[lowerBound ..< upperBound]
     }
 
 }
