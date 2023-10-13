@@ -124,7 +124,7 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
             (wrapped as! any KvResponseInternalProtocol).insert(to: accumulator)
         }
 
@@ -168,12 +168,12 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
             switch content {
             case .falseGroup(let value):
-                value.insertResponses(to: accumulator)
+                value.resolvedGroup.insertResponses(to: accumulator)
             case .trueGroup(let value):
-                value.insertResponses(to: accumulator)
+                value.resolvedGroup.insertResponses(to: accumulator)
             }
         }
     }
@@ -204,9 +204,9 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
-            e0.insertResponses(to: accumulator)
-            e1.insertResponses(to: accumulator)
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
+            e0.resolvedGroup.insertResponses(to: accumulator)
+            e1.resolvedGroup.insertResponses(to: accumulator)
         }
 
     }
@@ -239,10 +239,10 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
-            e0.insertResponses(to: accumulator)
-            e1.insertResponses(to: accumulator)
-            e2.insertResponses(to: accumulator)
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
+            e0.resolvedGroup.insertResponses(to: accumulator)
+            e1.resolvedGroup.insertResponses(to: accumulator)
+            e2.resolvedGroup.insertResponses(to: accumulator)
         }
 
     }
@@ -277,11 +277,11 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
-            e0.insertResponses(to: accumulator)
-            e1.insertResponses(to: accumulator)
-            e2.insertResponses(to: accumulator)
-            e3.insertResponses(to: accumulator)
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
+            e0.resolvedGroup.insertResponses(to: accumulator)
+            e1.resolvedGroup.insertResponses(to: accumulator)
+            e2.resolvedGroup.insertResponses(to: accumulator)
+            e3.resolvedGroup.insertResponses(to: accumulator)
         }
 
     }

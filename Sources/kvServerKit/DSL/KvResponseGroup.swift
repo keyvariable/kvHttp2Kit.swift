@@ -96,15 +96,8 @@ extension KvResponseGroup {
 
 
 
-    // MARK: Accumulation
-
-    internal func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
-        switch self {
-        case let group as any KvResponseGroupInternalProtocol:
-            group.insertResponses(to: accumulator)
-        default:
-            body.insertResponses(to: accumulator)
-        }
+    internal var resolvedGroup: any KvResponseGroupInternalProtocol {
+        (self as? any KvResponseGroupInternalProtocol) ?? body.resolvedGroup
     }
 
 
@@ -803,7 +796,7 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
 protocol KvResponseGroupInternalProtocol : KvResponseGroup {
 
-    func insertResponses<A : KvResponseAccumulator>(to accumulator: A)
+    func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A)
 
 }
 
@@ -843,15 +836,20 @@ struct KvModifiedResponseGroup : KvResponseGroupInternalProtocol {
 
     // MARK: : KvResponseGroupInternalProtocol
 
-    func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
+    func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
+
+        @inline(__always)
+        func Insert<A>(to accumulator: A) where A : KvHttpResponseAccumulator {
+            sourceProvider().resolvedGroup.insertResponses(to: accumulator)
+        }
+        
+
         switch configuration {
         case .none:
-            sourceProvider().insertResponses(to: accumulator)
+            Insert(to: accumulator)
 
         case .some(let configuration):
-            accumulator.with(configuration) { accumulator in
-                sourceProvider().insertResponses(to: accumulator)
-            }
+            accumulator.with(configuration, body: Insert(to:))
         }
     }
 

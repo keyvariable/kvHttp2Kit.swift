@@ -79,9 +79,9 @@ extension KvForEach : KvResponseGroup where Content : KvResponseGroup {
 
 extension KvForEach : KvResponseGroupInternalProtocol where Self : KvResponseGroup {
 
-    func insertResponses<A>(to accumulator: A) where A : KvResponseAccumulator {
+    func insertResponses<A>(to accumulator: A) where A : KvHttpResponseAccumulator {
         data.forEach {
-            content($0).insertResponses(to: accumulator)
+            content($0).resolvedGroup.insertResponses(to: accumulator)
         }
     }
 

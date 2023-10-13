@@ -21,6 +21,8 @@
 //  Created by Svyatoslav Popov on 28.06.2023.
 //
 
+// MARK: - KvResponseAccumulator
+
 protocol KvResponseAccumulator : AnyObject {
 
     associatedtype NestedAccumulator : KvResponseAccumulator
@@ -31,6 +33,16 @@ protocol KvResponseAccumulator : AnyObject {
 
 
     func with(_ configuration: KvResponseGroupConfiguration, body: (NestedAccumulator) -> Void)
+
+}
+
+
+
+// MARK: - KvHttpResponseAccumulator
+
+protocol KvHttpResponseAccumulator : KvResponseAccumulator
+where NestedAccumulator: KvHttpResponseAccumulator
+{
 
     func insert<HttpResponse>(_ response: HttpResponse) where HttpResponse : KvHttpResponseImplementationProtocol
 

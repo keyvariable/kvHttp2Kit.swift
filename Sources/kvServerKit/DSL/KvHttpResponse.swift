@@ -202,7 +202,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
     // MARK: : KvResponseInternalProtocol
 
-    func insert<A : KvResponseAccumulator>(to accumulator: A) {
+    func insert<A : KvHttpResponseAccumulator>(to accumulator: A) {
         let configuration = ImplementationConfiguration(accumulator.responseGroupConfiguration, configuration)
 
         accumulator.insert(implementationBlock(configuration))

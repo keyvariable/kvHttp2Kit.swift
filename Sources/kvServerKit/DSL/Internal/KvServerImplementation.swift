@@ -28,15 +28,15 @@ import kvKit
 class KvServerImplementation {
 
     init<S : KvServer>(from declaration: S) {
-        let schema = Schema()
+        let httpSchema = HttpSchema()
 
-        declaration.body.insertResponses(to: schema.makeAccumulator())
+        declaration.body.resolvedGroup.insertResponses(to: httpSchema.makeAccumulator())
 
         httpServer = .init()
 
-        schema.forEachChannel { channelSchema in
+        httpSchema.forEachChannel { channelSchema in
             switch channelSchema {
-            case let httpChannelSchema as Schema.HttpChannel:
+            case let httpChannelSchema as HttpSchema.HttpChannel:
                 httpServer.createChannel(httpChannelSchema)
 
             default:
@@ -78,7 +78,7 @@ class KvServerImplementation {
 
 
 
-// MARK: .Schema.ChannelSchema
+// MARK: .HttpSchema.ChannelSchema
 
 fileprivate protocol KvServerImplementationChannelSchema : AnyObject {
 
@@ -88,7 +88,7 @@ fileprivate protocol KvServerImplementationChannelSchema : AnyObject {
 }
 
 
-extension KvServerImplementation.Schema {
+extension KvServerImplementation.HttpSchema {
 
     fileprivate typealias ChannelSchema = KvServerImplementationChannelSchema
 
@@ -96,11 +96,11 @@ extension KvServerImplementation.Schema {
 
 
 
-// MARK: .Schema
-
 extension KvServerImplementation {
 
-    fileprivate class Schema {
+    // MARK: .HttpSchema
+
+    fileprivate class HttpSchema {
 
         typealias HttpEndpoints = KvResponseGroup.Configuration.Network.HttpEndpoints
 
@@ -125,16 +125,16 @@ extension KvServerImplementation {
 
         // MARK: .Accumulator
 
-        class Accumulator : KvResponseAccumulator {
+        class Accumulator : KvHttpResponseAccumulator {
 
-            weak var schema: Schema!
+            weak var schema: HttpSchema!
 
             let responseGroupConfiguration: KvResponseGroup.Configuration?
 
             let httpChannels: [HttpChannel]
 
 
-            init(_ schema: Schema, configuration: KvResponseGroup.Configuration? = nil, httpChannels: [HttpChannel]? = nil) {
+            init(_ schema: HttpSchema, configuration: KvResponseGroup.Configuration? = nil, httpChannels: [HttpChannel]? = nil) {
                 self.schema = schema
                 self.responseGroupConfiguration = configuration
                 self.httpChannels = httpChannels ?? schema.httpChannels(for: responseGroupConfiguration)
@@ -143,7 +143,7 @@ extension KvServerImplementation {
             }
 
 
-            // MARK: : KvResponseAccumulator
+            // MARK: : KvHttpResponseAccumulator
 
             func with(_ configuration: KvResponseGroup.Configuration, body: (Accumulator) -> Void) {
                 let newConfiguration = KvResponseGroup.Configuration.overlay(configuration, over: self.responseGroupConfiguration)
@@ -419,7 +419,7 @@ extension KvServerImplementation {
 
         // MARK: Managing Channels
 
-        func createChannel(_ channelSchema: Schema.HttpChannel) {
+        func createChannel(_ channelSchema: HttpSchema.HttpChannel) {
             guard let controller = ChannelController(from: channelSchema) else { return }
 
             channelSchema.configurations.forEach { (endpoint, configuration) in
@@ -495,7 +495,7 @@ extension KvServerImplementation.HttpServer {
         typealias Dispatcher = KvHttpResponseDispatcher
 
 
-        init?(from schema: KvServerImplementation.Schema.HttpChannel) {
+        init?(from schema: KvServerImplementation.HttpSchema.HttpChannel) {
             guard let dispatcher = Dispatcher(from: schema.dispatchSchema) else { return nil }
 
             self.dispatcher = dispatcher

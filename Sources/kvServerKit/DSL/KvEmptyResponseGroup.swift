@@ -38,7 +38,7 @@ public struct KvEmptyResponseGroup : KvResponseGroup {
 
 extension KvEmptyResponseGroup : KvResponseGroupInternalProtocol {
 
-    func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
+    func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
         // Nothing to do
     }
 

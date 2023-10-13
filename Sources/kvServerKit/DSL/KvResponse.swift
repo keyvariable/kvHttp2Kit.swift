@@ -89,28 +89,11 @@ extension KvResponse {
 
 
 
-// MARK: Accumulation
-
-extension KvResponse {
-
-    internal func insert<A : KvResponseAccumulator>(to accumulator: A) {
-        switch self {
-        case let response as any KvResponseInternalProtocol:
-            response.insert(to: accumulator)
-        default:
-            body.insert(to: accumulator)
-        }
-    }
-
-}
-
-
-
 // MARK: - KvResponseInternalProtocol
 
 protocol KvResponseInternalProtocol : KvResponse {
 
-    func insert<A : KvResponseAccumulator>(to accumulator: A)
+    func insert<A : KvHttpResponseAccumulator>(to accumulator: A)
 
 }
 
