@@ -38,7 +38,7 @@ public struct KvRFC9110 {
 
 extension KvRFC9110 {
 
-    /// - Returns: An instance of ``Foundation/DateFormatter`` configured to operate with RFC9110 dates. E.g. Last-Modified or If-Modified-Since.
+    /// - Returns: An instance of `DateFormatter` configured to operate with RFC9110 dates. E.g. Last-Modified or If-Modified-Since.
     public static func makeDateFormatter() -> DateFormatter {
         let formatter = DateFormatter()
 

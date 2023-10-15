@@ -46,9 +46,9 @@ final class KvHttpResponseProviderTests : XCTestCase {
                         .query(.required("from", of: Value.self))
                         .query(.required("through", of: Value.self))
                         .queryFlatMap { $0 <= $1 ? .success($0...$1) : .failure }
-                        .content { context in
-                            var next = context.query.lowerBound
-                            var count = 1 + Value.Magnitude(bitPattern: context.query.upperBound) &- Value.Magnitude(bitPattern: next)
+                        .content { input in
+                            var next = input.query.lowerBound
+                            var count = 1 + Value.Magnitude(bitPattern: input.query.upperBound) &- Value.Magnitude(bitPattern: next)
 
                             return .bodyCallback { targetBuffer in
                                 let targetBuffer = targetBuffer.assumingMemoryBound(to: Value.self)

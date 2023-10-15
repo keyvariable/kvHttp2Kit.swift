@@ -76,17 +76,20 @@ protocol KvHttpSubpathResponseImplementation { }
 
 // MARK: - KvHttpResponseImplementation
 
-struct KvHttpResponseImplementation<QueryParser, Headers, BodyValue, Subpath> : KvHttpResponseImplementationProtocol
+struct KvHttpResponseImplementation<QueryParser, Headers, BodyValue, Subpath, SubpathValue> : KvHttpResponseImplementationProtocol
 where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
       Subpath : KvUrlSubpathProtocol
 {
 
     typealias HeadCallback = (KvHttpServer.RequestHeaders) -> Result<Headers, Error>
+    typealias SubpathFilterCallback = (Subpath) -> KvFilterResult<SubpathValue>
+
     typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
 
+    typealias Input = KvHttpResponseInput<QueryParser.Value, Headers, BodyValue, SubpathValue>
     typealias ResponseContext = KvHttpResponseContext
 
-    typealias ResponseProvider = (QueryParser.Value, Headers, BodyValue, Subpath) throws -> KvHttpResponseProvider
+    typealias ResponseProvider = (Input) throws -> KvHttpResponseProvider
 
 
 
@@ -94,12 +97,14 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
 
 
 
-    init(urlQueryParser: QueryParser,
+    init(subpathFilter: @escaping SubpathFilterCallback,
+         urlQueryParser: QueryParser,
          headCallback: @escaping HeadCallback,
          body: any KvHttpRequestBodyInternal,
          clientCallbacks: ClientCallbacks?,
          responseProvider: @escaping ResponseProvider
     ) {
+        self.subpathFilter = subpathFilter
         self.queryParser = urlQueryParser
         self.headCallback = headCallback
         self.body = body
@@ -109,9 +114,10 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
 
 
 
+    private let subpathFilter: SubpathFilterCallback
     private let queryParser: QueryParser
-
     private let headCallback: HeadCallback
+
     private let body: any KvHttpRequestBodyInternal
 
     private let clientCallbacks: ClientCallbacks?
@@ -123,15 +129,28 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
     // MARK: Operations
 
     func makeProcessor(in responseContext: ResponseContext) -> KvHttpRequestProcessorProtocol? {
-        switch queryParser.parseResult() {
-        case .success(let queryValue):
-            var responseContext = responseContext
-            responseContext.clientCallbacks = .accumulate(clientCallbacks, into: responseContext.clientCallbacks)
-            return Processor(queryValue, headCallback, body, responseContext, responseProvider)
+        // TODO: Avoid subpath processing when `Subpath == KvUnavailableUrlSubpath`
+        let subpathValue: SubpathValue
+        switch subpathFilter(.init(with: responseContext.subpathComponents)) {
+        case .accepted(let value):
+            subpathValue = value
+        case .rejected:
+            return nil
+        }
 
+        let queryValue: QueryParser.Value
+        switch queryParser.parseResult() {
+        case .success(let value):
+            queryValue = value
         case .failure:
             return nil
         }
+
+        var responseContext = responseContext
+
+        responseContext.clientCallbacks = .accumulate(clientCallbacks, into: responseContext.clientCallbacks)
+
+        return Processor(subpathValue, queryValue, headCallback, body, responseContext, responseProvider)
     }
 
 
@@ -140,12 +159,14 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
 
     class Processor : KvHttpRequestProcessorProtocol {
 
-        init(_ queryValue: QueryParser.Value,
+        init(_ subpathValue: SubpathValue,
+             _ queryValue: QueryParser.Value,
              _ headCallback: @escaping HeadCallback,
              _ body: any KvHttpRequestBodyInternal,
              _ responseContext: ResponseContext,
              _ responseProvider: @escaping ResponseProvider
         ) {
+            self.subpathValue = subpathValue
             self.queryValue = queryValue
             self.headCallback = headCallback
             self.body = body
@@ -154,6 +175,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
         }
 
 
+        private let subpathValue: SubpathValue
         private let queryValue: QueryParser.Value
         private var headers: Headers?
 
@@ -182,13 +204,17 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
         func makeRequestHandler() -> Result<KvHttpRequestHandler, Error> {
             guard let headers = headers else { return .failure(ProcessError.noHeaders) }
 
+            let subpathValue = subpathValue
             let queryValue = queryValue
             let responseContext = responseContext
 
             let responseProvider = responseProvider
 
             return .success(body.makeRequestHandler(responseContext.clientCallbacks) { bodyValue in
-                try responseProvider(queryValue, headers, bodyValue as! BodyValue, Subpath(with: responseContext.subpathComponents))
+                try responseProvider(.init(query: queryValue,
+                                           requestHeaders: headers,
+                                           requestBody: bodyValue as! BodyValue,
+                                           subpath: subpathValue))
             })
         }
 
@@ -217,17 +243,22 @@ extension KvHttpResponseImplementation : KvHttpSubpathResponseImplementation whe
 
 
 extension KvHttpResponseImplementation
-where QueryParser == KvEmptyUrlQueryParser, Headers == Void, BodyValue == KvHttpRequestVoidBodyValue, Subpath == KvUnavailableUrlSubpath
+where QueryParser == KvEmptyUrlQueryParser,
+      Headers == Void,
+      BodyValue == KvHttpRequestVoidBodyValue,
+      Subpath == KvUnavailableUrlSubpath,
+      SubpathValue == Void
 {
     // MARK: Simple Response Case
 
     /// Initializes implementation for emptry URL query, requiring head-only request, providing no analysis of request headers.
     init(clientCallbacks: ClientCallbacks?, responseProvider: @escaping () throws -> KvHttpResponseProvider) {
-        self.init(urlQueryParser: .init(),
+        self.init(subpathFilter: { _ in .accepted(()) },
+                  urlQueryParser: .init(),
                   headCallback: { _ in .success(()) },
                   body: KvHttpRequestProhibitedBody(),
                   clientCallbacks: clientCallbacks,
-                  responseProvider: { _, _, _, _ in try responseProvider() })
+                  responseProvider: { _ in try responseProvider() })
     }
 
 }

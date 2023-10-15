@@ -39,8 +39,8 @@ import Foundation
 ///             KvGroup("echo") {
 ///                 KvHttpResponse.dynamic
 ///                     .requestBody(.data)
-///                     .content { ctx in
-///                         guard let data: Data = ctx.requestBody else { return .badRequest }
+///                     .content { input in
+///                         guard let data: Data = input.requestBody else { return .badRequest }
 ///                         return .binary({ data }).contentLength(data.count)
 ///                     }
 ///             }

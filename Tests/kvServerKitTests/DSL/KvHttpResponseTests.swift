@@ -44,8 +44,8 @@ final class KvHttpResponseTests : XCTestCase {
                     KvGroup("echo") {
                         KvHttpResponse.dynamic
                             .requestBody(.data)
-                            .content { context in
-                                guard let data: Data = context.requestBody else { return .badRequest }
+                            .content { input in
+                                guard let data: Data = input.requestBody else { return .badRequest }
                                 return .binary { data }
                             }
                     }
@@ -55,7 +55,7 @@ final class KvHttpResponseTests : XCTestCase {
                             .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
                                 buffer.reduce(accumulator, &+)
                             }))
-                            .content { context in .string { "0x" + String(context.requestBody, radix: 16, uppercase: true) } }
+                            .content { input in .string { "0x" + String(input.requestBody, radix: 16, uppercase: true) } }
                     }
                 }
                 .httpMethods(.POST)
@@ -138,7 +138,7 @@ final class KvHttpResponseTests : XCTestCase {
                     KvGroup("boolean") {
                         KvHttpResponse.dynamic
                             .query(.bool("value"))
-                            .content { context in .string { "\(context.query)" } }
+                            .content { input in .string { "\(input.query)" } }
                     }
                     KvGroup("void") {
                         KvHttpResponse.dynamic
@@ -208,9 +208,7 @@ final class KvHttpResponseTests : XCTestCase {
             private func response(body: KvHttpRequestDataBody) -> some KvResponse {
                 KvHttpResponse.dynamic
                     .requestBody(body)
-                    .content { context in
-                            .string { "\(context.requestBody?.count ?? 0)" }
-                    }
+                    .content { input in .string { "\(input.requestBody?.count ?? 0)" } }
             }
 
             /// - Returns: The response in two groups with given limits.
@@ -282,7 +280,134 @@ final class KvHttpResponseTests : XCTestCase {
 
 
 
-    // MARK: Auxliliaries
+    // MARK: - testSubpathResponse()
+
+    func testSubpathResponse() async throws {
+
+        struct SubpathResponseServer : KvServer {
+
+            let configuration = TestKit.insecureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvHttpResponse.static { .string { "-" } }
+
+                    KvGroup("a") {
+                        KvHttpResponse.static { .string { "-a" } }
+
+                        KvGroup("b") {
+                            KvHttpResponse.static { .string { "-a-b" } }
+                        }
+                    }
+
+                    KvGroup("c") {
+                        KvHttpResponse.dynamic
+                            .subpath
+                            .content { input in .string { "/" + input.subpath.joined } }
+                    }
+                    KvGroup("c") {
+                        KvHttpResponse.dynamic
+                            .query(.required("separator"))
+                            .subpath
+                            .content { input in
+                                let separator = input.query
+                                return .string { separator + input.subpath.components.joined(separator: separator) }
+                            }
+                    }
+                }
+            }
+        }
+
+        try await TestKit.withRunningServer(of: SubpathResponseServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
+            try await TestKit.assertResponse(baseURL, path: "", expecting: "-")
+            try await TestKit.assertResponse(baseURL, path: "a", expecting: "-a")
+            try await TestKit.assertResponse(baseURL, path: "a/", expecting: "-a")
+            try await TestKit.assertResponse(baseURL, path: "a/b", expecting: "-a-b")
+            try await TestKit.assertResponse(baseURL, path: "a/b/", expecting: "-a-b")
+
+            try await TestKit.assertResponse(baseURL, path: "a/c", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "a/c/", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "b", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "b/", statusCode: .notFound, expecting: "")
+
+            try await TestKit.assertResponse(baseURL, path: "c", expecting: "/")
+            try await TestKit.assertResponse(baseURL, path: "c/", expecting: "/")
+            try await TestKit.assertResponse(baseURL, path: "c/a", expecting: "/a")
+            try await TestKit.assertResponse(baseURL, path: "c/a/", expecting: "/a")
+            try await TestKit.assertResponse(baseURL, path: "///c////a////", expecting: "/a")
+            try await TestKit.assertResponse(baseURL, path: "c/a/b/index.html", expecting: "/a/b/index.html")
+
+            do {
+                let query: TestKit.Query = .items([ .init(name: "separator", value: "+") ])
+                try await TestKit.assertResponse(baseURL, path: "c", query: query, expecting: "+")
+                try await TestKit.assertResponse(baseURL, path: "c/", query: query, expecting: "+")
+                try await TestKit.assertResponse(baseURL, path: "c/a", query: query, expecting: "+a")
+                try await TestKit.assertResponse(baseURL, path: "c/a/", query: query, expecting: "+a")
+                try await TestKit.assertResponse(baseURL, path: "///c////a////", query: query, expecting: "+a")
+                try await TestKit.assertResponse(baseURL, path: "c/a/b/index.html", query: query, expecting: "+a+b+index.html")
+            }
+        }
+    }
+
+
+
+    // MARK: - testSubpathFilter()
+
+    func testSubpathFilter() async throws {
+
+        struct SubpathFilterServer : KvServer {
+
+            let configuration = TestKit.insecureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvGroup("profiles") {
+                        KvHttpResponse.static { .string { "/" } }
+
+                        KvGroup("top") { KvHttpResponse.static { .string { "/top" } } }
+
+                        KvHttpResponse.dynamic
+                            .subpathFilter { $0.components.count == 1 }
+                            .subpathFlatMap {
+                                UInt($0.components.first!)
+                                    .flatMap { Self.profiles[$0] }
+                                    .map { .accepted($0) }
+                                ?? .rejected
+                            }
+                            .content { input in .string { input.subpath.uuidString } }
+                    }
+                    .onHttpIncident { incident in
+                        guard incident.defaultStatus == .notFound else { return nil }
+                        return .notFound.string { "-" }
+                    }
+                }
+            }
+
+            static let profiles: [UInt : UUID] = [ 1: UUID(), 3: UUID(), 4: UUID() ]
+
+        }
+
+        try await TestKit.withRunningServer(of: SubpathFilterServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
+            try await TestKit.assertResponse(baseURL, path: "profiles", expecting: "/")
+            try await TestKit.assertResponse(baseURL, path: "profiles/top", expecting: "/top")
+
+            for (id, value) in SubpathFilterServer.profiles {
+                try await TestKit.assertResponse(baseURL, path: "profiles/\(id)", expecting: value.uuidString)
+            }
+
+            // Global 404.
+            try await TestKit.assertResponse(baseURL, statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "profile", statusCode: .notFound, expecting: "")
+            // Local 404.
+            try await TestKit.assertResponse(baseURL, path: "profiles/top_rated", statusCode: .notFound, expecting: "-")
+            try await TestKit.assertResponse(baseURL, path: "profiles/0", statusCode: .notFound, expecting: "-")
+            try await TestKit.assertResponse(baseURL, path: "profiles/\(SubpathFilterServer.profiles.keys.first!)/summary", statusCode: .notFound, expecting: "-")
+        }
+    }
+
+
+
+    // MARK: - Auxliliaries
 
     private typealias TestKit = KvServerTestKit
 

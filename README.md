@@ -31,7 +31,7 @@ Just declare hierarchical list of responses, *kvServerKit* will do the rest. Res
 
 One of *declarative API* key features is structured URL query.
 There are modifiers of requests declaring types of URL query item values and optionally custom parsing callbacks.
-If structure of URL query is declared then the resulting values are available as a tuple in the response context.
+If structure of URL query is declared then the resulting values are available as a tuple in the response's callback.
 
 *Declarative API* allows response overloading by URL query.
 Any number of responses can be declared at the same routing point: HTTP method, user, host and path.
@@ -63,8 +63,8 @@ struct ExampleServer : KvServer {
             KvGroup("echo") {
                 KvHttpResponse.dynamic
                     .requestBody(.data)
-                    .content { ctx in
-                        guard let data: Data = ctx.requestBody else { return .badRequest }
+                    .content { input in
+                        guard let data: Data = input.requestBody else { return .badRequest }
                         retrun .binary { data }
                             .contentLength(data.count)
                     }
@@ -99,7 +99,7 @@ struct RandomValueResponseGroup : KvResponseGroup {
                     let lowerBound = from ?? .min, upperBound = through ?? .max
                     return lowerBound <= upperBound ? .success(lowerBound ... upperBound) : .failure
                 }
-                .content { ctx in .string { "\(Int.random(in: ctx.query))" } }
+                .content { input in .string { "\(Int.random(in: input.query))" } }
         }
     }
 }

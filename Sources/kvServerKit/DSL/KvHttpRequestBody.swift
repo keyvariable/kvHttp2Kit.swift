@@ -290,8 +290,8 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
     ///     .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
     ///         buffer.reduce(accumulator, &+)
     ///     }))
-    ///     .content { ctx in
-    ///         .string { "0x" + String(ctx.requestBody, radix: 16, uppercase: true) }
+    ///     .content { input in
+    ///         .string { "0x" + String(input.requestBody, radix: 16, uppercase: true) }
     ///     }
     /// ```
     @inlinable
@@ -412,8 +412,8 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
     /// ```swift
     /// KvHttpResponse.dynamic
     ///     .requestBody(.data)
-    ///     .content { ctx in
-    ///         guard let data: Data = ctx.requestBody else { return .badRequest }
+    ///     .content { input in
+    ///         guard let data: Data = input.requestBody else { return .badRequest }
     ///         return .binary({ data }).contentLength(data.count)
     ///     }
     /// ```

@@ -61,7 +61,7 @@ struct DeclarativeServer : KvServer {
             do {
                 /// Searching for a file once.
                 let indexURL = Bundle.module.url(forResource: "index", withExtension: "html", subdirectory: "Resources")!
-                /// Static responses ignore any request context like URL and HTTP method.
+                /// Static responses ignore any request input like URL query and requere the reqeust body to be empty.
                 KvHttpResponse.static {
                     /// Response content is taken from file at *indexURL*.
                     /// `.file` response fabrics also privide values for Content-Length, ETag and Last-Modified headers.
@@ -73,13 +73,13 @@ struct DeclarativeServer : KvServer {
                 }
             }
 
-            /// Dynamic responses depend on request context.
-            /// For example the response below uses structured query handling.
+            /// Dynamic responses provide customizable processing of request content.
+            /// For example the response below uses structured URL query handling.
             KvHttpResponse.dynamic
-                /// The modifier adds required string value of query item named `name` to the response context.
+                /// This modifier adds required string value of query item named `name` to the response input.
                 .query(.required("name"))
-                .content { context in
-                    let name = context.query.trimmingCharacters(in: .whitespacesAndNewlines)
+                .content { input in
+                    let name = input.query.trimmingCharacters(in: .whitespacesAndNewlines)
                     return .string { "Hello, \(!name.isEmpty ? name : "client")!" }
                 }
 
@@ -93,15 +93,15 @@ struct DeclarativeServer : KvServer {
                         /// Also arguments can be decoded like shown below when the type conforms to `LosslessStringConvertible`.
                         /// Custom decoding block can be provided too.
                         .query(.optional("from", of: Int.self))
-                        /// This modifier adds second optional value to the context.
+                        /// This modifier adds second optional value to the input.
                         .query(.optional("through", of: Int.self))
                         /// Query values can be transformed and filtered like below to simplify final `.content` statement.
                         .queryFlatMap { from, through -> QueryResult<ClosedRange<Int>> in
                             let lowerBound = from ?? .min, upperBound = through ?? .max
                             return lowerBound <= upperBound ? .success(lowerBound ... upperBound) : .failure
                         }
-                        /// Now `context.query` is the range.
-                        .content { context in .string { "\(Int.random(in: context.query))" } }
+                        /// Now `input.query` is the range.
+                        .content { input in .string { "\(Int.random(in: input.query))" } }
                 }
 
                 KvGroup("uuid") {
@@ -109,10 +109,10 @@ struct DeclarativeServer : KvServer {
                         /// Boolean query items handle various cases of URL query item values.
                         .query(.bool("string"))
                         /// - Note: Content of response depends on query flag.
-                        .content { context in
+                        .content { input in
                             let uuid = UUID()
 
-                            switch context.query {
+                            switch input.query {
                             case true:
                                 return .string { uuid.uuidString }
                             case false:
@@ -156,7 +156,7 @@ struct DeclarativeServer : KvServer {
                     .queryMap { queryItems in
                         (queryItems?.first).map { "\"\($0.value ?? "")\"" } ?? "nil"
                     }
-                    .content { context in .string { context.query } }
+                    .content { input in .string { input.query } }
             }
 
             /// Responses and response groups can be wrapped to types.
@@ -184,8 +184,8 @@ struct DeclarativeServer : KvServer {
                         ///
                         /// - Note: The resulting body value is optional. It's `nil` when request has no body.
                         .requestBody(.data)
-                        .content { context in
-                            guard let data: Data = context.requestBody else { return .badRequest }
+                        .content { input in
+                            guard let data: Data = input.requestBody else { return .badRequest }
                             return .binary({ data }).contentLength(data.count)
                         }
                 }
@@ -199,7 +199,7 @@ struct DeclarativeServer : KvServer {
                         .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
                             buffer.reduce(accumulator, &+)
                         }))
-                        .content { context in .string { "0x" + String(context.requestBody, radix: 16, uppercase: true) } }
+                        .content { input in .string { "0x" + String(input.requestBody, radix: 16, uppercase: true) } }
                 }
             }
             /// Responses in the group above are provided for HTTP requests with POST method only.
@@ -247,6 +247,15 @@ struct DeclarativeServer : KvServer {
             /// This response group provides contents of available images in the bundle.
             /// See it's implementation for the way to provide dynamic list of responses with `KvForEach()`.
             BundleImageResponses()
+
+            KvGroup("entities") {
+                /// It's a simple example of managing a database of sample entities.
+                /// It responds with:
+                /// - entity at "/entities/$id" path where $id is an identifier of existing entity;
+                /// - array of entities at "/entities";
+                /// - top-rated entity "/entities/top".
+                EntityResponseGroup()
+            }
         }
         /// Custom global 404 response is provided with an incident handler.
         .onHttpIncident { incident in
@@ -287,8 +296,8 @@ struct DeclarativeServer : KvServer {
     private func randomIntArrayResponse(limit: Int) -> some KvResponse {
         KvHttpResponse.dynamic
             .query(.required("count", of: Int.self))
-            .content { context in
-                let count = context.query
+            .content { input in
+                let count = input.query
 
                 // Note the way text responses with 400 status code are produced.
                 guard count >= 0 else { return .badRequest.string { "Invalid argument: count (\(count)) is negative" } }
@@ -309,13 +318,13 @@ struct DeclarativeServer : KvServer {
             KvHttpResponse.dynamic
                 .query(.required("lhs", of: Double.self))
                 .query(.required("rhs", of: Double.self))
-                .content { context in .string { "\(context.query.0 + context.query.1)" } }
+                .content { input in .string { "\(input.query.0 + input.query.1)" } }
         }
         KvGroup("sub") {
             KvHttpResponse.dynamic
                 .query(.required("lhs", of: Double.self))
                 .query(.required("rhs", of: Double.self))
-                .content { context in .string { "\(context.query.0 - context.query.1)" } }
+                .content { input in .string { "\(input.query.0 - input.query.1)" } }
         }
     }
 
@@ -344,7 +353,7 @@ struct DeclarativeServer : KvServer {
 
             KvHttpResponse.dynamic
                 .query(.required("to", of: Value.self))
-                .content { context in .string { "..< \(context.query)" } }
+                .content { input in .string { "..< \(input.query)" } }
 
             KvHttpResponse.dynamic
                 .query(.optional("from", of: Value.self))
@@ -421,6 +430,65 @@ struct DeclarativeServer : KvServer {
                 .filter { $0.pathExtension == "png" }
 #endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
         }
+
+    }
+
+
+    /// Example of a subpath processing response returning entity profiles by identifier in URL path, list of all entities and top-rated entity.
+    private struct EntityResponseGroup : KvResponseGroup {
+
+        var body: some KvResponseGroup {
+            KvGroup(httpMethods: .GET) {
+                KvHttpResponse.dynamic
+                    /// At first subpaths are filtered accepting single component subpaths.
+                    ///
+                    /// This modifier accepts or rejects requests by subpath.
+                    /// Subpaths are relative to point of the URL path hierarchy the response is declared at.
+                    .subpathFilter { $0.components.count == 1 }
+                    /// Then subpath is parsed as entity identifier and entity is fetched from the sample database.
+                    /// In this way response is accepted only for existing entities.
+                    ///
+                    /// This modifier also filters requests as `.subpathFilter` and allows to transform current value of subpath.
+                    .subpathFlatMap {
+                        Entity.ID($0.components.first!)
+                            .flatMap { Self.sampleDB[$0] }
+                            .map { .accepted($0) }
+                        ?? .rejected
+                    }
+                    /// The resulting subpath processing result is in `input.subpath`.
+                    .content { input in .json { input.subpath } }
+
+                /// Entity list.
+                ///
+                /// Note that there is no ambiguity due to the subpath processing response requires non-empty subpath.
+                KvHttpResponse.static {
+                    .json { Self.sampleDB.values.lazy.map { $0 } }
+                }
+
+                /// Top rated entity.
+                ///
+                /// Note that there is no ambiguity due to the subpath processing response requires first subpath component to be a number.
+                KvGroup("top") {
+                    KvHttpResponse.static {
+                        .json { Self.sampleDB.values.max(by: { $0.rate < $1.rate }) }
+                    }
+                }
+            }
+        }
+
+        private struct Entity : Codable {
+            typealias ID = UInt
+
+            let id: ID
+            let label: String
+            let rate: Double
+        }
+
+        private static let sampleDB: Dictionary<Entity.ID, Entity> = [
+            Entity(id: 1, label: UUID().uuidString, rate: 4.57),
+            Entity(id: 4, label: UUID().uuidString, rate: 1.32),
+            Entity(id: 6, label: UUID().uuidString, rate: 3.14),
+        ].reduce(into: .init()) { $0[$1.id] = $1 }
 
     }
 

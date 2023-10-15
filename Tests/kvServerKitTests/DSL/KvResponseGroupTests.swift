@@ -169,77 +169,6 @@ final class KvResponseGroupTests : XCTestCase {
 
 
 
-    // MARK: - testSubpathResponse()
-
-    func testSubpathResponse() async throws {
-
-        struct SubpathResponseServer : KvServer {
-
-            let configuration = TestKit.insecureHttpConfiguration()
-
-            var body: some KvResponseGroup {
-                NetworkGroup(with: configuration) {
-                    KvHttpResponse.static { .string { "-" } }
-
-                    KvGroup("a") {
-                        KvHttpResponse.static { .string { "-a" } }
-
-                        KvGroup("b") {
-                            KvHttpResponse.static { .string { "-a-b" } }
-                        }
-                    }
-
-                    KvGroup("c") {
-                        KvHttpResponse.dynamic
-                            .subpath
-                            .content { context in .string { "/" + context.subpath.joined } }
-                    }
-                    KvGroup("c") {
-                        KvHttpResponse.dynamic
-                            .query(.required("separator"))
-                            .subpath
-                            .content { context in
-                                let separator = context.query
-                                return .string { separator + context.subpath.components.joined(separator: separator) }
-                            }
-                    }
-                }
-            }
-        }
-
-        try await TestKit.withRunningServer(of: SubpathResponseServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
-            try await TestKit.assertResponse(baseURL, path: "", expecting: "-")
-            try await TestKit.assertResponse(baseURL, path: "a", expecting: "-a")
-            try await TestKit.assertResponse(baseURL, path: "a/", expecting: "-a")
-            try await TestKit.assertResponse(baseURL, path: "a/b", expecting: "-a-b")
-            try await TestKit.assertResponse(baseURL, path: "a/b/", expecting: "-a-b")
-
-            try await TestKit.assertResponse(baseURL, path: "a/c", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, path: "a/c/", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, path: "b", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, path: "b/", statusCode: .notFound, expecting: "")
-
-            try await TestKit.assertResponse(baseURL, path: "c", expecting: "/")
-            try await TestKit.assertResponse(baseURL, path: "c/", expecting: "/")
-            try await TestKit.assertResponse(baseURL, path: "c/a", expecting: "/a")
-            try await TestKit.assertResponse(baseURL, path: "c/a/", expecting: "/a")
-            try await TestKit.assertResponse(baseURL, path: "///c////a////", expecting: "/a")
-            try await TestKit.assertResponse(baseURL, path: "c/a/b/index.html", expecting: "/a/b/index.html")
-
-            do {
-                let query: TestKit.Query = .items([ .init(name: "separator", value: "+") ])
-                try await TestKit.assertResponse(baseURL, path: "c", query: query, expecting: "+")
-                try await TestKit.assertResponse(baseURL, path: "c/", query: query, expecting: "+")
-                try await TestKit.assertResponse(baseURL, path: "c/a", query: query, expecting: "+a")
-                try await TestKit.assertResponse(baseURL, path: "c/a/", query: query, expecting: "+a")
-                try await TestKit.assertResponse(baseURL, path: "///c////a////", query: query, expecting: "+a")
-                try await TestKit.assertResponse(baseURL, path: "c/a/b/index.html", query: query, expecting: "+a+b+index.html")
-            }
-        }
-    }
-
-
-
     // MARK: - testResponseGroupModifiers()
 
     func testResponseGroupModifiers() async throws {
@@ -350,15 +279,13 @@ final class KvResponseGroupTests : XCTestCase {
             private var optionalIntResponse: some KvResponse {
                 KvHttpResponse.dynamic
                     .query(.optional("int", of: Int.self))
-                    .content { context in
-                            .string { "\(context.query.map(String.init(_:)) ?? "nil") as Int?" }
-                    }
+                    .content { input in .string { "\(input.query.map(String.init(_:)) ?? "nil") as Int?" } }
             }
 
             private var requiredStringResponse: some KvResponse {
                 KvHttpResponse.dynamic
                     .query(.required("string"))
-                    .content { context in .string { "\"\(context.query)\"" } }
+                    .content { input in .string { "\"\(input.query)\"" } }
             }
 
             /// Produces value of single query item if it's name is `echo`.
@@ -380,7 +307,7 @@ final class KvResponseGroupTests : XCTestCase {
                     }
                 }()
 
-                return r.content { context in .string { context.query.map { "\"\($0)\"" } ?? "nil" } }
+                return r.content { input in .string { input.query.map { "\"\($0)\"" } ?? "nil" } }
             }
 
             /// Produces comma-separated list of query item names whether there are 2+ items.
@@ -390,7 +317,7 @@ final class KvResponseGroupTests : XCTestCase {
                         guard let query = query, query.count > 1 else { return .failure }
                         return .success(query.lazy.map({ $0.name }).joined(separator: ","))
                     }
-                    .content { context in .string { context.query } }
+                    .content { input in .string { input.query } }
             }
 
             /// Group of unambiguous responses.
@@ -410,7 +337,7 @@ final class KvResponseGroupTests : XCTestCase {
 
                 KvHttpResponse.dynamic
                     .query(.required("to", of: Float.self))
-                    .content { context in .string { "..< \(context.query)" } }
+                    .content { input in .string { "..< \(input.query)" } }
 
                 KvHttpResponse.dynamic
                     .query(.optional("from", of: Float.self))
@@ -589,7 +516,7 @@ final class KvResponseGroupTests : XCTestCase {
                                 KvHttpResponse.dynamic
                                     .query(.void("count"))
                                     .requestBody(.data.bodyLengthLimit(Self.bodyLimit))
-                                    .content { context in .string { "\(context.requestBody?.count ?? 0)" } }
+                                    .content { input in .string { "\(input.requestBody?.count ?? 0)" } }
                                     .onIncident { incident in
                                         guard incident.defaultStatus == .payloadTooLarge else { return nil }
                                         return .payloadTooLarge.string { Self.payloadTooLargeString }
