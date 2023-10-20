@@ -25,7 +25,7 @@
 
 /// A type that represents a response on server.
 ///
-/// This type can be used to create properties and custom types of serponses.
+/// This type can be used to create properties and custom types of responses.
 ///
 /// Below is an example of a current server time HTTP response type having *format* parameter:
 ///
@@ -72,7 +72,7 @@ public protocol KvResponse {
     associatedtype Body : KvResponse
 
 
-    /// Represens the behaviour of response.
+    /// Represents the behavior of response.
     var body: Body { get }
 
 }
@@ -108,9 +108,9 @@ public protocol KvNeverResponseProtocol : KvResponse {
 }
 
 
-// This approach helps to prevent substituion of `KvNeverResponse` as `Body` in the Xcode's code completion for `body` properties
+// This approach helps to prevent substitution of `KvNeverResponse` as `Body` in the Xcode's code completion for `body` properties
 // when declaring structures conforming to `KvResponse`.
-// If body constaint were `Body == KvNeverResponse` then the code completion would always produce `var body: KvNeverResponse`.
+// If body constraint were `Body == KvNeverResponse` then the code completion would always produce `var body: KvNeverResponse`.
 extension KvResponse where Body : KvNeverResponseProtocol {
 
     public var body: Body { Body() }

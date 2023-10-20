@@ -123,7 +123,7 @@ extension KvResponseGroup {
     /// - Parameter httpEndpoints: Sequence of network addresses (IP addresses or host names), ports and HTTP protocol configurations.
     ///
     /// Existing values of the contents are replaced with provided values.
-    /// Arguments of cascade invocations of the modifier are merged. Existing configurations are replaced with new values on the same endponts.
+    /// Arguments of cascade invocations of the modifier are merged. Existing configurations are replaced with new values on the same endpoints.
     ///
     /// Below is an example where the contents of `SomeResposeGroup` are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
     ///
@@ -374,7 +374,7 @@ extension KvResponseGroup {
     }
 
 
-    /// Declares handler of incidents in the receiver's context. It's a place to customize default reponse content.
+    /// Declares handler of incidents in the receiver's context. It's a place to customize default response content.
     ///
     /// - Parameter block:  A block returning custom response or `nil` for given *incident*.
     ///                     If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
@@ -839,7 +839,7 @@ struct KvModifiedResponseGroup : KvResponseGroupInternalProtocol {
     func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
 
         @inline(__always)
-        func Insert<A>(to accumulator: A) where A : KvHttpResponseAccumulator {
+        func Insert<Accumulator>(to accumulator: Accumulator) where Accumulator : KvHttpResponseAccumulator {
             sourceProvider().resolvedGroup.insertResponses(to: accumulator)
         }
         
@@ -880,9 +880,9 @@ public protocol KvNeverResponseGroupProtocol : KvResponseGroup {
 }
 
 
-// This approach helps to prevent substituion of `KvNeverResponseGroup` as `Body` in the Xcode's code completion for `body` properties
+// This approach helps to prevent substitution of `KvNeverResponseGroup` as `Body` in the Xcode's code completion for `body` properties
 // when declaring structures conforming to `KvResponseGroup`.
-// If body constaint were `Body == KvNeverResponseGroup` then the code completion would always produce `var body: KvNeverResponseGroup`.
+// If body constraint were `Body == KvNeverResponseGroup` then the code completion would always produce `var body: KvNeverResponseGroup`.
 extension KvResponseGroup where Body : KvNeverResponseGroupProtocol {
 
     public var body: Body { Body() }

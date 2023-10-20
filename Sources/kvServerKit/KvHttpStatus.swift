@@ -15,32 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvHttpResponseError.swift
+//  KvHttpStatus.swift
 //  kvServerKit
 //
-//  Created by Svyatoslav Popov on 06.10.2023.
+//  Created by Svyatoslav Popov on 16.10.2023.
 //
 
-import Foundation
+import NIOHTTP1
 
 
 
-/// Errors related to processing of HTTP responses.
-public enum KvHttpResponseError : LocalizedError, Equatable {
-
-    /// File at URL doesn't exist.
-    case fileDoesNotExist(URL)
-
-    /// Schema of URL is "file:" but resource at URL is not a file.
-    case isNotAFile(URL)
-
-    /// Unable to create input stream for URL.
-    case unableToCreateInputStream(URL)
-
-    /// Unable to get URL of a resource in bundle.
-    case unableToFindBundleResource(name: String, extension: String?, subdirectory: String?, bundle: Bundle)
-
-    /// Unable to find index file in directory at *directoryURL*.
-    case unableToFindIndexFile(directoryURL: URL)
-
-}
+public typealias KvHttpStatus = HTTPResponseStatus

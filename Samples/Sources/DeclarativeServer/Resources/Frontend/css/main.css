@@ -1,0 +1,31 @@
+html {
+    background-color: gainsboro;
+}
+@media (prefers-color-scheme: dark) {
+    html {
+        background-color: black;
+    }
+}
+
+body {
+    max-width: 960px;
+    min-height: 100vh;
+    box-sizing: border-box;
+
+    margin: 0 auto;
+    padding: 1rem 2rem;
+
+    color: black;
+    background-color: white;
+}
+@media (prefers-color-scheme: dark) {
+    body {
+        color: gainsboro;
+        background-color: #171717;
+    }
+}
+
+a:link, a:visited, a:hover, a:active { color: dodgerblue; }
+@media (prefers-color-scheme: dark) {
+    a:link, a:visited, a:hover, a:active { color: deepskyblue; }
+}

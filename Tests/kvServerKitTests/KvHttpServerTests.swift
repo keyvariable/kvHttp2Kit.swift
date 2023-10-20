@@ -76,7 +76,7 @@ final class KvHttpServerTests : XCTestCase {
                 try await KvServerTestKit.assertResponse(
                     baseURL, path: ImperativeHttpServer.Constants.Generator.path,
                     query: .items(queryItems),
-                    contentType: .application(.octetStream), message: httpDescription
+                    contentType: nil, message: httpDescription
                 ) { data, request, message in
                     data.withUnsafeBytes { buffer in
                         XCTAssertTrue(buffer.assumingMemoryBound(to: T.self).elementsEqual(range), message())
@@ -154,7 +154,6 @@ final class KvHttpServerTests : XCTestCase {
                 let data = Data(count: numericCast(ImperativeHttpServer.Constants.Echo.bodyLimit + 1))
 
                 try await KvServerTestKit.assertResponse(
-                    urlSession: .init(configuration: .ephemeral),
                     baseURL, method: "HEAD", path: ImperativeHttpServer.Constants.Echo.path,
                     body: data,
                     statusCode: .payloadTooLarge,
@@ -162,7 +161,6 @@ final class KvHttpServerTests : XCTestCase {
                 )
 
                 try await KvServerTestKit.assertResponse(
-                    urlSession: .init(configuration: .ephemeral),
                     baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path,
                     body: data,
                     statusCode: .payloadTooLarge,

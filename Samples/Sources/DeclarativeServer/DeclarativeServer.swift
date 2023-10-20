@@ -51,27 +51,21 @@ struct DeclarativeServer : KvServer {
         /// `http: .v2(ssl: ssl)` argument instructs the server to use secure HTTP/2.0 protocol.
         ///
         /// Port 8080 is used due to access to standard HTTP port 80 is probably denied.
-        /// Besides, real hosting providers usuasy provide specific address and port for internet connections.
+        /// Besides, real hosting providers usually provide specific address and port for internet connections.
         ///
         /// Host names can be used as addresses. For example:
         /// ```swift
         /// KvGroup(http: .v2(ssl: ssl), at: Host.current().names, on: [ 8080 ])
         /// ```
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-            do {
-                /// Searching for a file once.
-                let indexURL = Bundle.module.url(forResource: "index", withExtension: "html", subdirectory: "Resources")!
-                /// Static responses ignore any request input like URL query and requere the reqeust body to be empty.
-                KvHttpResponse.static {
-                    /// Response content is taken from file at *indexURL*.
-                    /// `.file` response fabrics also privide values for Content-Length, ETag and Last-Modified headers.
-                    /// See documentation for `.file` fabrics.
-                    try .file(at: indexURL)
-                        /// By default `.file` fabric provides `.application(.octetStream)` content type.
-                        /// So content type is changed to `.text(.html)`.
-                        .contentType(.text(.html))
-                }
-            }
+            /// *KvDirectory* declares hierarchy of files.
+            /// This directory is declared at the root of server's response hierarchy, so entire URL paths in requests are appended to the directory's root URL.
+            /// *KvDirectory* responds with index files for requests to directory items if available.
+            KvDirectory(at: Bundle.module.resourceURL!.appendingPathComponent("Resources/Frontend"))
+                /// This modifier enables response with contents of "\(statusCode).html" files in provided directory for non-200 statuses.
+                /// Provided path is relative to the directory's root.
+                /// - Note: Custom status file name callback can be provided with `.httpStatusFileName(_:)` modifier.
+                .httpStatusDirectory(pathComponent: "status")
 
             /// Dynamic responses provide customizable processing of request content.
             /// For example the response below uses structured URL query handling.
@@ -84,9 +78,9 @@ struct DeclarativeServer : KvServer {
                 }
 
             /// Groups with single unlabeled string argument provide paths to responses.
-            /// All the contents of the group below will be available at /random path.
-            KvGroup("random") {
-                /// The contents of the group below will be available ar /random/int path.
+            /// All the contents of the group below will be available at /generate path.
+            KvGroup("generate") {
+                /// The contents of the group below will be available at /generate/int path.
                 KvGroup("int") {
                     KvHttpResponse.dynamic
                         /// Arguments can be optional.
@@ -123,11 +117,11 @@ struct DeclarativeServer : KvServer {
                         }
                 }
             }
-            /// Custom 404 usage response for "/random" path is provided with an incident handler.
+            /// Custom 404 usage response for "/generate" path is provided with an incident handler.
             .onHttpIncident { incident in
                 switch incident.defaultStatus {
                 case .notFound:
-                    return .notFound.string { "Usage:\n  - /random/int[?from=1[&through=5]];\n  - /random/uuid[?string]." }
+                    return .notFound.string { "Usage:\n  - /generate/int[?from=1[&through=5]];\n  - /generate/int?count=10;\n  - /generate/uuid[?string]." }
                 default:
                     return nil
                 }
@@ -135,7 +129,7 @@ struct DeclarativeServer : KvServer {
 
             /// Path groups can contain separators.
             /// Declarations having common path prefixes or equal paths are correctly merged.
-            KvGroup("random/int") {
+            KvGroup("generate/int") {
                 /// Responses and response groups can be wrapped in properties and functions.
                 /// Wrapped responses can depend on arguments.
                 ///
@@ -144,7 +138,7 @@ struct DeclarativeServer : KvServer {
             }
 
             KvGroup("math") {
-                /// Note how hesponse groups are wrapped in a computed property.
+                /// Note how response groups are wrapped in a computed property.
                 mathResponses
             }
 
@@ -160,7 +154,7 @@ struct DeclarativeServer : KvServer {
             }
 
             /// Responses and response groups can be wrapped to types.
-            /// In the expample below group of responses depend on argument type and reused to provide different agrument handling.
+            /// In the example below group of responses depends on argument type and reused to provide different argument handling.
             KvGroup("range") {
                 KvGroup("uint") {
                     RangeResponses<UInt>()
@@ -170,7 +164,7 @@ struct DeclarativeServer : KvServer {
                 }
             }
 
-            KvGroup("random/bytes") {
+            KvGroup("generate/bytes") {
                 /// See the way to use buffered output instead of collecting entire response body.
                 randomBytesResponse
             }
@@ -214,7 +208,7 @@ struct DeclarativeServer : KvServer {
             /// - Note: If an HTTP request has body exceeding the limit then 413 (Payload Too Large) status is returned by default.
             .httpBodyLengthLimit(256 << 10)
 
-            /// Example of responses processing JSON entites available at the same path by for different HTTP methods.
+            /// Example of responses processing JSON entities available at the same path by for different HTTP methods.
             KvGroup("date") {
                 /// The limited availability feature is supported in `KvResponseGroupBuilder` result builder.
                 if #available(macOS 12.0, *) {
@@ -257,17 +251,6 @@ struct DeclarativeServer : KvServer {
                 EntityResponseGroup()
             }
         }
-        /// Custom global 404 response is provided with an incident handler.
-        .onHttpIncident { incident in
-            switch incident.defaultStatus {
-            case .notFound:
-                return try .notFound
-                    .file(resource: "404", extension: "html", subdirectory: "Resources", bundle: .module)
-                    .contentType(.text(.html))
-            default:
-                return nil
-            }
-        }
     }
 
 
@@ -282,7 +265,7 @@ struct DeclarativeServer : KvServer {
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
             let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: Self.resourceDirectory)!.path
 #else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            // - NOTE: Currently there is a bug in opensource `Bundle.module.url(forResource:withExtension:subdirectory:)`.
+            // - NOTE: Currently there is a bug in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
             //         So assuming that application is launched with `swift run` shell command in directory containing the package file.
             let pemPath = "./Sources/DeclarativeServer/\(Self.resourceDirectory)/\(fileName).\(fileExtension)"
 #endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
@@ -309,9 +292,9 @@ struct DeclarativeServer : KvServer {
     }
 
 
-    /// Response groups can be wrappped in properties and functions.
+    /// Response groups can be wrapped in properties and functions.
     ///
-    /// - Note: `@KvResponseGroupBuilder` attribute is used to combite multiple components.
+    /// - Note: `@KvResponseGroupBuilder` attribute is used to combine multiple components.
     @KvResponseGroupBuilder
     private var mathResponses: some KvResponseGroup {
         KvGroup("add") {
@@ -411,7 +394,7 @@ struct DeclarativeServer : KvServer {
                         KvGroup(url.lastPathComponent) {
                             KvHttpResponse.static {
                                 /// Use of `.file` fabric and modifier helps to reduce memory consumption and improve performance.
-                                /// Aslo consider `.binary`  fabric and modifier for input streams.
+                                /// Also consider `.binary`  fabric and modifier for input streams.
                                 try .file(at: url).contentType(.image(.png))
                             }
                         }
@@ -421,7 +404,7 @@ struct DeclarativeServer : KvServer {
         }
 
         private var imageURLs: [URL]? {
-            // - NOTE: Currently there is a bug in opensource `Bundle.module.urls(forResourcesWithExtension:subdirectory:)`.
+            // - NOTE: Currently there is a bug in open-source `Bundle.module.urls(forResourcesWithExtension:subdirectory:)`.
             //         So this response is implemented only on platforms listed below.
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
             return Bundle.module.urls(forResourcesWithExtension: "png", subdirectory: "Resources")
@@ -465,7 +448,7 @@ struct DeclarativeServer : KvServer {
                     .json { Self.sampleDB.values.lazy.map { $0 } }
                 }
 
-                /// Top rated entity.
+                /// Top-rated entity.
                 ///
                 /// Note that there is no ambiguity due to the subpath processing response requires first subpath component to be a number.
                 KvGroup("top") {

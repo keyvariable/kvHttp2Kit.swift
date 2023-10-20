@@ -139,10 +139,9 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
         try await TestKit.withRunningServer(of: ETagServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
-            func Assert(path: String? = nil, header: (name: String, value: String)?, statusCode: HTTPResponseStatus, content: String)  async throws {
-                let urlSession = URLSession(configuration: .ephemeral)
+            func Assert(path: String? = nil, header: (name: String, value: String)?, statusCode: KvHttpStatus, content: String)  async throws {
                 try await TestKit.assertResponse(
-                    urlSession: urlSession, baseURL, path: path,
+                    baseURL, path: path,
                     onRequest: header.map { (name, value) in { $0.setValue(value, forHTTPHeaderField: name) } },
                     statusCode: statusCode, expecting: content
                 )
@@ -218,10 +217,9 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
         try await TestKit.withRunningServer(of: ModificationDateServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
-            func Assert(path: String? = nil, header: (name: String, value: String)?, statusCode: HTTPResponseStatus, content: String)  async throws {
-                let urlSession = URLSession(configuration: .ephemeral)
+            func Assert(path: String? = nil, header: (name: String, value: String)?, statusCode: KvHttpStatus, content: String)  async throws {
                 try await TestKit.assertResponse(
-                    urlSession: urlSession, baseURL, path: path,
+                    baseURL, path: path,
                     onRequest: header.map { (name, value) in { $0.setValue(value, forHTTPHeaderField: name) } },
                     statusCode: statusCode, expecting: content
                 )

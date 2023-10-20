@@ -25,7 +25,7 @@ import Foundation
 
 
 
-/// A type that represents behaviour of a server.
+/// A type that represents behavior of a server.
 ///
 /// Below is an example of simple server:
 ///
@@ -63,7 +63,7 @@ import Foundation
 /// }
 /// ```
 ///
-/// Note `@main` attribute in the exapmle above. This attribute makes the server's ``main()`` method to be the entry point of application.
+/// Note `@main` attribute in the example above. This attribute makes the server's ``main()`` method to be the entry point of application.
 ///
 /// Servers can be launched manually. See ``start()`` for details.
 public protocol KvServer {
@@ -201,13 +201,13 @@ public class KvServerToken {
 
     // MARK: Operations
 
-    /// Intiates stop of the server. Given *completion* is invoked when the server is stopped and passed with the result.
+    /// Initiates stop of the server. Given *completion* is invoked when the server is stopped and passed with the result.
     public func stop(_ completion: ((Result<Void, Error>) -> Void)? = nil) {
         server.stop(completion)
     }
 
 
-    /// This method stops execution until server is started or stopeed and then returns the result.
+    /// This method stops execution until server is started or stopped and then returns the result.
     @discardableResult
     public func waitWhileStarting() -> Result<Void, Error> {
         server.waitWhileStarting()

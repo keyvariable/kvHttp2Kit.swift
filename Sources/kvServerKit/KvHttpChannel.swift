@@ -730,7 +730,7 @@ open class KvHttpChannel {
 
         /// Default HTTP status code submitted to a client when incident occurs.
         @inlinable
-        public var defaultStatus: KvHttpResponseProvider.Status {
+        public var defaultStatus: KvHttpStatus {
             switch self {
             case .noRequestHandler:
                 return .notFound
@@ -777,7 +777,7 @@ open class KvHttpChannel {
 
         /// Default HTTP status code submitted to a client when incident occurs.
         @inlinable
-        public var defaultStatus: KvHttpResponseProvider.Status {
+        public var defaultStatus: KvHttpStatus {
             switch self {
             case .byteLimitExceeded:
                 return .payloadTooLarge

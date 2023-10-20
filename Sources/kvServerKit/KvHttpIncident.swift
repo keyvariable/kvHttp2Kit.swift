@@ -25,6 +25,6 @@
 public protocol KvHttpIncident {
 
     /// Default HTTP status code submitted to a client when incident occurs.
-    var defaultStatus: KvHttpResponseProvider.Status { get }
+    var defaultStatus: KvHttpStatus { get }
 
 }

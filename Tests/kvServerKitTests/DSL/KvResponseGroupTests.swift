@@ -582,7 +582,6 @@ final class KvResponseGroupTests : XCTestCase {
 
             func Assert413(path: String, contentLength: UInt, response: String) async throws {
                 try await TestKit.assertResponse(
-                    urlSession: .init(configuration: .ephemeral),
                     baseURL, method: "POST", path: path, query: .raw("count"), body: contentLength > 0 ? Data(count: numericCast(contentLength)) : nil,
                     statusCode: .payloadTooLarge, contentType: .text(.plain), expecting: response
                 )

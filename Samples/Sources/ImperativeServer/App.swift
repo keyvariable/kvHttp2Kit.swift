@@ -39,7 +39,7 @@ struct App {
         /// `http: .v2(ssl: ssl)` argument instructs the server to use secure HTTP/2.0 protocol.
         ///
         /// Port 8080 is used due to access to standard HTTP port 80 is probably denied.
-        /// Besides, real hosting providers usuasy provide specific address and port for internet connections.
+        /// Besides, real hosting providers usually provide specific address and port for internet connections.
         ///
         /// - Note: Host names can be used as addresses.
         let configurations = Host.current().addresses
@@ -87,7 +87,7 @@ struct App {
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
             let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: resourceDirectory)!.path
 #else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            /// - NOTE: Currently there is a bug in opensource `Bundle.module.url(forResource:withExtension:subdirectory:)`.
+            /// - NOTE: Currently there is a bug in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
             ///         So assuming that application is launched with `swift run` shell command in directory containing the package file.
             let pemPath = "./Sources/ImperativeServer/\(resourceDirectory)/\(fileName).\(fileExtension)"
 #endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))

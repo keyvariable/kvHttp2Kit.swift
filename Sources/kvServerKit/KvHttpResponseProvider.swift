@@ -58,8 +58,6 @@ import NIOHTTP1
 /// ```
 public struct KvHttpResponseProvider {
 
-    public typealias Status = HTTPResponseStatus
-
     public typealias HeaderCallback = (inout HTTPHeaders) -> Void
 
     /// Body callback is used to write body fragments to provided client's buffer.
@@ -71,7 +69,7 @@ public struct KvHttpResponseProvider {
 
     /// HTTP response status code.
     @usableFromInline
-    var status: Status
+    var status: KvHttpStatus
 
     /// An optional callback providing custom headers.
     @usableFromInline
@@ -107,7 +105,7 @@ public struct KvHttpResponseProvider {
 
     /// Memberwise initializer.
     @usableFromInline
-    init(status: Status = .ok,
+    init(status: KvHttpStatus = .ok,
          customHeaderCallback: HeaderCallback? = nil,
          contentType: ContentType? = nil,
          contentLength: UInt64? = nil,
@@ -476,50 +474,6 @@ public struct KvHttpResponseProvider {
         }
     }
 
-
-    // MARK: .ResolvedURL
-
-    @usableFromInline
-    struct ResolvedURL : Equatable {
-
-        @usableFromInline
-        let value: URL
-        @usableFromInline
-        let isFile: Bool
-
-
-        @usableFromInline
-        init(value: URL, isFile: Bool) {
-            self.value = value
-            self.isFile = isFile
-        }
-
-
-        @usableFromInline
-        init(for url: URL) throws {
-            guard url.isFileURL else { self.init(value: url, isFile: false); return }
-
-            var isDirectory: ObjCBool = false
-
-            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { throw KvHttpResponseError.fileDoesNotExist(url) }
-            guard isDirectory.boolValue else { self.init(value: url, isFile: true); return }
-
-            // Checking "./index.html".
-            var indexURL = url.appendingPathComponent("index.html")
-            if FileManager.default.fileExists(atPath: indexURL.path, isDirectory: &isDirectory), !isDirectory.boolValue {
-                self.init(value: indexURL, isFile: true); return
-            }
-            // Checking "./index".
-            indexURL.deletePathExtension()
-            if FileManager.default.fileExists(atPath: indexURL.path, isDirectory: &isDirectory), !isDirectory.boolValue {
-                self.init(value: indexURL, isFile: true); return
-            }
-
-            throw KvHttpResponseError.unableToFindIndexFile(directoryURL: url)
-        }
-
-    }
-
 }
 
 
@@ -528,31 +482,29 @@ public struct KvHttpResponseProvider {
 
 extension KvHttpResponseProvider {
 
-    /// - Returns:  An instance where body is provided via *provider*, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
+    /// - Returns:  An instance where body is provided via *provider*, *status* is `.ok`.
     ///             See``BodyCallbackProvider`` for details.
     ///
     /// - Important: *Provider* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func bodyCallbackProvider(_ provider: @escaping BodyCallbackProvider) -> Self {
-        Self(contentType: .application(.octetStream))
-            .bodyCallbackProvider(provider)
+        Self().bodyCallbackProvider(provider)
     }
 
 
-    /// - Returns:  An instance where body is provided via *callback*, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
+    /// - Returns:  An instance where body is provided via *callback*, *status* is `.ok`.
     ///             See``BodyCallback`` for details.
     ///
     /// - Important: *Callback* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func bodyCallback(_ callback: @escaping BodyCallback) -> Self {
-        Self(contentType: .application(.octetStream))
-            .bodyCallback(callback)
+        Self().bodyCallback(callback)
     }
 
 
     /// - Returns: An instance where *status* is equal to given value.
     @inlinable
-    public static func status(_ status: Status) -> Self { .init(status: status) }
+    public static func status(_ status: KvHttpStatus) -> Self { .init(status: status) }
 
 }
 
@@ -584,11 +536,7 @@ extension KvHttpResponseProvider {
     ///
     /// Contents of the resulting instance:
     /// - body is content at *url*;
-    /// - content type is `.application(.octetStream)`;
     /// - content length, entity tag and modification date are provided when the scheme is "file:" and the attributes are availabe.
-    ///
-    /// Directory URLs having "file:" scheme are replaced with the index files (index.html or index).
-    /// If there is no index file in directory then ``KvHttpResponseError/unableToFindIndexFile(directoryURL:)`` is thrown.
     ///
     /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
     ///         This implenetation prevents double access to file system and monitoring of changes at URL.
@@ -596,10 +544,15 @@ extension KvHttpResponseProvider {
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func file(at url: URL) throws -> Self {
-        let resolvedURL = try ResolvedURL(for: url)
+        let resolvedURL = try KvDirectory.ResolvedURL(for: url)
 
-        return try Self().file(atResolvedURL: resolvedURL.value, isFile: resolvedURL.isFile)
+        return try Self().file(at: resolvedURL)
     }
+
+
+    @inline(__always)
+    @usableFromInline
+    static func file(at url: KvDirectory.ResolvedURL) throws -> Self { try Self().file(at: url) }
 
 
     /// Invokes ``file(at:)-swift.type.method`` fabric with URL of a resource file with given parameters.
@@ -783,7 +736,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns: A copy where *status* is changed to given value.
     @inlinable
-    public func status(_ status: Status) -> Self { modified { $0.status = status } }
+    public func status(_ status: KvHttpStatus) -> Self { modified { $0.status = status } }
 
 
     /// - Returns:A copy where given block is appended to chain of callbacks to be invoked before HTTP headers are sent to client.
@@ -866,11 +819,7 @@ extension KvHttpResponseProvider {
     ///
     /// Following changes are applied:
     /// - body is content at *url*;
-    /// - unset content type is changed to `.application(.octetStream)`;
     /// - content length, entity tag and modification date are updated when the scheme is "file:" and the attributes are availabe.
-    ///
-    /// Directory URLs having "file:" scheme are replaced with the index files (index.html or index).
-    /// If there is no index file in directory then ``KvHttpResponseError/unableToFindIndexFile(directoryURL:)`` is thrown.
     ///
     /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
     ///         This implenetation prevents double access to file system and monitoring of changes at URL.
@@ -878,10 +827,31 @@ extension KvHttpResponseProvider {
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func file(at url: URL) throws -> Self {
-        let resolvedURL = try ResolvedURL(for: url)
+        let resolvedURL = try KvDirectory.ResolvedURL(for: url)
 
-        return try self.file(atResolvedURL: resolvedURL.value, isFile: resolvedURL.isFile)
+        return try self.file(at: resolvedURL)
     }
+
+
+    @inline(__always)
+    @usableFromInline
+    func file(at url: KvDirectory.ResolvedURL) throws -> Self { try modified {
+        let (url, isLocal) = (url.value, url.isLocal)
+
+        if isLocal {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+
+            if let modificationDate = attributes[.modificationDate] as? Date {
+                $0.modificationDate = modificationDate
+                $0.entityTag = .base64(withBytesOf: modificationDate.timeIntervalSince1970)
+            }
+            if let size = attributes[.size] as? UInt64 {
+                $0.contentLength = size
+            }
+        }
+
+        $0.bodyCallbackProvider = Self.streamBodyCallbackProvider(url)
+    } }
 
 
     /// Invokes ``file(at:)-swift.method`` modifier with URL of a resource file with given parameters.
@@ -897,26 +867,6 @@ extension KvHttpResponseProvider {
 
         return try self.file(at: url)
     }
-
-
-    @inline(__always)
-    @usableFromInline
-    func file(atResolvedURL url: URL, isFile: Bool) throws -> Self { try modified {
-        if isFile {
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            
-            if let modificationDate = attributes[.modificationDate] as? Date {
-                $0.modificationDate = modificationDate
-                $0.entityTag = .base64(withBytesOf: modificationDate.timeIntervalSince1970)
-            }
-            if let size = attributes[.size] as? UInt64 {
-                $0.contentLength = size
-            }
-        }
-
-        $0.bodyCallbackProvider = Self.streamBodyCallbackProvider(url)
-        $0.contentType = $0.contentType ?? .application(.octetStream)
-    } }
 
 
     /// - Returns: A copy where body is JSON representation of given *payload*, missing `contentType` is changed to `.application(.json)`.

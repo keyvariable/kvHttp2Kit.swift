@@ -89,7 +89,7 @@ import NIOHTTP1
 ///         }
 ///     }
 /// ```
-public struct KvHttpResponse : KvResponseInternalProtocol {
+public struct KvHttpResponse : KvResponse {
 
     /// Type of raw URL query passed to the custom handlers.
     public typealias RawUrlQuery = [URLQueryItem]
@@ -146,7 +146,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///
     /// The callback provided to `.content`() method is passed with a request input, e.g. containing processed URL query, request headers, body.
     ///
-    /// Below is an example of a dymanic HTTP response with generated UUID. Format of returned UUID depends on *string* flag in URL query.
+    /// Below is an example of a dynamic HTTP response with generated UUID. Format of returned UUID depends on *string* flag in URL query.
     /// ```swift
     /// KvHttpResponse.dynamic
     ///     .query(.bool("string"))
@@ -187,7 +187,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     ///     .content { input in .string { "\(Int.random(in: input.query))" } }
     /// ```
     ///
-    /// A response can be declared for a hirarchy of URL paths.
+    /// A response can be declared for a hierarchy of URL paths.
     /// Below is an example of a response group providing access to profiles at "profiles/%u" paths and top-rated profiles at "profiles/top" path.
     /// ```swift
     /// KvGroup("profiles") {
@@ -211,33 +211,6 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
 
 
-    // MARK: : KvResponseInternalProtocol
-
-    func insert<A : KvHttpResponseAccumulator>(to accumulator: A) {
-        let configuration = ImplementationConfiguration(accumulator.responseGroupConfiguration, configuration)
-
-        accumulator.insert(implementationBlock(configuration))
-    }
-
-
-
-    // MARK: .ImplementationConfiguration
-
-    fileprivate struct ImplementationConfiguration {
-
-        let httpRequestBody: KvResponseGroupConfiguration.HttpRequestBody?
-        let clientCallbacks: ClientCallbacks?
-
-
-        init(_ responseGroupConfiguration: KvResponseGroupConfiguration?, _ responseConfiguration: Configuration?) {
-            self.httpRequestBody = responseGroupConfiguration?.httpRequestBody
-            self.clientCallbacks = .accumulate(responseConfiguration?.clientCallbacks, into: responseGroupConfiguration?.clientCallbacks)
-        }
-
-    }
-
-
-
     // MARK: .Incident
 
     /// *KvHttpResponse* specific incidents.
@@ -245,9 +218,9 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
         /// There are two or more declared responses for an HTTP request. Default status: 400 (Bad Request).
         case ambiguousRequest
-        /// Processing of HTTP request headers has failed with associated error. Default statis: 400 (Bad Request).
+        /// Processing of HTTP request headers has failed with associated error. Default status: 400 (Bad Request).
         case invalidHeaders(Error)
-        /// Request procissing has failed with associated error. Default status: 500 (Internal Server Error).
+        /// Request processing has failed with associated error. Default status: 500 (Internal Server Error).
         case processingFailed(Error)
         /// There are no declared responses for an HTTP request. Default status: 404 (Not Found).
         case responseNotFound
@@ -256,7 +229,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
         // MARK: : KvHttpIncident
 
         @inlinable
-        public var defaultStatus: KvHttpResponseProvider.Status {
+        public var defaultStatus: KvHttpStatus {
             switch self {
             case .ambiguousRequest:
                 return .badRequest
@@ -301,7 +274,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
 
 
-    /// Declares handler of incidents while processing requests to the responce. It's a place to customize default reponse content.
+    /// Declares handler of incidents while processing requests to the response. It's a place to customize default response content.
     ///
     /// - Parameter block:  A block returning custom response content or `nil` for given *incident*.
     ///                     If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
@@ -331,7 +304,7 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
     }
 
 
-    /// Declares callback for errors of processing requests to the responce.
+    /// Declares callback for errors of processing requests to the response.
     ///
     /// Previously declared value is replaced.
     ///
@@ -347,6 +320,36 @@ public struct KvHttpResponse : KvResponseInternalProtocol {
 
 }
 
+
+
+// MARK: : KvResponseInternalProtocol
+
+extension KvHttpResponse : KvResponseInternalProtocol {
+
+    func insert<A : KvHttpResponseAccumulator>(to accumulator: A) {
+        let configuration = ImplementationConfiguration(accumulator.responseGroupConfiguration, configuration)
+
+        accumulator.insert(implementationBlock(configuration))
+    }
+
+
+
+    // MARK: .ImplementationConfiguration
+
+    fileprivate struct ImplementationConfiguration {
+
+        let httpRequestBody: KvResponseGroupConfiguration.HttpRequestBody?
+        let clientCallbacks: ClientCallbacks?
+
+
+        init(_ responseGroupConfiguration: KvResponseGroupConfiguration?, _ responseConfiguration: Configuration?) {
+            self.httpRequestBody = responseGroupConfiguration?.httpRequestBody
+            self.clientCallbacks = .accumulate(responseConfiguration?.clientCallbacks, into: responseGroupConfiguration?.clientCallbacks)
+        }
+
+    }
+
+}
 
 
 // MARK: .DynamicResponse
@@ -444,7 +447,7 @@ extension KvHttpResponse {
 }
 
 
-// MARK: Complention for Empty Query
+// MARK: Completion for Empty Query
 
 extension KvHttpResponse.DynamicResponse where QueryItemGroup == KvEmptyUrlQueryItemGroup {
 
@@ -492,7 +495,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemIm
 }
 
 
-// MARK: Initializaion
+// MARK: Initialization
 
 public typealias InitialDynamicResponse = KvHttpResponse.DynamicResponse<KvEmptyUrlQueryItemGroup, KvHttpRequestIgnoredHeaders, KvHttpRequestVoidBodyValue, KvUnavailableUrlSubpath, Void>
 
@@ -661,7 +664,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value) -> T) -> MappingTwo<T> {
         mapQuery { $0.map(transform) }
@@ -671,7 +674,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation or rejects URL query.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryFlatMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value) -> KvResponse.QueryResult<T>) -> MappingTwo<T> {
         mapQuery { $0.flatMap(transform) }
@@ -747,7 +750,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value) -> T) -> MappingFour<T> {
         mapQuery { $0.map(transform) }
@@ -757,7 +760,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation or rejects URL query.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryFlatMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value) -> KvResponse.QueryResult<T>) -> MappingFour<T> {
         mapQuery { $0.flatMap(transform) }
@@ -790,7 +793,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value) -> T) -> MappingFive<T> {
         mapQuery { $0.map(transform) }
@@ -800,7 +803,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation or rejects URL query.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryFlatMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value) -> KvResponse.QueryResult<T>) -> MappingFive<T> {
         mapQuery { $0.flatMap(transform) }
@@ -833,7 +836,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value) -> T) -> MappingSix<T> {
         mapQuery { $0.map(transform) }
@@ -843,7 +846,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation or rejects URL query.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryFlatMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value) -> KvResponse.QueryResult<T>) -> MappingSix<T> {
         mapQuery { $0.flatMap(transform) }
@@ -876,7 +879,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value, QueryItemGroup.G6.Value) -> T) -> MappingSeven<T> {
         mapQuery { $0.map(transform) }
@@ -886,7 +889,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation or rejects URL query.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryFlatMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value, QueryItemGroup.G6.Value) -> KvResponse.QueryResult<T>) -> MappingSeven<T> {
         mapQuery { $0.flatMap(transform) }
@@ -919,7 +922,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value, QueryItemGroup.G6.Value, QueryItemGroup.G7.Value) -> T) -> MappingEight<T> {
         mapQuery { $0.map(transform) }
@@ -929,7 +932,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation or rejects URL query.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryFlatMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value, QueryItemGroup.G6.Value, QueryItemGroup.G7.Value) -> KvResponse.QueryResult<T>) -> MappingEight<T> {
         mapQuery { $0.flatMap(transform) }
@@ -962,7 +965,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value, QueryItemGroup.G6.Value, QueryItemGroup.G7.Value, QueryItemGroup.G8.Value) -> T) -> MappingNine<T> {
         mapQuery { $0.map(transform) }
@@ -972,7 +975,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation or rejects URL query.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryFlatMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value, QueryItemGroup.G6.Value, QueryItemGroup.G7.Value, QueryItemGroup.G8.Value) -> KvResponse.QueryResult<T>) -> MappingNine<T> {
         mapQuery { $0.flatMap(transform) }
@@ -991,7 +994,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value, QueryItemGroup.G6.Value, QueryItemGroup.G7.Value, QueryItemGroup.G8.Value, QueryItemGroup.G9.Value) -> T) -> MappingTen<T> {
         mapQuery { $0.map(transform) }
@@ -1001,7 +1004,7 @@ extension KvHttpResponse.DynamicResponse where QueryItemGroup : KvUrlQueryItemGr
     /// Replaces query value in the input with the result of transformation or rejects URL query.
     ///
     /// It's convenient to wrap tuples of query items into dedicated structures.
-    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifers. So 10 element query tuple limit can be bypassed.
+    /// Also tuples of query values in the input become single values and can be appended with `.query`() modifiers. So 10 element query tuple limit can be bypassed.
     @inlinable
     public func queryFlatMap<T>(_ transform: @escaping (QueryItemGroup.G0.Value, QueryItemGroup.G1.Value, QueryItemGroup.G2.Value, QueryItemGroup.G3.Value, QueryItemGroup.G4.Value, QueryItemGroup.G5.Value, QueryItemGroup.G6.Value, QueryItemGroup.G7.Value, QueryItemGroup.G8.Value, QueryItemGroup.G9.Value) -> KvResponse.QueryResult<T>) -> MappingTen<T> {
         mapQuery { $0.flatMap(transform) }

@@ -97,7 +97,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
                 switch from <= through {
                 case true:
-                    try await TestKit.assertResponse(baseURL, query: query, contentType: .application(.octetStream)) { data, request, message in
+                    try await TestKit.assertResponse(baseURL, query: query, contentType: nil) { data, request, message in
                         data.withUnsafeBytes { buffer in
                             XCTAssertTrue(buffer.assumingMemoryBound(to: Value.self).elementsEqual(from ... through), message())
                         }
@@ -155,26 +155,6 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
 
 
-    // MARK: - testUrlResolvation()
-
-    func testUrlResolvation() {
-        typealias ResolvedURL = KvHttpResponseProvider.ResolvedURL
-
-        func Assert(bundlePath: String, expectation: (URL) -> Result<ResolvedURL, KvHttpResponseError>) {
-            let url = Bundle.module.resourceURL!.appendingPathComponent(bundlePath)
-            XCTAssertEqual(Result(catching: { try ResolvedURL(for: url) }).mapError { $0 as! KvHttpResponseError }, expectation(url), "URL: \(url)")
-        }
-
-        Assert(bundlePath: "Resources/sample.txt", expectation: { .success(.init(value: $0, isFile: true)) })
-        Assert(bundlePath: "Resources/missing_file", expectation: { .failure(.fileDoesNotExist($0)) })
-
-        Assert(bundlePath: "Resources/html", expectation: { .success(.init(value: $0.appendingPathComponent("index.html"), isFile: true)) })
-        Assert(bundlePath: "Resources/html/a", expectation: { .success(.init(value: $0.appendingPathComponent("index"), isFile: true)) })
-        Assert(bundlePath: "Resources/html/a/b", expectation: { .failure(.unableToFindIndexFile(directoryURL: $0)) })
-    }
-
-
-
     // MARK: - testFileResponse()
 
     func testFileResponse() async throws {
@@ -187,15 +167,10 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
             static var sampleURL: URL { Bundle.module.url(forResource: "sample", withExtension: "txt", subdirectory: "Resources")! }
             static var missingURL: URL { sampleURL.appendingPathExtension("missing") }
-            static var indexHtmlDirectoryURL: URL { Bundle.module.resourceURL!.appendingPathComponent("Resources/html") }
-            static var indexDirectoryURL: URL { Bundle.module.resourceURL!.appendingPathComponent("Resources/html/a") }
-            static var noIndexDirectoryURL: URL { Bundle.module.resourceURL!.appendingPathComponent("Resources/html/a/b") }
 
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
-                    KvGroup("/") {
-                        KvHttpResponse.static { try .file(at: Self.indexHtmlDirectoryURL) }
-
+                    KvGroup {
                         do {
                             let sampleURL = Self.sampleURL
                             KvGroup(sampleURL.lastPathComponent) {
@@ -206,13 +181,6 @@ final class KvHttpResponseProviderTests : XCTestCase {
                             let missingURL = Self.missingURL
                             KvGroup(missingURL.lastPathComponent) {
                                 KvHttpResponse.static { try .file(at: missingURL) }
-                            }
-                        }
-                        KvGroup("a") {
-                            KvHttpResponse.static { try .file(at: Self.indexDirectoryURL) }
-
-                            KvGroup("b") {
-                                KvHttpResponse.static { try .file(at: Self.noIndexDirectoryURL) }
                             }
                         }
                     }
@@ -231,17 +199,16 @@ final class KvHttpResponseProviderTests : XCTestCase {
         }
 
         try await TestKit.withRunningServer(of: FileServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
-            let urlSession = URLSession(configuration: .ephemeral)
 
             func Assert(path: String? = nil, fileName: String? = nil, expected fileURL: URL) async throws {
                 let path = (path ?? "") + "/" + (fileName ?? fileURL.lastPathComponent)
 
-                switch try? KvHttpResponseProvider.ResolvedURL(for: fileURL).value {
+                switch try? KvDirectory.ResolvedURL(for: fileURL).value {
                 case .some(let url):
                     let data = try Data(contentsOf: url)
-                    try await TestKit.assertResponse(urlSession: urlSession, baseURL, path: path, contentType: .application(.octetStream), expecting: data)
+                    try await TestKit.assertResponse(baseURL, path: path, contentType: nil, expecting: data)
                 case .none:
-                    try await TestKit.assertResponse(urlSession: urlSession, baseURL, path: path, statusCode: .internalServerError, expecting: FileServer.errorMessage)
+                    try await TestKit.assertResponse(baseURL, path: path, statusCode: .internalServerError, expecting: FileServer.errorMessage)
                 }
             }
 
@@ -249,16 +216,12 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
             XCTAssertFalse(FileManager.default.fileExists(atPath: FileServer.missingURL.path))
             try await Assert(expected: FileServer.missingURL)
-
-            try await Assert(fileName: "", expected: FileServer.indexHtmlDirectoryURL)
-            try await Assert(path: "a", fileName: "", expected: FileServer.indexDirectoryURL)
-            try await Assert(path: "a/b", fileName: "", expected: FileServer.noIndexDirectoryURL)
         }
     }
 
 
 
-    // MARK: Auxliliaries
+    // MARK: - Auxliliaries
 
     private typealias TestKit = KvServerTestKit
 

@@ -234,28 +234,24 @@ final class KvHttpResponseTests : XCTestCase {
 
         try await TestKit.withRunningServer(of: BodyLimitServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
-            func Assert(_ urlSession: URLSession, path: String, contentLength: UInt, expectedLimit: UInt) async throws {
-                let (statusCode, content): (KvHttpResponseProvider.Status, String)
+            func Assert(path: String, contentLength: UInt, expectedLimit: UInt) async throws {
+                let (statusCode, content): (KvHttpStatus, String)
                 = contentLength <= expectedLimit ? (.ok, "\(contentLength)") : (.payloadTooLarge, "")
 
                 try await TestKit.assertResponse(
-                    urlSession: urlSession,
                     baseURL, method: "POST", path: path, query: nil, body: contentLength > 0 ? Data(count: numericCast(contentLength)) : nil,
                     statusCode: statusCode, contentType: .text(.plain), expecting: content
                 )
             }
 
             func Assert(path: String, expectedLimit: UInt) async throws {
-                // URL sessions are used to prevent reponses after body limit incidents to be discarded.
-                let urlSession = URLSession(configuration: .ephemeral)
-
                 let limits = [ [ 0, 1 ],
                                Array((BodyLimitServer.limits.min()! - 1)...(BodyLimitServer.limits.max()! + 1)),
                                [ KvHttpRequest.Constants.bodyLengthLimit, KvHttpRequest.Constants.bodyLengthLimit + 1 ]
                 ].joined().sorted()
 
                 for limit in limits {
-                    try await Assert(urlSession, path: path, contentLength: limit, expectedLimit: expectedLimit)
+                    try await Assert(path: path, contentLength: limit, expectedLimit: expectedLimit)
                     // Stop after first out-of-limit request due to server drops requests.
                     guard limit <= expectedLimit else { break }
                 }

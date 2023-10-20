@@ -172,21 +172,53 @@ class KvHttpResponseDispatcher {
 
 
         private(set) var match: Match = .notFound
+        /// This property holds attributes resolved between all dispatch subtrees.
         private(set) var resolvedAttributes: Attributes?
 
 
         fileprivate init() { }
 
 
+        /// Attributes in currect dispatch tree.
+        fileprivate private(set) var groupAttributes: Attributes?
+
+        private var resolvedAttributePathLevel: Int = 0
+        /// It's used to collect attributes on different path nodes. E.g. on GET and generic method dispatch trees.
+        private var groupAttributePathLevel: Int = 0
+
+
         // MARK: Operations
+
+        fileprivate func finalize() {
+            commitGroupAttributes()
+        }
+
 
         fileprivate func collect(_ match: Match) {
             self.match = self.match.union(with: match)
         }
 
 
-        fileprivate func collect(_ attributes: Attributes) {
-            Attributes.merge(addition: attributes, into: &resolvedAttributes)
+        fileprivate func collect(_ attributes: Attributes, pathLevel: Int) {
+            switch pathLevel >= groupAttributePathLevel {
+            case true:
+                Attributes.merge(addition: attributes, into: &self.groupAttributes)
+                groupAttributePathLevel = pathLevel
+
+            case false:
+                commitGroupAttributes()
+
+                self.groupAttributes = attributes
+                groupAttributePathLevel = pathLevel
+            }
+        }
+
+
+        private func commitGroupAttributes() {
+            guard resolvedAttributes == nil || groupAttributePathLevel > resolvedAttributePathLevel else { return }
+
+            resolvedAttributes = groupAttributes
+            resolvedAttributePathLevel = groupAttributePathLevel
         }
 
     }
@@ -200,6 +232,8 @@ class KvHttpResponseDispatcher {
         let result = RequestProcessorResult()
 
         rootNode.accumulateRequestProcessors(for: reqeustContext, into: result)
+
+        result.finalize()
 
         return result
     }
@@ -847,29 +881,29 @@ extension KvHttpResponseDispatcher {
 
         func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: KvHttpResponseDispatcher.RequestProcessorResult) {
 
-            func Process(_ node: PathNode) {
+            func Process(_ node: PathNode, pathLevel: Int) {
                 guard let subnode = node.subnode else { return }
 
                 if let attributes = subnode.attributes {
-                    accumulator.collect(attributes)
+                    accumulator.collect(attributes, pathLevel: pathLevel)
                 }
 
                 subnode.accumulateSubpathRequestProcessors(for: requestContext, into: accumulator)
             }
 
 
-            var iterator = Self.safePathComponens(requestContext.pathComponents).makeIterator()
+            var iterator = Self.safePathComponens(requestContext.pathComponents).enumerated().makeIterator()
             var node: PathNode = self
 
-            Process(node)
+            Process(node, pathLevel: 0)
 
-            while let component = iterator.next() {
+            while let (pathLevel, component) = iterator.next() {
                 guard let child = node.childNodes[component]
                 else { return }
 
                 node = child
 
-                Process(node)
+                Process(node, pathLevel: pathLevel + 1)
             }
 
             node.subnode?.accumulateRequestProcessors(for: requestContext, into: accumulator)
@@ -1101,7 +1135,7 @@ extension KvHttpResponseDispatcher {
                 guard requestContext.urlComponents.queryItems?.isEmpty != false
                 else { return }
 
-                accumulator.collect(queryElement.makeProcessor(requestContext, accumulator.resolvedAttributes?.clientCallbacks))
+                accumulator.collect(queryElement.makeProcessor(requestContext, accumulator.groupAttributes?.clientCallbacks))
             }
 
         }
@@ -1131,7 +1165,7 @@ extension KvHttpResponseDispatcher {
                 guard queryElement.queryParser.parse(requestContext.urlComponents.queryItems) == .complete
                 else { return }
 
-                accumulator.collect(queryElement.makeProcessor(requestContext, accumulator.resolvedAttributes?.clientCallbacks))
+                accumulator.collect(queryElement.makeProcessor(requestContext, accumulator.groupAttributes?.clientCallbacks))
             }
 
         }
@@ -1161,7 +1195,7 @@ extension KvHttpResponseDispatcher {
                     guard queryParser.status == .complete
                     else { return }
 
-                    accumulator.collect(queryElement.makeProcessor(requestContext, accumulator.resolvedAttributes?.clientCallbacks))
+                    accumulator.collect(queryElement.makeProcessor(requestContext, accumulator.groupAttributes?.clientCallbacks))
                 }
 
 
@@ -1205,7 +1239,7 @@ extension KvHttpResponseDispatcher {
             func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
                 let match = Self.withMatchResult(queryElements, in: requestContext) { match in
                     match.flatMap { processorBlock in
-                        processorBlock(requestContext, accumulator.resolvedAttributes?.clientCallbacks)
+                        processorBlock(requestContext, accumulator.groupAttributes?.clientCallbacks)
                     }
                 }
 
@@ -1263,7 +1297,7 @@ extension KvHttpResponseDispatcher {
             func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: RequestProcessorResult) {
                 let match = Self.withMatchResult(queryElements, in: requestContext) { match in
                     match.flatMap { processorBlock in
-                        processorBlock(requestContext, accumulator.resolvedAttributes?.clientCallbacks)
+                        processorBlock(requestContext, accumulator.groupAttributes?.clientCallbacks)
                     }
                 }
 
@@ -1394,7 +1428,7 @@ extension KvHttpResponseDispatcher {
                 let match = SerialQueries.withMatchResult(serialQueryElements, in: requestContext) { match1 in
                     EntireQueries.withMatchResult(entireQueryElements, in: requestContext) { match2 in
                         match1.union(with: match2).flatMap { processorBlock in
-                            processorBlock(requestContext, accumulator.resolvedAttributes?.clientCallbacks)
+                            processorBlock(requestContext, accumulator.groupAttributes?.clientCallbacks)
                         }
                     }
                 }

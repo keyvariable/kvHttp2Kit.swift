@@ -112,23 +112,25 @@ class KvServerTestKit {
     // MARK: Response Execution
 
     static func queryDataIgnoringCertificate(from url: URL, in urlSession: URLSession? = nil) async throws -> (Data, URLResponse) {
-        try await (urlSession ?? URLSession.shared).data(from: url, delegate: IgnoringCertificateTaskDelegate())
+        try await (urlSession ?? URLSession.init(configuration: .ephemeral)).data(from: url, delegate: IgnoringCertificateTaskDelegate())
     }
 
 
     static func queryDataIgnoringCertificate(for request: URLRequest, in urlSession: URLSession? = nil) async throws -> (Data, URLResponse) {
-        try await (urlSession ?? URLSession.shared).data(for: request, delegate: IgnoringCertificateTaskDelegate())
+        try await (urlSession ?? URLSession.init(configuration: .ephemeral)).data(for: request, delegate: IgnoringCertificateTaskDelegate())
     }
 
 
 
     // MARK: Validation Auxiliaries
 
+    /// - Parameter contentType: If `nil` then it's ignored.
     static func assertResponse(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
-        statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
+        statusCode: KvHttpStatus = .ok,
+        contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
         message: @escaping @autoclosure () -> String = "",
         bodyBlock: ((Data, URLRequest, () -> String) throws -> Void)? = nil
     ) async throws {
@@ -169,7 +171,9 @@ class KvServerTestKit {
             else { return XCTFail([ "Unexpected type of response: \(type(of: response))", message() ].lazy.filter({ !$0.isEmpty }).joined(separator: ". ")) }
 
             XCTAssertEqual(httpResponse.statusCode, numericCast(statusCode.code), message())
-            XCTAssertEqual(httpResponse.mimeType, contentType?.components.mimeType, message())
+            if let contentType = contentType {
+                XCTAssertEqual(httpResponse.mimeType, contentType.components.mimeType, message())
+            }
         }
 
         try bodyBlock?(data, request, message)
@@ -180,7 +184,8 @@ class KvServerTestKit {
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
-        statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
+        statusCode: KvHttpStatus = .ok,
+        contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
         expecting expected: String,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
@@ -195,7 +200,8 @@ class KvServerTestKit {
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
-        statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .application(.octetStream),
+        statusCode: KvHttpStatus = .ok,
+        contentType: KvHttpResponseProvider.ContentType? = .application(.octetStream),
         expecting expected: Data,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
@@ -209,7 +215,8 @@ class KvServerTestKit {
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
-        statusCode: KvHttpResponseProvider.Status = .ok, contentType: KvHttpResponseProvider.ContentType? = .application(.json),
+        statusCode: KvHttpStatus = .ok,
+        contentType: KvHttpResponseProvider.ContentType? = .application(.json),
         expecting expected: T,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {

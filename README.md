@@ -42,10 +42,11 @@ If there are two or more matching responses then *declarative API* automatically
 
 Below is an example of a server providing simple responses over secure HTTP/2.0 and HTTP/1.1 at all available IP addresses on 8080 port
 for both `example.com` and `www.example.com` hosts:
-- simple greeting text response at root path;
+- frontend files at "/var/www/example.com" directory with support of index files and status pages named "\(statusCode).html" in "status" subdirectory;
 - echo binary response with *POST* request's body at `/echo` path;
 - random boolean text response at `/random/bool` path;
-- random integer text response with structured URL query at `/random/int` path.
+- random integer text response with structured URL query at `/random/int` path;
+- usage hint for any unhandled subpath at "/random" path. 
 
 ```swift
 @main
@@ -54,11 +55,8 @@ struct ExampleServer : KvServer {
         let ssl: KvHttpChannel.Configuration.SSL = loadHttpsCertificate()
 
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-            do {
-                let indexURL = Bundle.module.url(forResource: "index", withExtension: "html")!
-
-                KvHttpResponse.static { try .file(at: indexURL).contentType(.text(.html)) }
-            }
+            KvDirectory(at: URL(fileURLWithPath: "/var/www/example.com"))
+                .httpStatusDirectory(pathComponent: "status")
 
             KvGroup("echo") {
                 KvHttpResponse.dynamic
@@ -74,12 +72,10 @@ struct ExampleServer : KvServer {
             KvGroup("random") {
                 RandomValueResponseGroup()
             }
-        }
-        .onHttpIncident { incident in
-            guard incident.defaultStatus == .notFound else { return nil }
-            return try .notFound
-                .file(resource: "404", extension: "html", bundle: .module)
-                .contentType(.text(.html))
+            .onHttpIncident { incident in
+                guard incident.defaultStatus == .notFound else { return nil }
+                return try .notFound.string { "Usage:\n  /random/bool\n  /random/int[?from=1[&through=9]]" }
+            }
         }
         .hosts("example.com")
         .subdomains(optional: "www")

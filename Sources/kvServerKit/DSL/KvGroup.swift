@@ -26,7 +26,7 @@ import NIOHTTP1
 
 
 
-/// It's designated to wrap responses and response groups in a group and then handle it as a signle entity.
+/// It's designated to wrap responses and response groups in a group and then handle it as a single entity.
 /// For example modifiers can be applied to whole group.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
