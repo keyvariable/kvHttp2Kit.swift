@@ -609,6 +609,65 @@ final class KvResponseGroupTests : XCTestCase {
 
 
 
+    // MARK: - testUrlDeclarations()
+
+    func testUrlDeclarations() async throws {
+
+        struct UrlDeclarationServer : KvServer {
+
+            let configuration = TestKit.secureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvGroup("directory") {
+                        TestKit.htmlDirectoryURL
+                    }
+                    KvGroup("file") {
+                        Bundle.module.url(forResource: "sample", withExtension: "txt", subdirectory: "Resources")
+                    }
+                    KvGroup("files") {
+                        Bundle.module.urls(forResourcesWithExtension: "html", subdirectory: "Resources/html_status")
+                    }
+                }
+            }
+
+        }
+
+        try await TestKit.withRunningServer(of: UrlDeclarationServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
+
+            func Assert(section: String, path: String, expectedPath: String) async throws {
+                let url = TestKit.htmlDirectoryURL.appendingPathComponent(expectedPath)
+                let expected = try Data(contentsOf: url)
+
+                try await TestKit.assertResponse(baseURL, path: section + "/" + path, contentType: nil, expecting: expected)
+            }
+
+            func Assert(section: String, path: String, status: KvHttpStatus) async throws {
+                let url = TestKit.htmlStatusDirectoryURL.appendingPathComponent("\(status.code).html")
+                let expected = try Data(contentsOf: url)
+
+                try await TestKit.assertResponse(baseURL, path: section + "/" + path, statusCode: status, contentType: nil, expecting: expected)
+            }
+
+            try await Assert(section: "directory", path: "", expectedPath: "index.html")
+            try await Assert(section: "directory", path: "index.html", expectedPath: "index.html")
+            try await Assert(section: "directory", path: "uuid.txt", expectedPath: "uuid.txt")
+            try await Assert(section: "directory", path: "a", expectedPath: "a/index")
+            try await Assert(section: "directory", path: "a/index", expectedPath: "a/index")
+
+            try await Assert(section: "directory", path: "sample.txt", status: .notFound)
+            try await Assert(section: "directory", path: ".uuid.txt", status: .notFound)
+            try await Assert(section: "directory", path: "a/index.html", status: .notFound)
+
+            try await Assert(section: "file", path: "sample.txt", expectedPath: "../sample.txt")
+
+            try await Assert(section: "files", path: "400.html", expectedPath: "../html_status/400.html")
+            try await Assert(section: "files", path: "404.html", expectedPath: "../html_status/404.html")
+        }
+    }
+
+
+
     // MARK: Auxliliaries
 
     private typealias TestKit = KvServerTestKit

@@ -41,7 +41,7 @@ final class KvDirectoryTests : XCTestCase {
 
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
-                    KvDirectory(at: Constants.htmlDirectoryURL)
+                    KvDirectory(at: TestKit.htmlDirectoryURL)
                 }
             }
 
@@ -52,7 +52,7 @@ final class KvDirectoryTests : XCTestCase {
             func Assert(path: String, expectedPath: String?) async throws {
                 switch expectedPath {
                 case .some(let expectedPath):
-                    let url = Constants.htmlDirectoryURL.appendingPathComponent(expectedPath)
+                    let url = TestKit.htmlDirectoryURL.appendingPathComponent(expectedPath)
                     let expected = try Data(contentsOf: url)
 
                     try await TestKit.assertResponse(baseURL, path: path, contentType: nil, expecting: expected)
@@ -187,25 +187,25 @@ final class KvDirectoryTests : XCTestCase {
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("1") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .whiteList("a/.b", ".c")
                     }
                     KvGroup("2") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .whiteList("a/.b", "a/.c")
                             .whiteList(".well-known")
                     }
                     KvGroup("3") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .blackList("a", "c")
                             .blackList(".well-known")
                     }
                     KvGroup("4") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .whiteList("a/.b/.uuid.txt")
                     }
                     KvGroup("5") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .whiteList("a/.b/.uuid.txt")
                             .blackList("a/.b")
                     }
@@ -218,7 +218,7 @@ final class KvDirectoryTests : XCTestCase {
             func Assert(directory: String, path: String, expected: String?) async throws {
                 switch expected {
                 case .some(let expected):
-                    let expectedData = try Data(contentsOf: Constants.htmlDirectoryURL.appendingPathComponent(expected))
+                    let expectedData = try Data(contentsOf: TestKit.htmlDirectoryURL.appendingPathComponent(expected))
                     try await TestKit.assertResponse(baseURL, path: directory + "/" + path, contentType: nil, expecting: expectedData)
                 case .none:
                     try await TestKit.assertResponse(baseURL, path: directory + "/" + path, statusCode: .notFound, expecting: "")
@@ -256,14 +256,14 @@ final class KvDirectoryTests : XCTestCase {
 
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
-                    KvDirectory(at: Constants.htmlDirectoryURL)
+                    KvDirectory(at: TestKit.htmlDirectoryURL)
                 }
             }
 
         }
 
         try await TestKit.withRunningServer(of: TestServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
-            try await TestKit.assertResponse(baseURL, method: "GET"   , path: "uuid.txt", statusCode: .ok, contentType: nil, expecting: Constants.data_uuid_txt)
+            try await TestKit.assertResponse(baseURL, method: "GET"   , path: "uuid.txt", statusCode: .ok, contentType: nil, expecting: TestKit.data_uuid_txt)
             try await TestKit.assertResponse(baseURL, method: "HEAD"  , path: "uuid.txt", statusCode: .ok, contentType: nil, expecting: Data())
             try await TestKit.assertResponse(baseURL, method: "POST"  , path: "uuid.txt", statusCode: .notFound, expecting: "")
             try await TestKit.assertResponse(baseURL, method: "PUT"   , path: "uuid.txt", statusCode: .notFound, expecting: "")
@@ -284,20 +284,20 @@ final class KvDirectoryTests : XCTestCase {
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("1") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
-                            .httpStatusDirectory(url: Constants.htmlStatusDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
+                            .httpStatusDirectory(url: TestKit.htmlStatusDirectoryURL)
                     }
                     KvGroup("2") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
-                            .httpStatusDirectory(url: Constants.htmlDirectoryURL.appendingPathComponent("a/.././status"))
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
+                            .httpStatusDirectory(url: TestKit.htmlDirectoryURL.appendingPathComponent("a/.././status"))
                     }
                     KvGroup("3") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .httpStatusDirectory(pathComponent: "status")
                     }
                     KvGroup("4") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
-                            .httpStatusDirectory(url: Constants.htmlDirectoryURL.appendingPathComponent("status"))
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
+                            .httpStatusDirectory(url: TestKit.htmlDirectoryURL.appendingPathComponent("status"))
                             .httpStatusFileName {
                                 switch $0 {
                                 case .badRequest:
@@ -310,12 +310,12 @@ final class KvDirectoryTests : XCTestCase {
                             }
                     }
                     KvGroup("5") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
-                            .httpStatusDirectory(url: Constants.externalHtmlStatusDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
+                            .httpStatusDirectory(url: TestKit.externalHtmlStatusDirectoryURL)
                     }
                     KvGroup("6") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
-                            .httpStatusDirectory(url: Constants.htmlStatusDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
+                            .httpStatusDirectory(url: TestKit.htmlStatusDirectoryURL)
 
                         KvHttpResponse.dynamic
                             .query(.required("uuid"))
@@ -329,7 +329,7 @@ final class KvDirectoryTests : XCTestCase {
         try await TestKit.withRunningServer(of: StatusDirectoryServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
             func Assert404(directory: String, statusDirectoryURL: URL? = nil, customName: Bool = false) async throws {
-                let statusDirectoryURL = statusDirectoryURL ?? Constants.htmlStatusDirectoryURL
+                let statusDirectoryURL = statusDirectoryURL ?? TestKit.htmlStatusDirectoryURL
                 let statusFileName = customName ? "NotFound.html" : "404.html"
 
                 let expectedData = try Data(contentsOf: statusDirectoryURL.appendingPathComponent(statusFileName))
@@ -339,7 +339,7 @@ final class KvDirectoryTests : XCTestCase {
             func AssertDirectAccess(directory: String, customName: Bool = false) async throws {
                 let statusFileName = customName ? "NotFound.html" : "404.html"
 
-                let expectedData = try Data(contentsOf: Constants.htmlStatusDirectoryURL.appendingPathComponent(statusFileName))
+                let expectedData = try Data(contentsOf: TestKit.htmlStatusDirectoryURL.appendingPathComponent(statusFileName))
                 try await TestKit.assertResponse(baseURL, path: directory + "/status/uuid.txt", statusCode: .notFound, contentType: nil, expecting: expectedData)
             }
 
@@ -347,7 +347,7 @@ final class KvDirectoryTests : XCTestCase {
             try await Assert404(directory: "2")
             try await Assert404(directory: "3")
             try await Assert404(directory: "4", customName: true)
-            try await Assert404(directory: "5", statusDirectoryURL: Constants.externalHtmlStatusDirectoryURL)
+            try await Assert404(directory: "5", statusDirectoryURL: TestKit.externalHtmlStatusDirectoryURL)
             try await Assert404(directory: "6")
 
             try await AssertDirectAccess(directory: "1")
@@ -372,8 +372,8 @@ final class KvDirectoryTests : XCTestCase {
 
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
-                    KvDirectory(at: Constants.htmlDirectoryURL)
-                        .httpStatusDirectory(url: Constants.htmlStatusDirectoryURL)
+                    KvDirectory(at: TestKit.htmlDirectoryURL)
+                        .httpStatusDirectory(url: TestKit.htmlStatusDirectoryURL)
 
                     KvHttpResponse.dynamic
                         .query(.required("uuid"))
@@ -397,11 +397,11 @@ final class KvDirectoryTests : XCTestCase {
         try await TestKit.withRunningServer(of: MixedServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
             func Assert(path: String, expectedPath: String) async throws {
-                try await TestKit.assertResponse(baseURL, path: path, contentType: nil, expecting: Data(contentsOf: Constants.htmlDirectoryURL.appendingPathComponent(expectedPath)))
+                try await TestKit.assertResponse(baseURL, path: path, contentType: nil, expecting: Data(contentsOf: TestKit.htmlDirectoryURL.appendingPathComponent(expectedPath)))
             }
 
             func Assert(path: String, status: KvHttpStatus) async throws {
-                let expecteData = try Data(contentsOf: Constants.htmlStatusDirectoryURL.appendingPathComponent("\(status.code).html"))
+                let expecteData = try Data(contentsOf: TestKit.htmlStatusDirectoryURL.appendingPathComponent("\(status.code).html"))
                 try await TestKit.assertResponse(baseURL, path: path, statusCode: status, contentType: nil, expecting: expecteData)
             }
 
@@ -437,25 +437,25 @@ final class KvDirectoryTests : XCTestCase {
             var body: some KvResponseGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("1") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .indexFileNames("uuid.txt")
                     }
                     KvGroup("2") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .httpIndexFileNames("uuid.txt")
                     }
                     KvGroup("3") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .indexFileNames()
                             .httpIndexFileNames("uuid.txt")
                     }
                     KvGroup("4") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .indexFileNames("uuid.txt")
                             .httpIndexFileNames()
                     }
                     KvGroup("5") {
-                        KvDirectory(at: Constants.htmlDirectoryURL)
+                        KvDirectory(at: TestKit.htmlDirectoryURL)
                             .indexFileNames()
                             .httpIndexFileNames()
                     }
@@ -467,7 +467,7 @@ final class KvDirectoryTests : XCTestCase {
         try await TestKit.withRunningServer(of: IndexServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
             func Assert(directory: String, expected: String) async throws {
-                let expectedData = try Data(contentsOf: Constants.htmlDirectoryURL.appendingPathComponent(expected))
+                let expectedData = try Data(contentsOf: TestKit.htmlDirectoryURL.appendingPathComponent(expected))
 
                 try await TestKit.assertResponse(baseURL, path: directory, contentType: nil, expecting: expectedData)
             }
@@ -491,19 +491,6 @@ final class KvDirectoryTests : XCTestCase {
 
 
     private typealias ContentType = KvHttpResponseProvider.ContentType
-
-
-    private struct Constants {
-
-        static let resourceDirectoryURL = Bundle.module.resourceURL!.appendingPathComponent("Resources")
-        static let htmlDirectoryURL = resourceDirectoryURL.appendingPathComponent("html")
-        static let htmlStatusDirectoryURL = htmlDirectoryURL.appendingPathComponent("status")
-        static let externalHtmlStatusDirectoryURL = resourceDirectoryURL.appendingPathComponent("html_status")
-
-        /// Data at /uuid.txt.
-        static let data_uuid_txt = try! Data(contentsOf: htmlDirectoryURL.appendingPathComponent("uuid.txt"))
-
-    }
 
 }
 

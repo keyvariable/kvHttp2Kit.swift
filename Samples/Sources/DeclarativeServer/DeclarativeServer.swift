@@ -58,14 +58,14 @@ struct DeclarativeServer : KvServer {
         /// KvGroup(http: .v2(ssl: ssl), at: Host.current().names, on: [ 8080 ])
         /// ```
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-            /// *KvDirectory* declares hierarchy of files.
+            /// A hierarchy of files at some URL can be declared with just URL.
+            /// It's a good way to declare frontends and resource directories.
             /// This directory is declared at the root of server's response hierarchy, so entire URL paths in requests are appended to the directory's root URL.
-            /// *KvDirectory* responds with index files for requests to directory items if available.
-            KvDirectory(at: Bundle.module.resourceURL!.appendingPathComponent("Resources/Frontend"))
-                /// This modifier enables response with contents of "\(statusCode).html" files in provided directory for non-200 statuses.
-                /// Provided path is relative to the directory's root.
-                /// - Note: Custom status file name callback can be provided with `.httpStatusFileName(_:)` modifier.
-                .httpStatusDirectory(pathComponent: "status")
+            /// Directory declarations provide automatic searching of the index files.
+            /// Also directory declarations via URL provide automatic search of "Status" or "status" subdirectory
+            /// to provide non-200 responses from files named "\(statusCode).html".
+            /// See `KvDirectory` and `KvFiles` for details.
+            Bundle.module.resourceURL!.appendingPathComponent("Resources/Frontend")
 
             /// Dynamic responses provide customizable processing of request content.
             /// For example the response below uses structured URL query handling.
@@ -386,6 +386,8 @@ struct DeclarativeServer : KvServer {
 
         var body: some KvResponseGroup {
             /// - Note: Conditional statements are supported.
+            ///
+            /// - Tip: `KvForEach()` is used as example. The same result can be archived with shorter code: `KvGroup("images") { imageURLs }`.
             if let urls = imageURLs {
                 KvGroup("images") {
                     /// `KvForEach()` is used to provide dynamic list of responses.

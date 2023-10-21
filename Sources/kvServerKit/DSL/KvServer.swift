@@ -34,7 +34,7 @@ import Foundation
 /// struct ExampleServer : KvServer {
 ///     var body: some KvResponseGroup {
 ///         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-///             KvHttpResponse.static { .string { "Hello, client" } }
+///             URL(string: "file:///var/www/example.com/")
 ///
 ///             KvGroup("echo") {
 ///                 KvHttpResponse.dynamic
@@ -47,15 +47,8 @@ import Foundation
 ///             .httpMethods(.POST)
 ///
 ///             KvGroup("uuid") {
-///                 KvHttpResponse.static
-///                     .content { .string { UUID().uuidString } }
+///                 KvHttpResponse.static { .string { UUID().uuidString } }
 ///             }
-///         }
-///         .onHttpIncident { incident in
-///             guard incident.defaultStatus == .notFound else { return nil }
-///             return try .notFound
-///                 .file(at: htmlFileURL)
-///                 .contentType(.text(.html))                 
 ///         }
 ///         .hosts("example.com")
 ///         .subdomains(optional: "www")

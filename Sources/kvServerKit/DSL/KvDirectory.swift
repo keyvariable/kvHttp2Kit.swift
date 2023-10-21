@@ -42,6 +42,22 @@ import Foundation
 /// *KvDirectory* handles "." and ".." special path components.
 /// Path having ".." special path components will never point out of the root.
 /// For example "a/../../" is equivalent to the root, "a/../../b.html" is equivalent to "b.html".
+///
+/// URLs having `hasDirectoryPath` property equal to `true`  can be declared as directory directly:
+///
+/// ```swift
+/// KvGroup("movies") {
+///     URL(string: "file:///url/to/movies/")
+/// }
+/// KvGroup("images") {
+///     Bundle.module.resourceURL!.appendingPathComponent("images", isDirectory: true)
+/// }
+/// ```
+///
+/// - Note: If a directory response is declared via an URL directly,
+///         then "Status" or "status" directory at the url is automatically selected as the HTTP status directory.
+///
+/// - SeeAlso: ``KvFiles``.
 public struct KvDirectory : KvResponse {
 
     @usableFromInline
@@ -55,14 +71,14 @@ public struct KvDirectory : KvResponse {
     }
 
 
-    /// Initializes a directory response having root at given URL.
+    /// Initializes a directory response having root at given URL. See ``KvDirectory`` for details.
     @inlinable
     public init(at rootURL: URL) {
         self.init(configuration: .init(rootURL: rootURL))
     }
 
 
-    /// Initializes a directory response having root at given path.
+    /// Initializes a directory response having root at given path. See ``KvDirectory`` for details.
     @inlinable
     public init?(atPath rootPath: String) {
         self.init(at: URL(fileURLWithPath: rootPath, isDirectory: true))
@@ -394,7 +410,6 @@ extension KvDirectory : KvResponseInternalProtocol {
 
                     return (try? ResolvedURL(for: url, isLocal: isRootLocal, indexNames: indexFileNames)).map { .accepted($0) } ?? .rejected
                 }
-
                 .content { input in try .file(at: input.subpath) }
         }
         .onHttpIncident { incident in

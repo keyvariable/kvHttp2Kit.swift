@@ -6,6 +6,7 @@
 - imperative and declarative APIs;
 - multithreaded request processing;
 - validation of requests and various automatic customizable context-dependent responses, e.g. 400, 404, 413;
+- automatic Last-Modified and ETag headers for file responses;
 - automatic 304 and 412 responses for preconditions on ETag and modification date;
 - automatic handling of HEAD method.
 
@@ -42,7 +43,8 @@ If there are two or more matching responses then *declarative API* automatically
 
 Below is an example of a server providing simple responses over secure HTTP/2.0 and HTTP/1.1 at all available IP addresses on 8080 port
 for both `example.com` and `www.example.com` hosts:
-- frontend files at "/var/www/example.com" directory with support of index files and status pages named "\(statusCode).html" in "status" subdirectory;
+- frontend files at "/var/www/example.com" directory with support of index files and status pages named "\(statusCode).html"
+  in "Status" or "status" subdirectory;
 - echo binary response with *POST* request's body at `/echo` path;
 - random boolean text response at `/random/bool` path;
 - random integer text response with structured URL query at `/random/int` path;
@@ -55,8 +57,7 @@ struct ExampleServer : KvServer {
         let ssl: KvHttpChannel.Configuration.SSL = loadHttpsCertificate()
 
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-            KvDirectory(at: URL(fileURLWithPath: "/var/www/example.com"))
-                .httpStatusDirectory(pathComponent: "status")
+            URL(string: "file:///var/www/example.com/")
 
             KvGroup("echo") {
                 KvHttpResponse.dynamic
