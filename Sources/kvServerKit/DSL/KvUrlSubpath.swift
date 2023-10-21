@@ -133,7 +133,7 @@ public struct KvUrlSubpath : KvUrlSubpathProtocol {
     /// - Note: Empty subpath is the root. So standardized "a/../../b" is "b".
     @inlinable
     public var standardized: KvUrlSubpath {
-        let standartizedComponents = components.reduce(into: Array<String>(), { partialResult, component in
+        let standardizedComponents = components.reduce(into: Array<String>(), { partialResult, component in
             switch component {
             case ".":
                 break
@@ -145,7 +145,7 @@ public struct KvUrlSubpath : KvUrlSubpathProtocol {
             }
         })
 
-        return .init(with: .init(standartizedComponents))
+        return .init(with: .init(standardizedComponents))
     }
 
 

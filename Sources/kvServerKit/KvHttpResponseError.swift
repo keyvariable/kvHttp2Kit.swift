@@ -31,7 +31,7 @@ public enum KvHttpResponseError : LocalizedError, Equatable {
     /// File at URL doesn't exist.
     case fileDoesNotExist(URL)
 
-    /// Schema of URL is "file:" but resource at URL is not a file.
+    /// Scheme of URL is "file:" but resource at URL is not a file.
     case isNotAFile(URL)
 
     /// Unable to create input stream for URL.

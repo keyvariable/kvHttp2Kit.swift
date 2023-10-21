@@ -29,8 +29,8 @@ import kvKit
 
 class KvHttpResponseDispatcher {
 
-    init?(from schema: Schema) {
-        guard let rootNode = schema.build() else { return nil }
+    init?(from scheme: Scheme) {
+        guard let rootNode = scheme.build() else { return nil }
 
         self.rootNode = rootNode
     }
@@ -242,28 +242,28 @@ class KvHttpResponseDispatcher {
 
 
 
-// MARK: .Schema.Container
+// MARK: .Scheme.Container
 
-fileprivate protocol KvHttpResponseDispatcherSchemaContainer {
+fileprivate protocol KvHttpResponseDispatcherSchemeContainer {
 
     func build() -> KvHttpResponseDispatcherNode?
 
 }
 
 
-extension KvHttpResponseDispatcher.Schema {
+extension KvHttpResponseDispatcher.Scheme {
 
-    fileprivate typealias Container = KvHttpResponseDispatcherSchemaContainer
+    fileprivate typealias Container = KvHttpResponseDispatcherSchemeContainer
 
 }
 
 
 
-// MARK: .Schema
+// MARK: .Scheme
 
 extension KvHttpResponseDispatcher {
 
-    struct Schema {
+    struct Scheme {
 
         private let methods: Methods = .init()
 
