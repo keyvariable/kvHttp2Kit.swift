@@ -530,7 +530,7 @@ extension KvServerImplementation.HttpServer {
         // MARK: : KvHttpClientDelegate
 
         func httpClient(_ httpClient: KvHttpChannel.Client, requestHandlerFor requestHead: KvHttpServer.RequestHead) -> KvHttpRequestHandler? {
-            guard let requestContext = KvHttpRequestContext(from: requestHead)
+            guard let requestContext = KvHttpRequestContext(httpClient, requestHead)
             else { return KvHttpHeadOnlyRequestHandler { .badRequest } }
 
             let requestProcessor: KvHttpRequestProcessorProtocol
@@ -540,15 +540,15 @@ extension KvServerImplementation.HttpServer {
             var onIncident = dispatchingResult.resolvedAttributes?.clientCallbacks?.onHttpIncident
 
 
-            func RequestHandler(for incident: KvHttpResponse.Incident, callback: ((KvHttpIncident) -> KvHttpResponseProvider?)?) -> KvHttpRequestHandler {
-                KvHttpHeadOnlyRequestHandler { callback?(incident) ?? .status(incident.defaultStatus) }
+            func RequestHandler(for incident: KvHttpResponse.Incident, callback: KvResponseGroupConfiguration.ClientCallbacks.IncidentCallback?) -> KvHttpRequestHandler {
+                KvHttpHeadOnlyRequestHandler { callback?(incident, requestContext) ?? .status(incident.defaultStatus) }
             }
 
 
             switch dispatchingResult.match {
             case .unambiguous(let value):
                 requestProcessor = value
-                onIncident = requestProcessor.onIncident(_:)
+                onIncident = requestProcessor.onIncident(_:_:)
             case .notFound:
                 return RequestHandler(for: .responseNotFound, callback: onIncident)
             case .ambiguous:
@@ -564,7 +564,7 @@ extension KvServerImplementation.HttpServer {
             }
 
             // Creation of a request processor
-            switch requestProcessor.makeRequestHandler() {
+            switch requestProcessor.makeRequestHandler(requestContext) {
             case .success(let requestHandler):
                 return requestHandler
             case .failure(let error):

@@ -385,7 +385,7 @@ final class KvDirectoryTests : XCTestCase {
                     KvGroup("bytes") {
                         KvHttpResponse.static { .string { Self.uuid.2.uuidString } }
                     }
-                    .onHttpIncident { incident in
+                    .onHttpIncident { incident, _ in
                         guard incident.defaultStatus == .notFound else { return nil }
                         return .notFound.string { Self.notFoundString_a }
                     }

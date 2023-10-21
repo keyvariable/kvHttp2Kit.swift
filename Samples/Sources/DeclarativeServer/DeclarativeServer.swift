@@ -118,10 +118,14 @@ struct DeclarativeServer : KvServer {
                 }
             }
             /// Custom 404 usage response for "/generate" path is provided with an incident handler.
-            .onHttpIncident { incident in
+            .onHttpIncident { incident, context in
                 switch incident.defaultStatus {
                 case .notFound:
-                    return .notFound.string { "Usage:\n  - /generate/int[?from=1[&through=5]];\n  - /generate/int?count=10;\n  - /generate/uuid[?string]." }
+                    var prefixComponents = context.urlComponents
+                    prefixComponents.path = "/generate"
+                    prefixComponents.query = nil
+                    let prefix = prefixComponents.url?.absoluteString ?? ""
+                    return .notFound.string { "Usage:\n  - \(prefix)/int[?from=1[&through=5]];\n  - \(prefix)/int?count=10;\n  - \(prefix)/uuid[?string]." }
                 default:
                     return nil
                 }

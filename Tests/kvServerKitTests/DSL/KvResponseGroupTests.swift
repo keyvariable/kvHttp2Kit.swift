@@ -658,7 +658,7 @@ final class KvResponseGroupTests : XCTestCase {
                                     .query(.void("count"))
                                     .requestBody(.data.bodyLengthLimit(Self.bodyLimit))
                                     .content { input in .string { "\(input.requestBody?.count ?? 0)" } }
-                                    .onIncident { incident in
+                                    .onIncident { incident, _ in
                                         guard incident.defaultStatus == .payloadTooLarge else { return nil }
                                         return .payloadTooLarge.string { Self.payloadTooLargeString }
                                     }
@@ -669,7 +669,7 @@ final class KvResponseGroupTests : XCTestCase {
                                 greetingResponse
                             }
                         }
-                        .onHttpIncident { incident in
+                        .onHttpIncident { incident, _ in
                             guard incident.defaultStatus == .notFound else { return nil }
                             return .notFound.string { Self.notFoundString2 }
                         }
@@ -680,7 +680,7 @@ final class KvResponseGroupTests : XCTestCase {
                             }
                         }
                     }
-                    .onHttpIncident { incident in
+                    .onHttpIncident { incident, _ in
                         guard incident.defaultStatus == .notFound else { return nil }
                         return .notFound.string { Self.notFoundString1 }
                     }
@@ -688,7 +688,7 @@ final class KvResponseGroupTests : XCTestCase {
                     KvGroup("d") {
                         greetingResponse
                     }
-                    .onHttpIncident { incident in
+                    .onHttpIncident { incident, _ in
                         guard incident.defaultStatus == .notFound else { return nil }
                         return .notFound.string { Self.notFoundString3 }
                     }

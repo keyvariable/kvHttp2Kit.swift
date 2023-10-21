@@ -59,9 +59,9 @@ protocol KvHttpRequestProcessorProtocol : AnyObject {
 
     func process(_ requestHeaders: KvHttpServer.RequestHeaders) -> Result<Void, Error>
 
-    func makeRequestHandler() -> Result<KvHttpRequestHandler, Error>
+    func makeRequestHandler(_ requestContext: KvHttpRequestContext) -> Result<KvHttpRequestHandler, Error>
 
-    func onIncident(_ incident: KvHttpIncident) -> KvHttpResponseProvider?
+    func onIncident(_ incident: KvHttpIncident, _ context: KvHttpRequestContext) -> KvHttpResponseProvider?
 
 }
 
@@ -201,7 +201,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
         }
 
 
-        func makeRequestHandler() -> Result<KvHttpRequestHandler, Error> {
+        func makeRequestHandler(_ requestContext: KvHttpRequestContext) -> Result<KvHttpRequestHandler, Error> {
             guard let headers = headers else { return .failure(ProcessError.noHeaders) }
 
             let subpathValue = subpathValue
@@ -210,7 +210,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
 
             let responseProvider = responseProvider
 
-            return .success(body.makeRequestHandler(responseContext.clientCallbacks) { bodyValue in
+            return .success(body.makeRequestHandler(requestContext, responseContext.clientCallbacks) { bodyValue in
                 try responseProvider(.init(query: queryValue,
                                            requestHeaders: headers,
                                            requestBody: bodyValue as! BodyValue,
@@ -219,8 +219,8 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
         }
 
 
-        func onIncident(_ incident: KvHttpIncident) -> KvHttpResponseProvider? {
-            responseContext.clientCallbacks?.onHttpIncident?(incident)
+        func onIncident(_ incident: KvHttpIncident, _ requestContext: KvHttpRequestContext) -> KvHttpResponseProvider? {
+            responseContext.clientCallbacks?.onHttpIncident?(incident, requestContext)
         }
 
 

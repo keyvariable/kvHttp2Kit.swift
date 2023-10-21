@@ -26,19 +26,22 @@ import Foundation
 
 
 /// It's used to identify responses in a dispatcher.
-@usableFromInline
-class KvHttpRequestContext {
+public class KvHttpRequestContext {
 
-    let method: KvHttpMethod
-    let url: URL
-    let urlComponents: URLComponents
+    public let method: KvHttpMethod
+    public let url: URL
+    public let urlComponents: URLComponents
     /// Path components are not part of *URLComponents*.
-    let pathComponents: ArraySlice<String>
+    public let pathComponents: ArraySlice<String>
 
 
-    init?(from head: KvHttpServer.RequestHead) {
-        guard let url = URL(string: head.uri),
-              let urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
+    init?(_ client: KvHttpChannel.Client, _ head: KvHttpServer.RequestHead) {
+        guard let isSecureHTTP = client.httpChannel?.configuration.http.isSecure else { return nil }
+
+        let uri = "\(isSecureHTTP ? "https" : "http")://\((head.headers.first(name: "host") ?? ""))\(head.uri)"
+
+        guard let urlComponents = URLComponents(string: uri),
+              let url = urlComponents.url
         else { return nil }
 
         method = head.method

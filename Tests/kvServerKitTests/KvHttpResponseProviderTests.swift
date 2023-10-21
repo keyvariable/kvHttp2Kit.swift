@@ -184,7 +184,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
                             }
                         }
                     }
-                    .onHttpIncident { incident in
+                    .onHttpIncident { incident, _ in
                         guard case KvHttpChannel.RequestIncident.requestProcessingError(let error) = incident else { return nil }
                         switch error {
                         case KvHttpResponseError.fileDoesNotExist(_), KvHttpResponseError.unableToFindIndexFile(_):

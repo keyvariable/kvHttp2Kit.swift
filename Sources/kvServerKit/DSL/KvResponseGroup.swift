@@ -405,9 +405,9 @@ extension KvResponseGroup {
     ///
     /// See: ``onError(_:)``.
     @inlinable
-    public func onHttpIncident(_ block: @escaping (KvHttpIncident) throws -> KvHttpResponseProvider?) -> some KvResponseGroup {
+    public func onHttpIncident(_ block: @escaping (KvHttpIncident, KvHttpRequestContext) throws -> KvHttpResponseProvider?) -> some KvResponseGroup {
         modified {
-            $0.clientCallbacks = .accumulate(.init(onHttpIncident: { try? block($0) }), into: $0.clientCallbacks)
+            $0.clientCallbacks = .accumulate(.init(onHttpIncident: { try? block($0, $1) }), into: $0.clientCallbacks)
         }
     }
 
@@ -420,7 +420,7 @@ extension KvResponseGroup {
     ///
     /// See: ``onHttpIncident(_:)``.
     @inlinable
-    public func onError(_ block: @escaping (Error) -> Void) -> some KvResponseGroup {
+    public func onError(_ block: @escaping (Error, KvHttpRequestContext) -> Void) -> some KvResponseGroup {
         modified {
             $0.clientCallbacks = .accumulate(.init(onError: block), into: $0.clientCallbacks)
         }
@@ -839,19 +839,24 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
     @usableFromInline
     struct ClientCallbacks : KvCascadable, KvReplacingOverlayCascadable, KvDefaultAccumulationCascadable {
 
+        @usableFromInline
+        typealias ErrorCallback = (Error, KvHttpRequestContext) -> Void
+        
+        @usableFromInline
+        typealias IncidentCallback = (KvHttpIncident, KvHttpRequestContext) -> KvHttpResponseProvider?
+
+
         /// Handles incidents.
         @usableFromInline
-        var onHttpIncident: ((KvHttpIncident) -> KvHttpResponseProvider?)?
+        var onHttpIncident: IncidentCallback?
 
         /// Handles errors from clients and requests.
         @usableFromInline
-        var onError: ((Error) -> Void)?
+        var onError: ErrorCallback?
 
 
         @usableFromInline
-        init(onHttpIncident: ((KvHttpIncident) -> KvHttpResponseProvider?)? = nil,
-             onError: ((Error) -> Void)? = nil
-        ) {
+        init(onHttpIncident: IncidentCallback? = nil, onError: ErrorCallback? = nil) {
             self.onHttpIncident = onHttpIncident
             self.onError = onError
         }

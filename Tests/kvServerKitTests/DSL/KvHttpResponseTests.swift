@@ -372,7 +372,7 @@ final class KvHttpResponseTests : XCTestCase {
                             }
                             .content { input in .string { input.subpath.uuidString } }
                     }
-                    .onHttpIncident { incident in
+                    .onHttpIncident { incident, _ in
                         guard incident.defaultStatus == .notFound else { return nil }
                         return .notFound.string { "-" }
                     }

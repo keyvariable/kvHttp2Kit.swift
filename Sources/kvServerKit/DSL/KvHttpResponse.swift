@@ -297,9 +297,9 @@ public struct KvHttpResponse : KvResponse {
     ///
     /// See: ``onError(_:)``.
     @inlinable
-    public func onIncident(_ block: @escaping (KvHttpIncident) throws -> KvHttpResponseProvider?) -> KvHttpResponse {
+    public func onIncident(_ block: @escaping (KvHttpIncident, KvHttpRequestContext) throws -> KvHttpResponseProvider?) -> KvHttpResponse {
         modified {
-            $0.clientCallbacks = .accumulate(.init(onHttpIncident: { try? block($0) }), into: $0.clientCallbacks)
+            $0.clientCallbacks = .accumulate(.init(onHttpIncident: { try? block($0, $1) }), into: $0.clientCallbacks)
         }
     }
 
@@ -312,7 +312,7 @@ public struct KvHttpResponse : KvResponse {
     ///
     /// See: ``onIncident(_:)``.
     @inlinable
-    public func onError(_ block: @escaping (Error) -> Void) -> KvHttpResponse {
+    public func onError(_ block: @escaping (Error, KvHttpRequestContext) -> Void) -> KvHttpResponse {
         modified {
             $0.clientCallbacks = .accumulate(.init(onError: block), into: $0.clientCallbacks)
         }

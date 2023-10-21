@@ -412,7 +412,7 @@ extension KvDirectory : KvResponseInternalProtocol {
                 }
                 .content { input in try .file(at: input.subpath) }
         }
-        .onHttpIncident { incident in
+        .onHttpIncident { incident, _ in
             let status = incident.defaultStatus
 
             return httpStatusFileNameBlock(status)
