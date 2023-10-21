@@ -186,7 +186,7 @@ extension KvResponseGroup {
     }
 
 
-    /// Adds given values into list of HTTP methods.
+    /// Adds given values into HTTP method filter.
     ///
     /// The result is the same as ``KvResponseGroup/httpMethods(_:)-6fbma``. See it's documentation for details.
     @inlinable
@@ -194,15 +194,17 @@ extension KvResponseGroup {
     where Methods : Sequence, Methods.Element == KvHttpMethod
     {
         modified {
-            $0.dispatching.httpMethods.formUnion(httpMethods)
+            $0.dispatching.insert(httpMethods: httpMethods)
         }
     }
 
 
-    /// Adds given values into list of HTTP methods.
+    /// Adds given values into HTTP method filter.
     ///
-    /// HTTP method lists of nested response groups are united. Nested lists of HTTP methods are resolved for each HTTP response and used to filter HTTP requests.
-    /// If the resolved list is empty then the response available for any HTTP method.
+    /// By default HTTP method filter accepts any value. Once this modifier is called, the filter is cleared and provided values are inserted.
+    ///
+    /// HTTP method filters of nested response groups are intersected. Nested filters by HTTP methods are resolved for each HTTP response and used to filter HTTP requests.
+    /// If the resolved filter is empty then the response is ignored.
     ///
     /// Below is a simple example:
     ///
@@ -218,7 +220,7 @@ extension KvResponseGroup {
     }
 
 
-    /// Adds given values into list of users.
+    /// Adds given values into URL filter by user.
     ///
     /// The result is the same as ``KvResponseGroup/users(_:)-48ll0``. See it's documentation for details.
     @inlinable
@@ -226,17 +228,21 @@ extension KvResponseGroup {
     where Users : Sequence, Users.Element == String
     {
         modified {
-            $0.dispatching.users.formUnion(users)
+            $0.dispatching.insert(users: users)
         }
     }
 
 
-    /// Adds given values into list of users.
+    /// Adds given values into URL filter by user.
     ///
-    /// User lists of nested response groups are united. Nested lists of users are resolved for each response and used to filter requests.
-    /// If the resolved list is empty then the response available for any or no user.
+    /// By default user filter accepts any value. Once this modifier is called, the filter is cleared and provided values are inserted.
+    ///
+    /// User filters of nested response groups are intersected. Nested filters by users are resolved for each response and used to filter requests.
+    /// If the resolved filter is empty then the response is ignored.
     ///
     /// Usually user is provided as a component of an URL and separated from domain component by "@" character.
+    ///
+    /// - Important: HTTP responses are unavailable when user filter is declared.
     ///
     /// Below is a simple example:
     ///
@@ -669,13 +675,13 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
         static let empty: Self = .init()
 
 
-        /// - Note: Empty set means any method.
+        /// - Note: `nil` means any method.
         @usableFromInline
-        var httpMethods: Set<KvHttpMethod>
+        var httpMethods: CascadableSet<KvHttpMethod>?
 
-        /// - Note: Empty set means any user.
+        /// - Note: `nil` means any user.
         @usableFromInline
-        var users: Set<String>
+        var users: CascadableSet<String>?
 
         /// - Note: Empty set means any host.
         @usableFromInline
@@ -690,8 +696,8 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
 
         @usableFromInline
-        init(httpMethods: Set<KvHttpMethod> = [ ],
-             users: Set<String> = [ ],
+        init(httpMethods: CascadableSet<KvHttpMethod>? = nil,
+             users: CascadableSet<String>? = nil,
              hosts: Set<String> = [ ],
              optionalSubdomains: Set<String> = [ ],
              path: String = ""
@@ -707,12 +713,65 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
         // MARK: : KvCascadable
 
         @usableFromInline
-        static func accumulate(_ addition: Self, into base: Self) -> Self {
-            .init(httpMethods: base.httpMethods.union(addition.httpMethods),
-                  users: base.users.union(addition.users),
+        static func overlay(_ addition: Self, over base: Self) -> Self {
+            .init(httpMethods: .overlay(addition.httpMethods, over: base.httpMethods),
+                  users: .overlay(addition.users, over: base.users),
                   hosts: base.hosts.union(addition.hosts),
                   optionalSubdomains: base.optionalSubdomains.union(addition.optionalSubdomains),
                   path: base.path + addition.path)    // Assuming paths are safe and always have leading path separators
+        }
+
+
+        @usableFromInline
+        static func accumulate(_ addition: Self, into base: Self) -> Self {
+            .init(httpMethods: .accumulate(addition.httpMethods, into: base.httpMethods),
+                  users: .accumulate(addition.users, into: base.users),
+                  hosts: base.hosts.union(addition.hosts),
+                  optionalSubdomains: base.optionalSubdomains.union(addition.optionalSubdomains),
+                  path: base.path + addition.path)    // Assuming paths are safe and always have leading path separators
+        }
+
+
+        // MARK: .CascadableSet
+
+        @usableFromInline
+        struct CascadableSet<T : Hashable> : KvDefaultOverlayCascadable, KvDefaultAccumulationCascadable {
+
+            private(set) var elements: Set<T>
+
+
+            @usableFromInline
+            init<Elements>(_ elements: Elements) where Elements : Sequence, Elements.Element == T {
+                self.elements = .init(elements)
+            }
+
+            @usableFromInline
+            init(_ elements: Set<T>) {
+                self.elements = elements
+            }
+
+
+            // MARK: : KvCascadable
+
+            @usableFromInline
+            static func overlay(_ addition: Self, over base: Self) -> Self {
+                .init(base.elements.intersection(addition.elements))
+            }
+
+
+            @usableFromInline
+            static func accumulate(_ addition: Self, into base: Self) -> Self {
+                .init(base.elements.union(addition.elements))
+            }
+
+
+            // MARK: Operations
+
+            @usableFromInline
+            mutating func insert<Elements>(_ elements: Elements) where Elements : Sequence, Elements.Element == T {
+                self.elements.formUnion(elements)
+            }
+
         }
 
 
@@ -737,6 +796,26 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
             var result = lhs
             result.append(contentsOf: rhs)
             return result
+        }
+
+
+        @inline(__always)
+        @usableFromInline
+        mutating func insert<HttpMethods>(httpMethods: HttpMethods)
+        where HttpMethods : Sequence, HttpMethods.Element == KvHttpMethod
+        {
+            self.httpMethods?.insert(httpMethods)
+            ?? (self.httpMethods = .init(httpMethods))
+        }
+
+
+        @inline(__always)
+        @usableFromInline
+        mutating func insert<Users>(users: Users)
+        where Users : Sequence, Users.Element == String
+        {
+            self.users?.insert(users)
+            ?? (self.users = .init(users))
         }
 
 

@@ -304,10 +304,12 @@ extension KvHttpResponseDispatcher {
 
             /// Correctly enumerates keys in optional sequences. Body is called with wildcard key (`nil`) when *keys* are missing or empty.
             static func forEachKey<S>(in keys: S?, body: (Key?) -> Void) where S : Sequence, S.Element == Key {
+                /// `nil` means wildcard key.
                 guard var iterator = keys?.makeIterator() else { return body(nil) }
 
                 do {
-                    guard let first = iterator.next() else { return body(nil) }
+                    /// Empty means no key.
+                    guard let first = iterator.next() else { return }
 
                     body(first)
                 }
@@ -452,14 +454,14 @@ extension KvHttpResponseDispatcher {
         private class Methods : DictionaryContainer<Users, MethodNode> {
 
             func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachKey(in: configuration.httpMethods) { method in
+                Self.forEachKey(in: configuration.httpMethods?.elements) { method in
                     child(for: method).insert(response, for: configuration)
                 }
             }
 
 
             func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachKey(in: configuration.httpMethods) { method in
+                Self.forEachKey(in: configuration.httpMethods?.elements) { method in
                     child(for: method).insert(attributes, for: configuration)
                 }
             }
@@ -475,14 +477,14 @@ extension KvHttpResponseDispatcher {
         private class Users : DictionaryContainer<Hosts, UserNode> {
 
             func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachKey(in: configuration.users) { user in
+                Self.forEachKey(in: configuration.users?.elements) { user in
                     child(for: user).insert(response, for: configuration)
                 }
             }
 
 
             func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachKey(in: configuration.users) { user in
+                Self.forEachKey(in: configuration.users?.elements) { user in
                     child(for: user).insert(attributes, for: configuration)
                 }
             }

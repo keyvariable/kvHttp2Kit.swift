@@ -493,9 +493,150 @@ final class KvResponseGroupTests : XCTestCase {
         }
 
         try await TestKit.withRunningServer(of: CascadeNetworkModifierServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
-            try await TestKit.assertResponse(baseURL, contentType: .text(.plain), expecting: CascadeNetworkModifierServer.greeting)
+            try await TestKit.assertResponse(baseURL, expecting: CascadeNetworkModifierServer.greeting)
         }
     }
+
+
+
+    // MARK: - testCascadeHttpMethodModifiers()
+
+    func testCascadeHttpMethodModifiers() async throws {
+
+        struct CascadeHttpMethodModifierServer : KvServer {
+
+            let configuration = TestKit.insecureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvHttpResponse.static { .string { "/" } }
+
+                    KvGroup("a") {
+                        KvHttpResponse.static { .string { "/a" } }
+
+                        KvGroup("b") {
+                            KvHttpResponse.static { .string { "/a/b" } }
+
+                            KvGroup("c") {
+                                KvHttpResponse.static { .string { "/a/b/c" } }
+                            }
+                            .httpMethods(.POST)
+                        }
+                        .httpMethods(.POST, .PUT)
+
+                        KvGroup("d") {
+                            KvHttpResponse.static { .string { "/a/d" } }
+                        }
+                        .httpMethods(.PUT)
+                    }
+                    .httpMethods(.GET, .POST)
+                }
+            }
+
+        }
+
+        try await TestKit.withRunningServer(of: CascadeHttpMethodModifierServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
+            try await TestKit.assertResponse(baseURL, method: "GET" , path: nil, expecting: "/")
+            try await TestKit.assertResponse(baseURL, method: "POST", path: nil, expecting: "/")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: nil, expecting: "/")
+
+            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a", expecting: "/a")
+            try await TestKit.assertResponse(baseURL, method: "POST", path: "a", expecting: "/a")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a", statusCode: .notFound, expecting: "")
+
+            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/b", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "POST", path: "a/b", expecting: "/a/b")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/b", statusCode: .notFound, expecting: "")
+
+            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/b/c", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "POST", path: "a/b/c", expecting: "/a/b/c")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/b/c", statusCode: .notFound, expecting: "")
+
+            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/d", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "POST", path: "a/d", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/d", statusCode: .notFound, expecting: "")
+        }
+    }
+
+
+
+    // MARK: - testCascadeUserModifiers()
+
+    // TODO: Enable when user filters will be actually applied.
+#if false
+    func testCascadeUserModifiers() async throws {
+
+        struct CascadeUserModifierServer : KvServer {
+
+            let configuration = TestKit.insecureHttpConfiguration()
+
+            var body: some KvResponseGroup {
+                NetworkGroup(with: configuration) {
+                    KvHttpResponse.static { .string { "/" } }
+
+                    KvGroup("a") {
+                        KvHttpResponse.static { .string { "/a" } }
+
+                        KvGroup("b") {
+                            KvHttpResponse.static { .string { "/a/b" } }
+
+                            KvGroup("c") {
+                                KvHttpResponse.static { .string { "/a/b/c" } }
+                            }
+                            .users("Y")
+                        }
+                        .users("Y", "Z")
+
+                        KvGroup("d") {
+                            KvHttpResponse.static { .string { "/a/d" } }
+                        }
+                        .users("Z")
+                    }
+                    .users("X", "Y")
+                }
+            }
+
+        }
+
+        try await TestKit.withRunningServer(of: CascadeUserModifierServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
+
+            func Assert(user: String?, path: String?, expecting: String?) async throws {
+                var baseURL = baseURL
+                if let user = user {
+                    var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: true)!
+                    components.user = user
+                    baseURL = components.url!
+                }
+                try await TestKit.assertResponse(baseURL, path: path, statusCode: expecting != nil ? .ok : .notFound, expecting: expecting ?? "")
+            }
+
+            try await Assert(user: nil, path: nil, expecting: "/")
+            try await Assert(user: "X", path: nil, expecting: "/")
+            try await Assert(user: "Y", path: nil, expecting: "/")
+            try await Assert(user: "Z", path: nil, expecting: "/")
+
+            try await Assert(user: nil, path: "a", expecting: nil)
+            try await Assert(user: "X", path: "a", expecting: "/a")
+            try await Assert(user: "Y", path: "a", expecting: "/a")
+            try await Assert(user: "Z", path: "a", expecting: nil)
+
+            try await Assert(user: nil, path: "a/b", expecting: nil)
+            try await Assert(user: "X", path: "a/b", expecting: nil)
+            try await Assert(user: "Y", path: "a/b", expecting: "/a/b")
+            try await Assert(user: "Z", path: "a/b", expecting: nil)
+
+            try await Assert(user: nil, path: "a/b/c", expecting: nil)
+            try await Assert(user: "X", path: "a/b/c", expecting: nil)
+            try await Assert(user: "Y", path: "a/b/c", expecting: "/a/b/c")
+            try await Assert(user: "Z", path: "a/b/c", expecting: nil)
+
+            try await Assert(user: nil, path: "a/d", expecting: nil)
+            try await Assert(user: "X", path: "a/d", expecting: nil)
+            try await Assert(user: "Y", path: "a/d", expecting: nil)
+            try await Assert(user: "Z", path: "a/d", expecting: nil)
+        }
+    }
+#endif
 
 
 

@@ -211,7 +211,8 @@ struct DeclarativeServer : KvServer {
             /// Example of responses processing JSON entities available at the same path by for different HTTP methods.
             KvGroup("date") {
                 /// The limited availability feature is supported in `KvResponseGroupBuilder` result builder.
-                if #available(macOS 12.0, *) {
+                /// This availability check is for `ISO8601DateFormatter`.
+                if #available(macOS 12.0, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
                     KvGroup(httpMethods: .POST) {
                         /// Returns ISO 8601 representation of date components in JSON format.
                         KvHttpResponse.dynamic

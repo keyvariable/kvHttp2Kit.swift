@@ -117,9 +117,9 @@ where Addresses : Sequence, Addresses.Element == KvNetworkEndpoint.Address, Port
 
 // MARK: Response Dispatching
 
-/// Adds given values into list of HTTP methods.
+/// Declares a response group with HTTP method filter containing given elements.
 ///
-/// The result is the same as ``KvGroup(httpMethods:content:)-29gzp``. See it's documentation for details.
+/// See ``KvResponseGroup/httpMethods(_:)-6fbma`` for details.
 @inlinable
 public func KvGroup<Methods, Content : KvResponseGroup>(
     httpMethods: Methods,
@@ -127,35 +127,13 @@ public func KvGroup<Methods, Content : KvResponseGroup>(
 ) -> some KvResponseGroup
 where Methods : Sequence, Methods.Element == KvHttpMethod
 {
-    KvModifiedResponseGroup(configuration: .init(dispatching: .init(httpMethods: Set(httpMethods))), source: content)
+    KvModifiedResponseGroup(configuration: .init(dispatching: .init(httpMethods: .init(httpMethods))), source: content)
 }
 
 
-/// Adds given values into list of HTTP methods.
+/// Declares a response group with HTTP method filter containing given elements.
 ///
-/// HTTP method lists of nested response groups are united. Nested lists of HTTP methods are resolved for each HTTP response and used to filter HTTP requests.
-/// If the resolved list is empty then the response available for any HTTP method.
-///
-/// Below is an example of typical usage:
-///
-/// ```swift
-/// KvGroup(httpMethods: .GET, .PUT, .DELETE) {
-///     HttpResponses()
-/// }
-/// ```
-///
-/// Below is an example where `Response1` is available for `.GET`, `.PUT` and `.DELETE` HTTP methods but `Response2` is available only for `.GET` and `.PUT` HTTP methods.
-///
-/// ```swift
-/// KvGroup(httpMethods: .GET, .PUT) {
-///     KvGroup(httpMethods: .DELETE) {
-///         Response1()
-///     }
-///     Response2()
-/// }
-/// ```
-///
-/// See: ``KvResponseGroup/httpMethods(_:)-6fbma``.
+/// See ``KvResponseGroup/httpMethods(_:)-6fbma`` for details.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
     httpMethods: KvHttpMethod...,
@@ -165,9 +143,11 @@ public func KvGroup<Content : KvResponseGroup>(
 }
 
 
-/// Adds given values into list of users.
+/// Declares a response group with user filter containing given elements.
 ///
-/// The result is the same as ``KvGroup(users:content:)-3140o``. See it's documentation for details.
+/// - Important: HTTP responses are unavailable when user filter is declared.
+///
+/// See ``KvResponseGroup/users(_:)-48ll0`` for details.
 @inlinable
 public func KvGroup<Users, Content : KvResponseGroup>(
     users: Users,
@@ -179,33 +159,11 @@ where Users : Sequence, Users.Element == String
 }
 
 
-/// Adds given values into list of users.
+/// Declares a response group with user filter containing given elements.
 ///
-/// User lists of nested response groups are united. Nested lists of users are resolved for each response and used to filter requests.
-/// If the resolved list is empty then the response available for any or no user.
+/// - Important: HTTP responses are unavailable when user filter is declared.
 ///
-/// Usually user is provided as a component of an URL and separated from domain component by "@" character.
-///
-/// Below is an example of typical usage:
-///
-/// ```swift
-/// KvGroup(users: "user1", "user2") {
-///     Responses()
-/// }
-/// ```
-///
-/// Below is an example where `Response1` is available for "user1", "user2" and "admin" users but `Response2` is available only for "user1" and "user2" users.
-///
-/// ```swift
-/// KvGroup(users: "user1", "user2") {
-///     KvGroup(users: "admin") {
-///         Response1()
-///     }
-///     Response2()
-/// }
-/// ```
-///
-/// See: ``KvResponseGroup/users(_:)-48ll0``.
+/// See ``KvResponseGroup/users(_:)-48ll0`` for details.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
     users: String...,
