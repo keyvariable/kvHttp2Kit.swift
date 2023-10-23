@@ -57,7 +57,7 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
     // MARK: : KvHttpRequestHandler
 
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) {
         bodyData?.append(bytes.assumingMemoryBound(to: UInt8.self))
@@ -69,7 +69,7 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
     ///
     /// - Returns: Invocation result of the receiver's `.responseBlock` passed with the colleted body data.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
         return try responseBlock(bodyData)
@@ -79,7 +79,7 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
     /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
     /// Override it to provide custom incident handling.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
         return nil
@@ -88,7 +88,7 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
     /// Override it to handle errors. Default implementation just prints error message to console.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
         print("\(type(of: self)) did catch error: \(error)")

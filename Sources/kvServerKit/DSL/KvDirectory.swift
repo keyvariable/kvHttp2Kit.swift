@@ -122,7 +122,7 @@ public struct KvDirectory : KvResponse {
     /// Initially black list is ``Defaults/blackList-swift.type.property``.
     /// First application of this modifier clears the default value even if modifier's argument list is empty.
     ///
-    /// See: ``whiteList(_:)-43l0i``.
+    /// - SeeAlso: ``whiteList(_:)-43l0i``.
     @inlinable
     public func blackList(_ paths: String...) -> Self { blackList(paths.lazy.map(KvUrlSubpath.init(path:))) }
 
@@ -171,7 +171,7 @@ public struct KvDirectory : KvResponse {
     /// Initially white list is ``Defaults/whiteList-swift.type.property``.
     /// First application of this modifier clears the default value even if modifier's argument list is empty.
     ///
-    /// See: ``blackList(_:)-5xwjb``.
+    /// - SeeAlso: ``blackList(_:)-5xwjb``.
     @inlinable
     public func whiteList(_ paths: String...) -> Self { whiteList(paths.lazy.map(KvUrlSubpath.init(path:))) }
 

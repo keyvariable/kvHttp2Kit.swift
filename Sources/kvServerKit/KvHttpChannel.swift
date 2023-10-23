@@ -340,7 +340,7 @@ open class KvHttpChannel {
 
     /// Removes the receiver from server the receiver is bound to. Channel will be stopped.
     ///
-    /// See: ``waitUntilStopped()``.
+    /// - SeeAlso: ``waitUntilStopped()``.
     public func removeFromServer() {
         server?.removeChannel(self)
     }
@@ -348,7 +348,7 @@ open class KvHttpChannel {
 
     /// Channel have to be registered on a server.
     ///
-    /// See: ``waitWhileStarting()``.
+    /// - SeeAlso: ``waitWhileStarting()``.
     func start() {
 
         final class ErrorHandler : ChannelInboundHandler {
@@ -551,7 +551,7 @@ open class KvHttpChannel {
 
     /// This method is called by server.
     ///
-    /// See: ``waitUntilStopped()``.
+    /// - SeeAlso: ``waitUntilStopped()``.
     func stop() {
 
         func CurrentListeningChannel() -> Channel? {
@@ -594,7 +594,7 @@ open class KvHttpChannel {
     ///
     /// - Note: If the channel's status is not *.running* or *.stopped* then method just returns success or result of last stop.
     ///
-    /// See: ``waitUntilStopped()``.
+    /// - SeeAlso: ``waitUntilStopped()``.
     @discardableResult
     public func waitWhileStarting() -> Result<Void, Error> {
         stateCondition.withLock {
@@ -618,7 +618,7 @@ open class KvHttpChannel {
     ///
     /// - Note: If the channel is stopped then method just returns result of last stop.
     ///
-    /// See: ``waitWhileStarting()``.
+    /// - SeeAlso: ``waitWhileStarting()``.
     @discardableResult
     public func waitUntilStopped() -> Result<Void, Error> {
         stateCondition.withLock {
@@ -758,8 +758,10 @@ open class KvHttpChannel {
     public enum RequestIncident : KvHttpIncident {
 
         /// This incident is emitted when a request exceeds provided or default limit for a body.
-        /// See ``KvHttpRequestHandler/bodyLengthLimit``, ``KvResponseGroup/httpBodyLengthLimit(_:)``, ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
         /// By default `.payloadTooLarge` (413) status is returned.
+        ///
+        /// - SeeAlso: ``KvHttpRequestHandler/bodyLengthLimit``, ``KvResponseGroup/httpBodyLengthLimit(_:)``,
+        ///            ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
         case byteLimitExceeded
         /// Failed to process a request header. Details are in *message* associated value.
         /// By default `.badRequest` (400) status is returned.

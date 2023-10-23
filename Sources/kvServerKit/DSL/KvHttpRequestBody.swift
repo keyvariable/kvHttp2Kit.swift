@@ -184,7 +184,7 @@ public protocol KvHttpRequestRequiredBody : KvHttpRequestBody {
     ///
     /// Previously declared value is replaced.
     ///
-    /// See: ``KvResponseGroup/httpBodyLengthLimit(_:)``.
+    /// - SeeAlso: ``KvResponseGroup/httpBodyLengthLimit(_:)``.
     func bodyLengthLimit(_ value: UInt) -> Self
 
 }

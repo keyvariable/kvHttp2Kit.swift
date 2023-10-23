@@ -305,7 +305,7 @@ public struct KvHttpResponse : KvResponse {
     ///
     /// Incident handlers can be provided for responses in groups with ``KvResponseGroup/onHttpIncident(_:)``.
     ///
-    /// See: ``onError(_:)``.
+    /// - SeeAlso: ``onError(_:)``.
     @inlinable
     public func onIncident(_ block: @escaping (KvHttpIncident, KvHttpRequestContext) throws -> KvHttpResponseProvider?) -> KvHttpResponse {
         modified {
@@ -320,7 +320,7 @@ public struct KvHttpResponse : KvResponse {
     ///
     /// Error callbacks can be provided for responses in groups with ``KvResponseGroup/onError(_:)``.
     ///
-    /// See: ``onIncident(_:)``.
+    /// - SeeAlso: ``onIncident(_:)``.
     @inlinable
     public func onError(_ block: @escaping (Error, KvHttpRequestContext) -> Void) -> KvHttpResponse {
         modified {
@@ -1189,7 +1189,7 @@ extension KvHttpResponse.ParameterizedResponse where Subpath == KvUnavailableUrl
 
     /// Analog of ``subpathFlatMap(_:)-1b07o`` modifier returning a boolean value.
     ///
-    /// See: ``subpath``, ``subpathFlatMap(_:)-1b07o``.
+    /// - SeeAlso: ``subpath``, ``subpathFlatMap(_:)-1b07o``.
     @inlinable
     public func subpathFilter(_ predicate: @escaping (KvUrlSubpath) -> Bool) -> HandlingSubpath<KvUrlSubpath> {
         subpathFlatMap { predicate($0) ? .accepted($0) : .rejected }
@@ -1219,7 +1219,7 @@ extension KvHttpResponse.ParameterizedResponse where Subpath == KvUnavailableUrl
     /// }
     /// ```
     ///
-    /// See: ``subpath``, ``subpathFilter(_:)-7fq07``.
+    /// - SeeAlso: ``subpath``, ``subpathFilter(_:)-7fq07``.
     @inlinable
     public func subpathFlatMap<SubpathMapValue>(_ predicate: @escaping (KvUrlSubpath) -> KvFilterResult<SubpathMapValue>) -> HandlingSubpath<SubpathMapValue> {
         map { .init(

@@ -124,7 +124,7 @@ open class KvHttpServer {
     /// }
     /// ```
     ///
-    /// See: ``waitWhileStarting()``, ``stop()``, ``stop(_:)``.
+    /// - SeeAlso: ``waitWhileStarting()``, ``stop()``, ``stop(_:)``.
     public func start() throws {
         do {
             try stateCondition.withLock {
@@ -174,7 +174,7 @@ open class KvHttpServer {
     /// Server can be stopped at any moment. If server is being started then this method will stop server just after it will be completely started.
     /// This method can be called multiple times. If it is then *completion* is invoked multiple times with the same stop result.
     ///
-    /// See: ``waitUntilStopped()``, ``start()``.
+    /// - SeeAlso: ``waitUntilStopped()``, ``start()``.
     public func stop(_ completion: ((Result<Void, Error>) -> Void)? = nil) {
 
         /// - Returns: A *Result* instance where `.success(nil)` means that server has been successfuly stopped.
@@ -222,7 +222,7 @@ open class KvHttpServer {
 
     /// Async wrapper around ``stop(_:)`` method.
     ///
-    /// See: ``start()``.
+    /// - SeeAlso: ``start()``.
     @inlinable
     public func stop() async throws {
         try await withCheckedThrowingContinuation { continuation in
@@ -237,7 +237,7 @@ open class KvHttpServer {
     ///
     /// - Note: When server's status becomes *.running* it's channels can be in start process. Use ``KvHttpChannel/waitWhileStarting()`` to wait until channels are started.
     ///
-    /// See: ``waitUntilStopped()``.
+    /// - SeeAlso: ``waitUntilStopped()``.
     @discardableResult
     public func waitWhileStarting() -> Result<Void, Error> {
         stateCondition.withLock {
@@ -261,7 +261,7 @@ open class KvHttpServer {
     ///
     /// - Note: If the server is stopped then method just returns result of last stop.
     ///
-    /// See: ``waitWhileStarting()``.
+    /// - SeeAlso: ``waitWhileStarting()``.
     @discardableResult
     public func waitUntilStopped() -> Result<Void, Error> {
         let serverResult = stateCondition.withLock {
@@ -341,7 +341,7 @@ open class KvHttpServer {
     ///
     /// - Note: This property is thread-safe so costs of mutual exclusion should be taken into account.
     ///
-    /// See: ``State-swift.enum``.
+    /// - SeeAlso: ``State-swift.enum``.
     public var state: State { stateCondition.withLock { .init(for: _state) } }
 
 
@@ -385,7 +385,7 @@ open class KvHttpServer {
     ///
     /// - Note: This property is thread-safe so costs of mutual exclusion should be taken into account.
     ///
-    /// See: ``addChannel(_:)``, ``KvHttpChannel/removeFromServer()``.
+    /// - SeeAlso: ``addChannel(_:)``, ``KvHttpChannel/removeFromServer()``.
     public func contains(channelWith id: KvHttpChannel.ID) -> Bool { mutationLock.withLock { _channels[id] != nil } }
 
 

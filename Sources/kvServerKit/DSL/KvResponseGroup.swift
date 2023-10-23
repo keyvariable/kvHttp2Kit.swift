@@ -148,7 +148,7 @@ extension KvResponseGroup {
     ///     .httpMethods(.GET, .PUT, .DELETE)
     /// ```
     ///
-    /// See: ``KvGroup(httpMethods:content:)-29gzp``.
+    /// - SeeAlso: ``KvGroup(httpMethods:content:)-29gzp``.
     @inlinable
     public func httpMethods(_ httpMethods: KvHttpMethod...) -> some KvResponseGroup {
         self.httpMethods(httpMethods)
@@ -187,7 +187,7 @@ extension KvResponseGroup {
     ///     .users("user1", "user2")
     /// ```
     ///
-    /// See: ``KvGroup(users:content:)-3140o``.
+    /// - SeeAlso: ``KvGroup(users:content:)-3140o``.
     @inlinable
     public func users(_ users: String...) -> some KvResponseGroup {
         self.users(users)
@@ -228,7 +228,7 @@ extension KvResponseGroup {
     /// }
     /// ```
     ///
-    /// See: ``KvGroup(_:content:)``.
+    /// - SeeAlso: ``KvGroup(_:content:)``.
     @inlinable
     public func path(_ pathComponent: String) -> some KvResponseGroup {
         modified {
@@ -242,7 +242,7 @@ extension KvResponseGroup {
     ///
     /// Previously declared value is replaced.
     ///
-    /// See: ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
+    /// - SeeAlso: ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
     @inlinable
     public func httpBodyLengthLimit(_ value: UInt) -> some KvResponseGroup {
         modified {
@@ -281,7 +281,7 @@ extension KvResponseGroup {
     ///
     /// Incident handlers can be provided for particular responses with ``KvHttpResponse/onIncident(_:)``.
     ///
-    /// See: ``onError(_:)``.
+    /// - SeeAlso: ``onError(_:)``.
     @inlinable
     public func onHttpIncident(_ block: @escaping (KvHttpIncident, KvHttpRequestContext) throws -> KvHttpResponseProvider?) -> some KvResponseGroup {
         modified {
@@ -296,7 +296,7 @@ extension KvResponseGroup {
     ///
     /// Error callbacks can be provided for particular responses with ``KvHttpResponse/onError(_:)``.
     ///
-    /// See: ``onHttpIncident(_:)``.
+    /// - SeeAlso: ``onHttpIncident(_:)``.
     @inlinable
     public func onError(_ block: @escaping (Error, KvHttpRequestContext) -> Void) -> some KvResponseGroup {
         modified {

@@ -59,7 +59,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     @inlinable public var bodyLengthLimit: UInt { underlying.bodyLengthLimit }
 
 
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) {
         underlying.httpClient(httpClient, didReceiveBodyBytes: bytes)
@@ -70,7 +70,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     ///
     /// - Returns: Invocation result of the receiver's `.responseBlock` passed with the colleted body data.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
         return try underlying.httpClientDidReceiveEnd(httpClient)
@@ -80,7 +80,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
     /// Override it to provide custom incident handling. 
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
         return nil
@@ -89,7 +89,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
 
     /// Override it to handle errors. Default implementation just prints error message to console.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
         print("\(type(of: self)) did catch error: \(error)")

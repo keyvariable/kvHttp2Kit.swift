@@ -315,7 +315,7 @@ public struct KvHttpResponseProvider {
 
         /// - Returns: An instance where value is the result of `data.base64EncodedString()`.
         ///
-        /// See: ``base64(withBytesOf:options:)``.
+        /// - SeeAlso: ``base64(withBytesOf:options:)``.
         @inlinable
         public static func base64(_ data: Data, options: Options = [ ]) -> Self {
             .init(safeValue: data.base64EncodedString(), options: options)
@@ -326,7 +326,7 @@ public struct KvHttpResponseProvider {
         ///
         /// - Note: `Data.base64EncodedString()` method with default encoding options is used.
         ///
-        /// See: ``base64(_:options:)``.
+        /// - SeeAlso: ``base64(_:options:)``.
         @inlinable
         public static func base64<T>(withBytesOf x: T, options: Options = [ ]) -> Self {
             withUnsafeBytes(of: x) { buffer in

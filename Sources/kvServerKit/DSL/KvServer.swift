@@ -148,7 +148,7 @@ extension KvServer {
     /// CustomCompletion()
     /// ```
     ///
-    /// See: ``main()``.
+    /// - SeeAlso: ``main()``.
     public func start() throws -> KvServerToken {
         let server = KvServerImplementation(from: self)
 

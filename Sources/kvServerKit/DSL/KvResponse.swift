@@ -65,7 +65,7 @@
 /// }
 /// ```
 ///
-/// See: ``KvHttpResponse``.
+/// - SeeAlso: ``KvHttpResponse``.
 public protocol KvResponse {
 
     /// It's inferred from your implementation of the required property ``KvResponse/body-swift.property-7lcxm``.

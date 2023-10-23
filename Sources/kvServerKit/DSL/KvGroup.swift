@@ -60,9 +60,9 @@ public func KvGroup<Content : KvResponseGroup>(
 /// }
 /// ```
 ///
-/// See: ``KvGroup(http:at:content:)``, ``KvGroup(http:at:on:content:)``, ``KvResponseRootGroup/http(_:)``.
-///
 /// - Note: By default HTTP responses are available at IPv6 local machine address `::1`, on port 80, via insecure HTTP/1.1.
+///
+/// - SeeAlso: ``KvGroup(http:at:content:)``, ``KvGroup(http:at:on:content:)``, ``KvResponseRootGroup/http(_:)``.
 @inlinable
 public func KvGroup<HttpEndpoints, Content : KvResponseRootGroup>(
     httpEndpoints: HttpEndpoints,
@@ -88,7 +88,7 @@ where HttpEndpoints : Sequence, HttpEndpoints.Element == (KvNetworkEndpoint, KvR
 /// }
 /// ```
 ///
-/// See: ``KvResponseRootGroup/http(_:at:)``.
+/// - SeeAlso: ``KvResponseRootGroup/http(_:at:)``.
 @inlinable
 public func KvGroup<Endpoints, Content : KvResponseRootGroup>(
     http: KvResponseRootGroup.HTTP,
@@ -111,7 +111,7 @@ where Endpoints : Sequence, Endpoints.Element == KvNetworkEndpoint
 /// }
 /// ```
 ///
-/// See: ``KvResponseRootGroup/http(_:at:on:)``.
+/// - SeeAlso: ``KvResponseRootGroup/http(_:at:on:)``.
 @inlinable
 public func KvGroup<Addresses, Ports, Content : KvResponseRootGroup>(
     http: KvResponseRootGroup.HTTP,
@@ -262,7 +262,7 @@ public func KvGroup<Content : KvResponseRootGroup>(
 /// }
 /// ```
 ///
-/// See: ``KvResponseGroup/path(_:)``.
+/// - SeeAlso: ``KvResponseGroup/path(_:)``.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
     _ path: String,
