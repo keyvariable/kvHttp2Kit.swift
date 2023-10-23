@@ -102,7 +102,7 @@ extension KvServerImplementation {
 
     fileprivate class HttpScheme {
 
-        typealias HttpEndpoints = KvResponseGroup.Configuration.Network.HttpEndpoints
+        typealias HttpEndpoints = KvResponseRootGroup.Configuration.Network.HttpEndpoints
 
 
         private var channels: Channels = .init()
@@ -113,7 +113,7 @@ extension KvServerImplementation {
         func makeAccumulator() -> Accumulator { Accumulator(self) }
 
 
-        func httpChannels(for configuration: KvResponseGroup.Configuration?) -> [HttpChannel] {
+        func httpChannels(for configuration: KvResponseRootGroupConfiguration?) -> [HttpChannel] {
             channels.httpChannels(for: configuration)
         }
 
@@ -125,19 +125,39 @@ extension KvServerImplementation {
 
         // MARK: .Accumulator
 
+        // TODO: Review entire accumulation algorithm to optimize performance.
         class Accumulator : KvHttpResponseAccumulator {
+
+            typealias DispatchConfiguration = KvHttpResponseDispatcher.Scheme.DispatchConfiguration
+
 
             weak var scheme: HttpScheme!
 
-            let responseGroupConfiguration: KvResponseGroup.Configuration?
+            let responseRootGroupConfiguration: KvResponseRootGroupConfiguration?
+            let responseGroupConfiguration: KvResponseGroupConfiguration?
 
+            let dispatchConfiguration: DispatchConfiguration
             let httpChannels: [HttpChannel]
 
 
-            init(_ scheme: HttpScheme, configuration: KvResponseGroup.Configuration? = nil, httpChannels: [HttpChannel]? = nil) {
+            convenience init(_ scheme: HttpScheme) { self.init(
+                scheme,
+                rootGroupConfiguration: nil,
+                groupConfiguration: nil,
+                httpChannels: nil
+            ) }
+
+
+            init(_ scheme: HttpScheme,
+                 rootGroupConfiguration: KvResponseRootGroupConfiguration?,
+                 groupConfiguration: KvResponseGroupConfiguration?,
+                 httpChannels: [HttpChannel]?
+            ) {
                 self.scheme = scheme
-                self.responseGroupConfiguration = configuration
-                self.httpChannels = httpChannels ?? scheme.httpChannels(for: responseGroupConfiguration)
+                self.responseRootGroupConfiguration = rootGroupConfiguration
+                self.responseGroupConfiguration = groupConfiguration
+                self.dispatchConfiguration = .init(rootGroupConfiguration?.dispatching, groupConfiguration?.dispatching)
+                self.httpChannels = httpChannels ?? scheme.httpChannels(for: responseRootGroupConfiguration)
 
                 updateSchemeNode()
             }
@@ -145,14 +165,29 @@ extension KvServerImplementation {
 
             // MARK: : KvHttpResponseAccumulator
 
-            func with(_ configuration: KvResponseGroup.Configuration, body: (Accumulator) -> Void) {
-                let newConfiguration = KvResponseGroup.Configuration.overlay(configuration, over: self.responseGroupConfiguration)
+            func with(_ configuration: KvResponseRootGroupConfiguration, body: (KvServerImplementation.HttpScheme.Accumulator) -> Void) {
+                let newConfiguration = KvResponseRootGroupConfiguration.overlay(configuration, over: responseRootGroupConfiguration)
 
-                let isHttpConfigurationChanged = newConfiguration.network.httpEndpoints != self.responseGroupConfiguration?.network.httpEndpoints
+                let isHttpConfigurationChanged = newConfiguration.network?.httpEndpoints != responseRootGroupConfiguration?.network?.httpEndpoints
 
                 let accumulator = Accumulator(scheme,
-                                              configuration: newConfiguration,
+                                              rootGroupConfiguration: newConfiguration,
+                                              groupConfiguration: responseGroupConfiguration,
                                               httpChannels: isHttpConfigurationChanged ? nil : httpChannels)
+
+                accumulator.updateRedirections()
+
+                body(accumulator)
+            }
+
+
+            func with(_ configuration: KvResponseGroupConfiguration, body: (Accumulator) -> Void) {
+                let newConfiguration = KvResponseGroupConfiguration.overlay(configuration, over: self.responseGroupConfiguration)
+
+                let accumulator = Accumulator(scheme,
+                                              rootGroupConfiguration: responseRootGroupConfiguration,
+                                              groupConfiguration: newConfiguration,
+                                              httpChannels: httpChannels)
 
                 body(accumulator)
             }
@@ -161,7 +196,7 @@ extension KvServerImplementation {
             func insert<HttpResponse>(_ response: HttpResponse)
             where HttpResponse : KvHttpResponseImplementationProtocol
             {
-                forEachDispatchScheme { $0.insert(response, for: responseGroupConfiguration?.dispatching ?? .empty) }
+                forEachDispatchScheme { $0.insert(response, for: dispatchConfiguration) }
             }
 
 
@@ -173,12 +208,18 @@ extension KvServerImplementation {
             }
 
 
+            private func updateRedirections() {
+                guard let dispatching = responseRootGroupConfiguration?.dispatching else { return }
+
+                forEachDispatchScheme { $0.insertRedirections(for: dispatching) }
+            }
+
+
             private func updateSchemeNode() {
-                guard let responseGroupConfiguration,
-                      let attributes = KvHttpResponseDispatcher.Attributes.from(responseGroupConfiguration)
+                guard let attributes = responseGroupConfiguration.flatMap(KvHttpResponseDispatcher.Attributes.from(_:))
                 else { return }
 
-                forEachDispatchScheme { $0.insert(attributes, for: responseGroupConfiguration.dispatching) }
+                forEachDispatchScheme { $0.insert(attributes, for: dispatchConfiguration) }
             }
 
         }
@@ -303,10 +344,10 @@ extension KvServerImplementation {
             }
 
 
-            mutating func httpChannels(for configuration: KvResponseGroup.Configuration?) -> [HttpChannel] {
+            mutating func httpChannels(for configuration: KvResponseRootGroupConfiguration?) -> [HttpChannel] {
                 let endpoints = {
                     $0?.isEmpty == false ? $0! : Defaults.httpEndpoints
-                }(configuration?.network.httpEndpoints)
+                }(configuration?.network?.httpEndpoints)
 
                 return fetch(for: endpoints.elements, fabric: { slice in
                     HttpChannel(for: endpoints.intersection(slice))
@@ -345,7 +386,8 @@ extension KvServerImplementation {
             func drop(_ endpoints: Set<KvNetworkEndpoint>) -> HttpChannel {
                 assert(!endpoints.isEmpty, "There is no need to call .drop() method for empty argument")
 
-                let dropped = HttpChannel(configurations: configurations.filter({ endpoints.contains($0.key) }), dispatchScheme: dispatchScheme)
+                let dropped = HttpChannel(configurations: configurations.filter({ endpoints.contains($0.key) }),
+                                          dispatchScheme: dispatchScheme)
 
                 endpoints.forEach { configurations.removeValue(forKey: $0) }
 
@@ -540,8 +582,8 @@ extension KvServerImplementation.HttpServer {
             var onIncident = dispatchingResult.resolvedAttributes?.clientCallbacks?.onHttpIncident
 
 
-            func RequestHandler(for incident: KvHttpResponse.Incident, callback: KvResponseGroupConfiguration.ClientCallbacks.IncidentCallback?) -> KvHttpRequestHandler {
-                KvHttpHeadOnlyRequestHandler { callback?(incident, requestContext) ?? .status(incident.defaultStatus) }
+            func RequestHandler(for incident: KvHttpResponse.Incident, callback: KvClientCallbacks.IncidentCallback?) -> KvHttpRequestHandler {
+                return KvHttpHeadOnlyRequestHandler { callback?(incident, requestContext) ?? .status(incident.defaultStatus) }
             }
 
 

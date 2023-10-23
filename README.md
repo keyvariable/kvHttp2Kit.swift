@@ -24,7 +24,7 @@ Some features:
 - structured URL queries;
 - handlers for common request body types;
 - support of Punycode and percent-encoding for URLs;
-- convenient response content builder.
+- redirections from alias hosts and optional prefixes.
 
 Just declare hierarchical list of responses, *kvServerKit* will do the rest. Responses can be declared in any order.
 *Declarative API* automatically starts declared network communication channels, builds routing trees to responses and URL query parsers.
@@ -42,7 +42,7 @@ If there are two or more matching responses then *declarative API* automatically
 *Declarative API* builds fast single-pass URL query parser for several responses with declared structure of URL query at the same routing point.
 
 Below is an example of a server providing simple responses over secure HTTP/2.0 and HTTP/1.1 at all available IP addresses on 8080 port
-for both `example.com` and `www.example.com` hosts:
+on "example.com" host and redirections from "www.example.com", "example.org", "www.example.org", "example.net", "www.example.net" hosts:
 - frontend files at "/var/www/example.com" directory with support of index files and status pages named "\(statusCode).html"
   in "Status" or "status" subdirectory;
 - echo binary response with *POST* request's body at `/echo` path;
@@ -53,33 +53,38 @@ for both `example.com` and `www.example.com` hosts:
 ```swift
 @main
 struct ExampleServer : KvServer {
-    var body: some KvResponseGroup {
+    var body: some KvResponseRootGroup {
         let ssl: KvHttpChannel.Configuration.SSL = loadHttpsCertificate()
 
         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-            URL(string: "file:///var/www/example.com/")
+            KvGroup(hosts: "example.com",
+                    hostAliases: "example.org", "example.net",
+                    optionalSubdomains: "www")
+            {
+                URL(string: "file:///var/www/example.com/")
 
-            KvGroup("echo") {
-                KvHttpResponse.dynamic
-                    .requestBody(.data)
-                    .content { input in
-                        guard let data: Data = input.requestBody else { return .badRequest }
-                        retrun .binary { data }
-                            .contentLength(data.count)
+                KvGroup("echo") {
+                    KvHttpResponse.dynamic
+                        .requestBody(.data)
+                        .content { input in
+                            guard let data: Data = input.requestBody else { return .badRequest }
+                            return .binary { data }
+                                .contentLength(data.count)
+                        }
+                }
+                .httpMethods(.POST)
+
+                KvGroup("random") {
+                    RandomValueResponseGroup()
+                }
+                .onHttpIncident { incident in
+                    guard incident.defaultStatus == .notFound else { return nil }
+                    return try .notFound.string {
+                        "Usage:\n  /random/bool\n  /random/int[?from=1[&through=9]]"
                     }
-            }
-            .httpMethods(.POST)
-
-            KvGroup("random") {
-                RandomValueResponseGroup()
-            }
-            .onHttpIncident { incident in
-                guard incident.defaultStatus == .notFound else { return nil }
-                return try .notFound.string { "Usage:\n  /random/bool\n  /random/int[?from=1[&through=9]]" }
+                }
             }
         }
-        .hosts("example.com")
-        .subdomains(optional: "www")
     }
 }
 

@@ -38,7 +38,7 @@ import NIOHTTP1
 ///
 /// ```swift
 /// // Plain text response.
-/// .string { "Test pesponse" }
+/// .string { "Test response" }
 ///
 /// // Raw byte response.
 /// .binary { data }
@@ -98,6 +98,10 @@ public struct KvHttpResponseProvider {
     @usableFromInline
     var modificationDate: Date?
 
+    /// Value for `Location` response header.
+    @usableFromInline
+    var location: URL?
+
     /// Response options. E.g. disconnection flag.
     @usableFromInline
     var options: Options
@@ -109,6 +113,9 @@ public struct KvHttpResponseProvider {
          customHeaderCallback: HeaderCallback? = nil,
          contentType: ContentType? = nil,
          contentLength: UInt64? = nil,
+         entityTag: EntityTag? = nil,
+         modificationDate: Date? = nil,
+         location: URL? = nil,
          options: Options = [ ],
          bodyCallbackProvider: BodyCallbackProvider? = nil
     ) {
@@ -116,6 +123,9 @@ public struct KvHttpResponseProvider {
         self.customHeaderCallback = customHeaderCallback
         self.contentType = contentType
         self.contentLength = contentLength
+        self.entityTag = entityTag
+        self.modificationDate = modificationDate
+        self.location = location
         self.options = options
         self.bodyCallbackProvider = bodyCallbackProvider
     }
@@ -130,7 +140,7 @@ public struct KvHttpResponseProvider {
 
         case image(Image)
 
-        /// Explicitely provided MIME-type and semicolon-separated options.
+        /// Explicitly provided MIME-type and semicolon-separated options.
         case raw(String, options: String?)
 
         case text(Text)
@@ -325,7 +335,7 @@ public struct KvHttpResponseProvider {
         }
 
 
-        /// - Returns: An instance where value is a hexademical representation of bytes from *data*.
+        /// - Returns: An instance where value is a hexadecimal representation of bytes from *data*.
         @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
         @inlinable
         public static func hex<Bytes>(_ bytes: Bytes, options: Options = [ ]) -> Self
@@ -527,7 +537,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns: An instance where body is taken from provided *stream*, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
     ///
-    /// - Important: *Sream* can may ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *Stream* can may ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func binary(_ stream: InputStream) -> Self { Self().binary(stream) }
 
@@ -536,10 +546,10 @@ extension KvHttpResponseProvider {
     ///
     /// Contents of the resulting instance:
     /// - body is content at *url*;
-    /// - content length, entity tag and modification date are provided when the scheme is "file:" and the attributes are availabe.
+    /// - content length, entity tag and modification date are provided when the scheme is "file:" and the attributes are available.
     ///
     /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
-    ///         This implenetation prevents double access to file system and monitoring of changes at URL.
+    ///         This implementation prevents double access to file system and monitoring of changes at URL.
     ///
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
@@ -591,6 +601,8 @@ extension KvHttpResponseProvider {
 
 extension KvHttpResponseProvider {
 
+    // MARK: 2xx
+
     /// - Returns: An instance where *status* is `.ok`.
     @inlinable public static var ok: Self { .init(status: .ok) }
     /// - Returns: An instance where *status* is `.created`.
@@ -611,22 +623,29 @@ extension KvHttpResponseProvider {
     @inlinable public static var alreadyReported: Self { .init(status: .alreadyReported) }
     /// - Returns: An instance where *status* is `.imUsed`.
     @inlinable public static var imUsed: Self { .init(status: .imUsed) }
+
+    // MARK: 3xx
+
     /// - Returns: An instance where *status* is `.multipleChoices`.
-    @inlinable public static var multipleChoices: Self { .init(status: .multipleChoices) }
+    @inlinable public static func multipleChoices(preferredLocation: URL? = nil) -> Self { .init(status: .multipleChoices, location: preferredLocation) }
     /// - Returns: An instance where *status* is `.movedPermanently`.
-    @inlinable public static var movedPermanently: Self { .init(status: .movedPermanently) }
+    @inlinable public static func movedPermanently(location: URL?) -> Self { .init(status: .movedPermanently, location: location) }
     /// - Returns: An instance where *status* is `.found`.
-    @inlinable public static var found: Self { .init(status: .found) }
+    @inlinable public static func found(location: URL?) -> Self { .init(status: .found, location: location) }
     /// - Returns: An instance where *status* is `.seeOther`.
-    @inlinable public static var seeOther: Self { .init(status: .seeOther) }
+    @inlinable public static func seeOther(location: URL) -> Self { .init(status: .seeOther, location: location) }
     /// - Returns: An instance where *status* is `.notModified`.
     @inlinable public static var notModified: Self { .init(status: .notModified) }
     /// - Returns: An instance where *status* is `.useProxy`.
+    @available(*, deprecated, message: "The 305 (Use Proxy) status code has been deprecated due to security concerns. See https://www.rfc-editor.org/rfc/rfc7231.html#appendix-B")
     @inlinable public static var useProxy: Self { .init(status: .useProxy) }
     /// - Returns: An instance where *status* is `.temporaryRedirect`.
-    @inlinable public static var temporaryRedirect: Self { .init(status: .temporaryRedirect) }
+    @inlinable public static func temporaryRedirect(location: URL?) -> Self { .init(status: .temporaryRedirect, location: location) }
     /// - Returns: An instance where *status* is `.permanentRedirect`.
-    @inlinable public static var permanentRedirect: Self { .init(status: .permanentRedirect) }
+    @inlinable public static func permanentRedirect(location: URL?) -> Self { .init(status: .permanentRedirect, location: location) }
+
+    // MARK: 4xx
+
     /// - Returns: An instance where *status* is `.badRequest`.
     @inlinable public static var badRequest: Self { .init(status: .badRequest) }
     /// - Returns: An instance where *status* is `.unauthorized`.
@@ -683,6 +702,9 @@ extension KvHttpResponseProvider {
     @inlinable public static var requestHeaderFieldsTooLarge: Self { .init(status: .requestHeaderFieldsTooLarge) }
     /// - Returns: An instance where *status* is `.unavailableForLegalReasons`.
     @inlinable public static var unavailableForLegalReasons: Self { .init(status: .unavailableForLegalReasons) }
+
+    // MARK: 5xx
+
     /// - Returns: An instance where *status* is `.internalServerError`.
     @inlinable public static var internalServerError: Self { .init(status: .internalServerError) }
     /// - Returns: An instance where *status* is `.notImplemented`.
@@ -768,7 +790,7 @@ extension KvHttpResponseProvider {
     @inlinable
     public func entityTag(_ value: EntityTag) -> Self { modified { $0.entityTag = value } }
 
-    /// - Returns: A copy where modification date is changes to given *value*.
+    /// - Returns: A copy where modification date is changed to given *value*.
     ///
     /// - Note: It's recommended to prefer ``entityTag(_:)`` instead if possible.
     ///
@@ -776,6 +798,11 @@ extension KvHttpResponseProvider {
     /// For example, response is automatically replaced with 304 (Not Modified) when request contains `If-Modified-Since` header with a later date.
     @inlinable
     public func modificationDate(_ value: Date) -> Self { modified { $0.modificationDate = value } }
+
+
+    /// - Returns: A copy where value of `Location` header is changed to given *value*.
+    @inlinable
+    public func location(_ value: URL) -> Self { modified { $0.location = value } }
 
 }
 
@@ -805,7 +832,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns: A copy where body is taken from provided *stream*, missing `contentType` is changed to `.application(.octetStream)`.
     ///
-    /// - Important: *Sream* may be ignored, for example when HTTP method is *HEAD*.
+    /// - Important: *Stream* may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func binary(_ stream: InputStream) -> Self {
         modified {
@@ -819,10 +846,10 @@ extension KvHttpResponseProvider {
     ///
     /// Following changes are applied:
     /// - body is content at *url*;
-    /// - content length, entity tag and modification date are updated when the scheme is "file:" and the attributes are availabe.
+    /// - content length, entity tag and modification date are updated when the scheme is "file:" and the attributes are available.
     ///
     /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
-    ///         This implenetation prevents double access to file system and monitoring of changes at URL.
+    ///         This implementation prevents double access to file system and monitoring of changes at URL.
     ///
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
@@ -886,7 +913,7 @@ extension KvHttpResponseProvider {
     }
 
 
-    /// - Returns: A copy where body is UTF8 representation of given *string*, missing`contentType` is changed to `.text(.plain)`.
+    /// - Returns: A copy where body is UTF8 representation of given *string*, missing `contentType` is changed to `.text(.plain)`.
     ///
     /// - Important: *String* block may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
@@ -910,119 +937,131 @@ extension KvHttpResponseProvider {
 
 extension KvHttpResponseProvider {
 
-    /// - Returns: A copy where *status* is chaned to`.ok`.
+    // MARK: 2xx
+
+    /// - Returns: A copy where *status* is changed to`.ok`.
     @inlinable public var ok: Self { modified { $0.status = .ok } }
-    /// - Returns: A copy where *status* is chaned to`.created`.
+    /// - Returns: A copy where *status* is changed to`.created`.
     @inlinable public var created: Self { modified { $0.status = .created } }
-    /// - Returns: A copy where *status* is chaned to`.accepted`.
+    /// - Returns: A copy where *status* is changed to`.accepted`.
     @inlinable public var accepted: Self { modified { $0.status = .accepted } }
-    /// - Returns: A copy where *status* is chaned to`.nonAuthoritativeInformation`.
+    /// - Returns: A copy where *status* is changed to`.nonAuthoritativeInformation`.
     @inlinable public var nonAuthoritativeInformation: Self { modified { $0.status = .nonAuthoritativeInformation } }
-    /// - Returns: A copy where *status* is chaned to`.noContent`.
+    /// - Returns: A copy where *status* is changed to`.noContent`.
     @inlinable public var noContent: Self { modified { $0.status = .noContent } }
-    /// - Returns: A copy where *status* is chaned to`.resetContent`.
+    /// - Returns: A copy where *status* is changed to`.resetContent`.
     @inlinable public var resetContent: Self { modified { $0.status = .resetContent } }
-    /// - Returns: A copy where *status* is chaned to`.partialContent`.
+    /// - Returns: A copy where *status* is changed to`.partialContent`.
     @inlinable public var partialContent: Self { modified { $0.status = .partialContent } }
-    /// - Returns: A copy where *status* is chaned to`.multiStatus`.
+    /// - Returns: A copy where *status* is changed to`.multiStatus`.
     @inlinable public var multiStatus: Self { modified { $0.status = .multiStatus } }
-    /// - Returns: A copy where *status* is chaned to`.alreadyReported`.
+    /// - Returns: A copy where *status* is changed to`.alreadyReported`.
     @inlinable public var alreadyReported: Self { modified { $0.status = .alreadyReported } }
-    /// - Returns: A copy where *status* is chaned to`.imUsed`.
+    /// - Returns: A copy where *status* is changed to`.imUsed`.
     @inlinable public var imUsed: Self { modified { $0.status = .imUsed } }
-    /// - Returns: A copy where *status* is chaned to`.multipleChoices`.
+
+    // MARK: 3xx
+
+    /// - Returns: A copy where *status* is changed to`.multipleChoices`.
     @inlinable public var multipleChoices: Self { modified { $0.status = .multipleChoices } }
-    /// - Returns: A copy where *status* is chaned to`.movedPermanently`.
+    /// - Returns: A copy where *status* is changed to`.movedPermanently`.
     @inlinable public var movedPermanently: Self { modified { $0.status = .movedPermanently } }
-    /// - Returns: A copy where *status* is chaned to`.found`.
+    /// - Returns: A copy where *status* is changed to`.found`.
     @inlinable public var found: Self { modified { $0.status = .found } }
-    /// - Returns: A copy where *status* is chaned to`.seeOther`.
+    /// - Returns: A copy where *status* is changed to`.seeOther`.
     @inlinable public var seeOther: Self { modified { $0.status = .seeOther } }
-    /// - Returns: A copy where *status* is chaned to`.notModified`.
+    /// - Returns: A copy where *status* is changed to`.notModified`.
     @inlinable public var notModified: Self { modified { $0.status = .notModified } }
-    /// - Returns: A copy where *status* is chaned to`.useProxy`.
+    /// - Returns: A copy where *status* is changed to`.useProxy`.
+    @available(*, deprecated, message: "The 305 (Use Proxy) status code has been deprecated due to security concerns. See https://www.rfc-editor.org/rfc/rfc7231.html#appendix-B")
     @inlinable public var useProxy: Self { modified { $0.status = .useProxy } }
-    /// - Returns: A copy where *status* is chaned to`.temporaryRedirect`.
+    /// - Returns: A copy where *status* is changed to`.temporaryRedirect`.
     @inlinable public var temporaryRedirect: Self { modified { $0.status = .temporaryRedirect } }
-    /// - Returns: A copy where *status* is chaned to`.permanentRedirect`.
+    /// - Returns: A copy where *status* is changed to`.permanentRedirect`.
     @inlinable public var permanentRedirect: Self { modified { $0.status = .permanentRedirect } }
-    /// - Returns: A copy where *status* is chaned to`.badRequest`.
+
+    // MARK: 4xx
+
+    /// - Returns: A copy where *status* is changed to`.badRequest`.
     @inlinable public var badRequest: Self { modified { $0.status = .badRequest } }
-    /// - Returns: A copy where *status* is chaned to`.unauthorized`.
+    /// - Returns: A copy where *status* is changed to`.unauthorized`.
     @inlinable public var unauthorized: Self { modified { $0.status = .unauthorized } }
-    /// - Returns: A copy where *status* is chaned to`.paymentRequired`.
+    /// - Returns: A copy where *status* is changed to`.paymentRequired`.
     @inlinable public var paymentRequired: Self { modified { $0.status = .paymentRequired } }
-    /// - Returns: A copy where *status* is chaned to`.forbidden`.
+    /// - Returns: A copy where *status* is changed to`.forbidden`.
     @inlinable public var forbidden: Self { modified { $0.status = .forbidden } }
-    /// - Returns: A copy where *status* is chaned to`.notFound`.
+    /// - Returns: A copy where *status* is changed to`.notFound`.
     @inlinable public var notFound: Self { modified { $0.status = .notFound } }
-    /// - Returns: A copy where *status* is chaned to`.methodNotAllowed`.
+    /// - Returns: A copy where *status* is changed to`.methodNotAllowed`.
     @inlinable public var methodNotAllowed: Self { modified { $0.status = .methodNotAllowed } }
-    /// - Returns: A copy where *status* is chaned to`.notAcceptable`.
+    /// - Returns: A copy where *status* is changed to`.notAcceptable`.
     @inlinable public var notAcceptable: Self { modified { $0.status = .notAcceptable } }
-    /// - Returns: A copy where *status* is chaned to`.proxyAuthenticationRequired`.
+    /// - Returns: A copy where *status* is changed to`.proxyAuthenticationRequired`.
     @inlinable public var proxyAuthenticationRequired: Self { modified { $0.status = .proxyAuthenticationRequired } }
-    /// - Returns: A copy where *status* is chaned to`.requestTimeout`.
+    /// - Returns: A copy where *status* is changed to`.requestTimeout`.
     @inlinable public var requestTimeout: Self { modified { $0.status = .requestTimeout } }
-    /// - Returns: A copy where *status* is chaned to`.conflict`.
+    /// - Returns: A copy where *status* is changed to`.conflict`.
     @inlinable public var conflict: Self { modified { $0.status = .conflict } }
-    /// - Returns: A copy where *status* is chaned to`.gone`.
+    /// - Returns: A copy where *status* is changed to`.gone`.
     @inlinable public var gone: Self { modified { $0.status = .gone } }
-    /// - Returns: A copy where *status* is chaned to`.lengthRequired`.
+    /// - Returns: A copy where *status* is changed to`.lengthRequired`.
     @inlinable public var lengthRequired: Self { modified { $0.status = .lengthRequired } }
-    /// - Returns: A copy where *status* is chaned to`.preconditionFailed`.
+    /// - Returns: A copy where *status* is changed to`.preconditionFailed`.
     @inlinable public var preconditionFailed: Self { modified { $0.status = .preconditionFailed } }
-    /// - Returns: A copy where *status* is chaned to`.payloadTooLarge`.
+    /// - Returns: A copy where *status* is changed to`.payloadTooLarge`.
     @inlinable public var payloadTooLarge: Self { modified { $0.status = .payloadTooLarge } }
-    /// - Returns: A copy where *status* is chaned to`.uriTooLong`.
+    /// - Returns: A copy where *status* is changed to`.uriTooLong`.
     @inlinable public var uriTooLong: Self { modified { $0.status = .uriTooLong } }
-    /// - Returns: A copy where *status* is chaned to`.unsupportedMediaType`.
+    /// - Returns: A copy where *status* is changed to`.unsupportedMediaType`.
     @inlinable public var unsupportedMediaType: Self { modified { $0.status = .unsupportedMediaType } }
-    /// - Returns: A copy where *status* is chaned to`.rangeNotSatisfiable`.
+    /// - Returns: A copy where *status* is changed to`.rangeNotSatisfiable`.
     @inlinable public var rangeNotSatisfiable: Self { modified { $0.status = .rangeNotSatisfiable } }
-    /// - Returns: A copy where *status* is chaned to`.expectationFailed`.
+    /// - Returns: A copy where *status* is changed to`.expectationFailed`.
     @inlinable public var expectationFailed: Self { modified { $0.status = .expectationFailed } }
-    /// - Returns: A copy where *status* is chaned to`.imATeapot`.
+    /// - Returns: A copy where *status* is changed to`.imATeapot`.
     @inlinable public var imATeapot: Self { modified { $0.status = .imATeapot } }
-    /// - Returns: A copy where *status* is chaned to`.misdirectedRequest`.
+    /// - Returns: A copy where *status* is changed to`.misdirectedRequest`.
     @inlinable public var misdirectedRequest: Self { modified { $0.status = .misdirectedRequest } }
-    /// - Returns: A copy where *status* is chaned to`.unprocessableEntity`.
+    /// - Returns: A copy where *status* is changed to`.unprocessableEntity`.
     @inlinable public var unprocessableEntity: Self { modified { $0.status = .unprocessableEntity } }
-    /// - Returns: A copy where *status* is chaned to`.locked`.
+    /// - Returns: A copy where *status* is changed to`.locked`.
     @inlinable public var locked: Self { modified { $0.status = .locked } }
-    /// - Returns: A copy where *status* is chaned to`.failedDependency`.
+    /// - Returns: A copy where *status* is changed to`.failedDependency`.
     @inlinable public var failedDependency: Self { modified { $0.status = .failedDependency } }
-    /// - Returns: A copy where *status* is chaned to`.upgradeRequired`.
+    /// - Returns: A copy where *status* is changed to`.upgradeRequired`.
     @inlinable public var upgradeRequired: Self { modified { $0.status = .upgradeRequired } }
-    /// - Returns: A copy where *status* is chaned to`.preconditionRequired`.
+    /// - Returns: A copy where *status* is changed to`.preconditionRequired`.
     @inlinable public var preconditionRequired: Self { modified { $0.status = .preconditionRequired } }
-    /// - Returns: A copy where *status* is chaned to`.tooManyRequests`.
+    /// - Returns: A copy where *status* is changed to`.tooManyRequests`.
     @inlinable public var tooManyRequests: Self { modified { $0.status = .tooManyRequests } }
-    /// - Returns: A copy where *status* is chaned to`.requestHeaderFieldsTooLarge`.
+    /// - Returns: A copy where *status* is changed to`.requestHeaderFieldsTooLarge`.
     @inlinable public var requestHeaderFieldsTooLarge: Self { modified { $0.status = .requestHeaderFieldsTooLarge } }
-    /// - Returns: A copy where *status* is chaned to`.unavailableForLegalReasons`.
+    /// - Returns: A copy where *status* is changed to`.unavailableForLegalReasons`.
     @inlinable public var unavailableForLegalReasons: Self { modified { $0.status = .unavailableForLegalReasons } }
-    /// - Returns: A copy where *status* is chaned to`.internalServerError`.
+
+    // MARK: 5xx
+
+    /// - Returns: A copy where *status* is changed to`.internalServerError`.
     @inlinable public var internalServerError: Self { modified { $0.status = .internalServerError } }
-    /// - Returns: A copy where *status* is chaned to`.notImplemented`.
+    /// - Returns: A copy where *status* is changed to`.notImplemented`.
     @inlinable public var notImplemented: Self { modified { $0.status = .notImplemented } }
-    /// - Returns: A copy where *status* is chaned to`.badGateway`.
+    /// - Returns: A copy where *status* is changed to`.badGateway`.
     @inlinable public var badGateway: Self { modified { $0.status = .badGateway } }
-    /// - Returns: A copy where *status* is chaned to`.serviceUnavailable`.
+    /// - Returns: A copy where *status* is changed to`.serviceUnavailable`.
     @inlinable public var serviceUnavailable: Self { modified { $0.status = .serviceUnavailable } }
-    /// - Returns: A copy where *status* is chaned to`.gatewayTimeout`.
+    /// - Returns: A copy where *status* is changed to`.gatewayTimeout`.
     @inlinable public var gatewayTimeout: Self { modified { $0.status = .gatewayTimeout } }
-    /// - Returns: A copy where *status* is chaned to`.httpVersionNotSupported`.
+    /// - Returns: A copy where *status* is changed to`.httpVersionNotSupported`.
     @inlinable public var httpVersionNotSupported: Self { modified { $0.status = .httpVersionNotSupported } }
-    /// - Returns: A copy where *status* is chaned to`.variantAlsoNegotiates`.
+    /// - Returns: A copy where *status* is changed to`.variantAlsoNegotiates`.
     @inlinable public var variantAlsoNegotiates: Self { modified { $0.status = .variantAlsoNegotiates } }
-    /// - Returns: A copy where *status* is chaned to`.insufficientStorage`.
+    /// - Returns: A copy where *status* is changed to`.insufficientStorage`.
     @inlinable public var insufficientStorage: Self { modified { $0.status = .insufficientStorage } }
-    /// - Returns: A copy where *status* is chaned to`.loopDetected`.
+    /// - Returns: A copy where *status* is changed to`.loopDetected`.
     @inlinable public var loopDetected: Self { modified { $0.status = .loopDetected } }
-    /// - Returns: A copy where *status* is chaned to`.notExtended`.
+    /// - Returns: A copy where *status* is changed to`.notExtended`.
     @inlinable public var notExtended: Self { modified { $0.status = .notExtended } }
-    /// - Returns: A copy where *status* is chaned to`.networkAuthenticationRequired`.
+    /// - Returns: A copy where *status* is changed to`.networkAuthenticationRequired`.
     @inlinable public var networkAuthenticationRequired: Self { modified { $0.status = .networkAuthenticationRequired } }
 
 }

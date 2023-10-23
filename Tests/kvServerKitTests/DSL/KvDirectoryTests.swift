@@ -39,7 +39,7 @@ final class KvDirectoryTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvDirectory(at: TestKit.htmlDirectoryURL)
                 }
@@ -184,7 +184,7 @@ final class KvDirectoryTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("1") {
                         KvDirectory(at: TestKit.htmlDirectoryURL)
@@ -254,7 +254,7 @@ final class KvDirectoryTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvDirectory(at: TestKit.htmlDirectoryURL)
                 }
@@ -281,7 +281,7 @@ final class KvDirectoryTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("1") {
                         KvDirectory(at: TestKit.htmlDirectoryURL)
@@ -370,7 +370,7 @@ final class KvDirectoryTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvDirectory(at: TestKit.htmlDirectoryURL)
                         .httpStatusDirectory(url: TestKit.htmlStatusDirectoryURL)
@@ -434,7 +434,7 @@ final class KvDirectoryTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("1") {
                         KvDirectory(at: TestKit.htmlDirectoryURL)

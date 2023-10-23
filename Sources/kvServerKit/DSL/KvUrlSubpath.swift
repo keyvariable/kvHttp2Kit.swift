@@ -62,7 +62,7 @@ public struct KvUnavailableUrlSubpath : KvUrlSubpathProtocol {
 
 // MARK: - KvUrlSubpath
 
-/// Representaion of subpath in ``KvHttpResponse/DynamicResponse/Input`` of ``KvHttpResponse/DynamicResponse``.
+/// Representation of subpath in ``KvHttpResponse/DynamicResponse/Input`` of ``KvHttpResponse/DynamicResponse``.
 public struct KvUrlSubpath : KvUrlSubpathProtocol {
 
     /// Sequence of path components.
@@ -76,22 +76,22 @@ public struct KvUrlSubpath : KvUrlSubpathProtocol {
 
         while let (offset, component) = iterator.next() {
             if let separatorIndex = component.firstIndex(of: "/") {
-                var safeComonents = Array(components.prefix(offset))
+                var safeComponents = Array(components.prefix(offset))
 
                 func Append<S : StringProtocol>(_ component: S) {
-                    safeComonents.append(contentsOf: component[separatorIndex...]
+                    safeComponents.append(contentsOf: component[separatorIndex...]
                         .split(separator: "/", omittingEmptySubsequences: true)
                         .lazy.map { String($0) })
                 }
 
-                safeComonents.append(.init(component.prefix(upTo: separatorIndex)))
+                safeComponents.append(.init(component.prefix(upTo: separatorIndex)))
                 Append(component[separatorIndex...])
 
                 while let (_, component) = iterator.next() {
                     Append(component)
                 }
 
-                self.init(safeComponents: .init(safeComonents))
+                self.init(safeComponents: .init(safeComponents))
                 return
             }
         }
@@ -119,7 +119,7 @@ public struct KvUrlSubpath : KvUrlSubpathProtocol {
 
     // MARK: Operations
 
-    /// A booelan value indicating whether the receiver is empty.
+    /// A boolean value indicating whether the receiver is empty.
     @inlinable
     public var isEmpty: Bool { components.isEmpty }
 
@@ -128,7 +128,7 @@ public struct KvUrlSubpath : KvUrlSubpathProtocol {
     public var joined: String { components.joined(separator: "/") }
 
 
-    /// A copy where occurences of "." and ".." special components are resolved.
+    /// A copy where occurrences of "." and ".." special components are resolved.
     ///
     /// - Note: Empty subpath is the root. So standardized "a/../../b" is "b".
     @inlinable

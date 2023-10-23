@@ -126,7 +126,7 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvHttpResponse.static { .string { "-" } }
 
@@ -203,7 +203,7 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvHttpResponse.static { .string { "-" } }
 

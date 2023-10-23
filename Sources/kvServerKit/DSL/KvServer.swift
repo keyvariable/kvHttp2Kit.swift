@@ -32,26 +32,26 @@ import Foundation
 /// ```swift
 /// @main
 /// struct ExampleServer : KvServer {
-///     var body: some KvResponseGroup {
+///     var body: some KvResponseRootGroup {
 ///         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-///             URL(string: "file:///var/www/example.com/")
+///             KvGroup(hosts: "example.com", optionalSubdomains: "www") {
+///                 URL(string: "file:///var/www/example.com/")
 ///
-///             KvGroup("echo") {
-///                 KvHttpResponse.dynamic
-///                     .requestBody(.data)
-///                     .content { input in
-///                         guard let data: Data = input.requestBody else { return .badRequest }
-///                         return .binary({ data }).contentLength(data.count)
-///                     }
-///             }
-///             .httpMethods(.POST)
+///                 KvGroup("echo") {
+///                     KvHttpResponse.dynamic
+///                         .requestBody(.data)
+///                         .content { input in
+///                             guard let data: Data = input.requestBody else { return .badRequest }
+///                             return .binary({ data }).contentLength(data.count)
+///                         }
+///                 }
+///                 .httpMethods(.POST)
 ///
-///             KvGroup("uuid") {
-///                 KvHttpResponse.static { .string { UUID().uuidString } }
+///                 KvGroup("uuid") {
+///                     KvHttpResponse.static { .string { UUID().uuidString } }
+///                 }
 ///             }
 ///         }
-///         .hosts("example.com")
-///         .subdomains(optional: "www")
 ///     }
 /// }
 /// ```
@@ -64,13 +64,13 @@ public protocol KvServer {
     /// The type of connection and request dispatcher.
     ///
     /// It's inferred from your implementation of the required property ``body-swift.property``.
-    associatedtype Body : KvResponseGroup
+    associatedtype Body : KvResponseRootGroup
 
 
     /// The behavior of the server.
     ///
     /// It's a place to define server's configuration, routing of requests and responses.
-    @KvResponseGroupBuilder
+    @KvResponseRootGroupBuilder
     var body: Self.Body { get }
 
 

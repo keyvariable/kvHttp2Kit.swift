@@ -42,7 +42,7 @@ struct DeclarativeServer : KvServer {
 
     // MARK: : KvServer
 
-    var body: some KvResponseGroup {
+    var body: some KvResponseRootGroup {
         let ssl = try! ssl
 
         /// This declaration makes it's HTTP responses to be available at all the current machine's IP addresses on port 8080.

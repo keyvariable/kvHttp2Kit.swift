@@ -57,12 +57,42 @@ public struct KvForEach<Data, Content> where Data : Sequence {
 }
 
 
+// MARK: : KvResponseRootGroup where Content : KvResponseRootGroup
 
-// MARK: : KvResponseGroup where Content : KvResponse
+extension KvForEach : KvResponseRootGroup where Content : KvResponseRootGroup {
+
+    public var body: KvNeverResponseRootGroup { KvNeverResponseRootGroup() }
+
+
+    /// Creates dynamically generated collection of response groups from given *data* sequence.
+    @inlinable
+    public init(_ data: Data, @KvResponseRootGroupBuilder content: @escaping (Data.Element) -> Content) {
+        self.init(data: data, content: content)
+    }
+
+}
+
+
+
+// MARK: : KvResponseRootGroupInternalProtocol where Content : KvResponseRootGroup
+
+extension KvForEach : KvResponseRootGroupInternalProtocol where Self : KvResponseRootGroup {
+
+    func insertResponses<A>(to accumulator: A) where A : KvHttpResponseAccumulator {
+        data.forEach {
+            content($0).resolvedGroup.insertResponses(to: accumulator)
+        }
+    }
+
+}
+
+
+
+// MARK: : KvResponseGroup where Content : KvResponseGroup
 
 extension KvForEach : KvResponseGroup where Content : KvResponseGroup {
 
-    public typealias Body = KvNeverResponseGroup
+    public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
 
 
     /// Creates dynamically generated collection of response groups from given *data* sequence.
@@ -75,7 +105,7 @@ extension KvForEach : KvResponseGroup where Content : KvResponseGroup {
 
 
 
-// MARK: : KvResponseGroup where Content : KvResponse
+// MARK: : KvResponseGroupInternalProtocol where Content : KvResponse
 
 extension KvForEach : KvResponseGroupInternalProtocol where Self : KvResponseGroup {
 

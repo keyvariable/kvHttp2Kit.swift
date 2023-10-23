@@ -40,7 +40,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvHttpResponse.dynamic
                         .query(.required("from", of: Value.self))
@@ -132,7 +132,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
             static var url: URL { Bundle.module.url(forResource: "sample", withExtension: "txt", subdirectory: "Resources")! }
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     let url = Self.url
 
@@ -168,7 +168,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
             static var sampleURL: URL { Bundle.module.url(forResource: "sample", withExtension: "txt", subdirectory: "Resources")! }
             static var missingURL: URL { sampleURL.appendingPathExtension("missing") }
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup {
                         do {

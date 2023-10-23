@@ -40,7 +40,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             static let configurations = TestKit.testConfigurations
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 KvForEach(Self.configurations) { configuration in
                     NetworkGroup(with: configuration) {
                         KvHttpResponse.static {
@@ -77,7 +77,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             let configuration = TestKit.insecureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("a") {
                         KvGroup("b") {
@@ -179,7 +179,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             static var greeting: String { "Welcome!" }
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("a") {
                         KvGroup {
@@ -211,7 +211,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             let configuration = TestKit.insecureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("entire") {
                         KvGroup("single") {
@@ -478,13 +478,13 @@ final class KvResponseGroupTests : XCTestCase {
 
             static let greeting = "cascade"
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     httpsServer
                 }
             }
 
-            private var httpsServer: some KvResponseGroup {
+            private var httpsServer: some KvResponseRootGroup {
                 NetworkGroup(with: TestKit.secureHttpConfiguration()) {
                     KvHttpResponse.static { .string { Self.greeting } }
                 }
@@ -507,7 +507,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             let configuration = TestKit.insecureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvHttpResponse.static { .string { "/" } }
 
@@ -570,7 +570,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             let configuration = TestKit.insecureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvHttpResponse.static { .string { "/" } }
 
@@ -648,7 +648,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup {
                         KvGroup("a") {
@@ -758,7 +758,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("directory") {
                         TestKit.htmlDirectoryURL

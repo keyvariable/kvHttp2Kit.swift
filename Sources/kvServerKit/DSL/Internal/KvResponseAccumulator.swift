@@ -32,6 +32,8 @@ protocol KvResponseAccumulator : AnyObject {
     var responseGroupConfiguration: KvResponseGroupConfiguration? { get }
 
 
+    func with(_ configuration: KvResponseRootGroupConfiguration, body: (NestedAccumulator) -> Void)
+
     func with(_ configuration: KvResponseGroupConfiguration, body: (NestedAccumulator) -> Void)
 
 }

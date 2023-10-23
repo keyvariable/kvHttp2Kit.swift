@@ -39,26 +39,27 @@ final class KvHttpResponseTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvGroup("echo") {
-                        KvHttpResponse.dynamic
-                            .requestBody(.data)
-                            .content { input in
-                                guard let data: Data = input.requestBody else { return .badRequest }
-                                return .binary { data }
-                            }
-                    }
+                    KvGroup(httpMethods: .POST) {
+                        KvGroup("echo") {
+                            KvHttpResponse.dynamic
+                                .requestBody(.data)
+                                .content { input in
+                                    guard let data: Data = input.requestBody else { return .badRequest }
+                                    return .binary { data }
+                                }
+                        }
 
-                    KvGroup("bytesum") {
-                        KvHttpResponse.dynamic
-                            .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
-                                buffer.reduce(accumulator, &+)
-                            }))
-                            .content { input in .string { "0x" + String(input.requestBody, radix: 16, uppercase: true) } }
+                        KvGroup("bytesum") {
+                            KvHttpResponse.dynamic
+                                .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
+                                    buffer.reduce(accumulator, &+)
+                                }))
+                                .content { input in .string { "0x" + String(input.requestBody, radix: 16, uppercase: true) } }
+                        }
                     }
                 }
-                .httpMethods(.POST)
             }
 
         }
@@ -88,7 +89,7 @@ final class KvHttpResponseTests : XCTestCase {
             static let dateComponents: Set<Calendar.Component> = [ .calendar, .year, .month, .day, .hour, .minute, .second, .nanosecond, .timeZone ]
             let echoDateComponents = Calendar.current.dateComponents(Self.dateComponents, from: Date())
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     if #available(macOS 12.0, *) {
                         KvGroup(httpMethods: .POST) {
@@ -133,7 +134,7 @@ final class KvHttpResponseTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("boolean") {
                         KvHttpResponse.dynamic
@@ -176,29 +177,30 @@ final class KvHttpResponseTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvGroup("no_body") {
-                        KvHttpResponse.static { .string { "0" } }
-                    }
-                    KvGroup("default_limit") {
-                        response
-                    }
+                    KvGroup(httpMethods: .POST) {
+                        KvGroup("no_body") {
+                            KvHttpResponse.static { .string { "0" } }
+                        }
+                        KvGroup("default_limit") {
+                            response
+                        }
 
-                    KvForEach([ limits[1], nil ]) { limit1 in group(limit: limit1) {
-                        KvForEach([ limits[2], nil ]) { limit2 in group(limit: limit2) {
-                            KvForEach([ limits[3], nil ]) { limit3 in KvGroup(path("r", limit3)) {
-                                switch limit3 {
-                                case .some(let limit3):
-                                    response(limit: limit3)
-                                case .none:
-                                    response
-                                }
+                        KvForEach([ limits[1], nil ]) { limit1 in group(limit: limit1) {
+                            KvForEach([ limits[2], nil ]) { limit2 in group(limit: limit2) {
+                                KvForEach([ limits[3], nil ]) { limit3 in KvGroup(path("r", limit3)) {
+                                    switch limit3 {
+                                    case .some(let limit3):
+                                        response(limit: limit3)
+                                    case .none:
+                                        response
+                                    }
+                                } }
                             } }
                         } }
-                    } }
+                    }
                 }
-                .httpMethods(.POST)
             }
 
             private var response: some KvResponse { response(body: .data) }
@@ -284,7 +286,7 @@ final class KvHttpResponseTests : XCTestCase {
 
             let configuration = TestKit.insecureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvHttpResponse.static { .string { "-" } }
 
@@ -355,7 +357,7 @@ final class KvHttpResponseTests : XCTestCase {
 
             let configuration = TestKit.insecureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("profiles") {
                         KvHttpResponse.static { .string { "/" } }

@@ -42,13 +42,16 @@ protocol KvHttpRequestBodyInternal : KvHttpRequestBody {
 
     typealias Configuration = KvHttpRequestBodyConfiguration
 
-    typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
     typealias ResponseBlock = (Value) throws -> KvHttpResponseProvider
 
 
     func with(baseConfiguration: Configuration) -> Self
 
-    func makeRequestHandler(_ requestContext: KvHttpRequestContext, _ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler
+    func makeRequestHandler(
+        _ requestContext: KvHttpRequestContext,
+        _ clientCallbacks: KvClientCallbacks?,
+        responseBlock: @escaping ResponseBlock
+    ) -> KvHttpRequestHandler
 
 }
 
@@ -121,7 +124,11 @@ public struct KvHttpRequestProhibitedBody : KvHttpRequestBodyInternal {
     func with(baseConfiguration: Configuration) -> Self { self }
 
     @usableFromInline
-    func makeRequestHandler(_ requestContext: KvHttpRequestContext, _ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+    func makeRequestHandler(
+        _ requestContext: KvHttpRequestContext,
+        _ clientCallbacks: KvClientCallbacks?,
+        responseBlock: @escaping ResponseBlock
+    ) -> KvHttpRequestHandler {
         RequestHandler(requestContext, clientCallbacks) {
             try responseBlock(.init())
         }
@@ -132,7 +139,10 @@ public struct KvHttpRequestProhibitedBody : KvHttpRequestBodyInternal {
 
     private class RequestHandler : KvHttpHeadOnlyRequestHandler {
 
-        init(_ requestContext: KvHttpRequestContext, _ clientCallbacks: ClientCallbacks?, responseBlock: @escaping KvHttpHeadOnlyRequestHandler.ResponseBlock) {
+        init(_ requestContext: KvHttpRequestContext,
+             _ clientCallbacks: KvClientCallbacks?,
+             responseBlock: @escaping KvHttpHeadOnlyRequestHandler.ResponseBlock
+        ) {
             self.requestContext = requestContext
             self.clientCallbacks = clientCallbacks
 
@@ -141,7 +151,7 @@ public struct KvHttpRequestProhibitedBody : KvHttpRequestBodyInternal {
 
 
         private let requestContext: KvHttpRequestContext
-        private let clientCallbacks: ClientCallbacks?
+        private let clientCallbacks: KvClientCallbacks?
 
 
         // MARK: : KvHttpRequestHandler
@@ -239,7 +249,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
     @usableFromInline
     var configuration: Configuration = .init()
 
-    let requestHandlerProvider: (Self, KvHttpRequestContext, ClientCallbacks?, @escaping ResponseBlock) -> KvHttpRequestHandler
+    let requestHandlerProvider: (Self, KvHttpRequestContext, KvClientCallbacks?, @escaping ResponseBlock) -> KvHttpRequestHandler
 
 
     @usableFromInline
@@ -329,7 +339,11 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
     // MARK: : KvHttpRequestBodyInternal
 
     @usableFromInline
-    func makeRequestHandler(_ requestContext: KvHttpRequestContext, _ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+    func makeRequestHandler(
+        _ requestContext: KvHttpRequestContext,
+        _ clientCallbacks: KvClientCallbacks?,
+        responseBlock: @escaping ResponseBlock
+    ) -> KvHttpRequestHandler {
         requestHandlerProvider(self, requestContext, clientCallbacks, responseBlock)
     }
 
@@ -342,7 +356,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
              initial initialResult: PartialResult,
              nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) throws -> PartialResult,
              _ requestContext: KvHttpRequestContext,
-             _ clientCallbacks: ClientCallbacks?,
+             _ clientCallbacks: KvClientCallbacks?,
              responseBlock: @escaping KvHttpReducingRequestHandler<PartialResult>.ResponseBlock
         ) {
             self.requestContext = requestContext
@@ -359,7 +373,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
              into initialResult: PartialResult,
              updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) throws -> Void,
              _ requestContext: KvHttpRequestContext,
-             _ clientCallbacks: ClientCallbacks?,
+             _ clientCallbacks: KvClientCallbacks?,
              responseBlock: @escaping KvHttpReducingRequestHandler<PartialResult>.ResponseBlock
         ) {
             self.requestContext = requestContext
@@ -373,7 +387,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
 
 
         private let requestContext: KvHttpRequestContext
-        private let clientCallbacks: ClientCallbacks?
+        private let clientCallbacks: KvClientCallbacks?
 
 
         // MARK: : KvHttpRequestHandler
@@ -433,7 +447,11 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
     // MARK: : KvHttpRequestBodyInternal
 
     @usableFromInline
-    func makeRequestHandler(_ requestContext: KvHttpRequestContext, _ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+    func makeRequestHandler(
+        _ requestContext: KvHttpRequestContext,
+        _ clientCallbacks: KvClientCallbacks?,
+        responseBlock: @escaping ResponseBlock
+    ) -> KvHttpRequestHandler {
         RequestHandler(configuration, requestContext, clientCallbacks, responseBlock: responseBlock)
     }
 
@@ -442,7 +460,11 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
 
     private class RequestHandler : KvHttpCollectingBodyRequestHandler {
 
-        init(_ configuration: Configuration, _ requestContext: KvHttpRequestContext, _ clientCallbacks: ClientCallbacks? , responseBlock: @escaping KvHttpCollectingBodyRequestHandler.ResponseBlock) {
+        init(_ configuration: Configuration,
+             _ requestContext: KvHttpRequestContext,
+             _ clientCallbacks: KvClientCallbacks?,
+             responseBlock: @escaping KvHttpCollectingBodyRequestHandler.ResponseBlock
+        ) {
             self.requestContext = requestContext
             self.clientCallbacks = clientCallbacks
 
@@ -451,7 +473,7 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
 
 
         private let requestContext: KvHttpRequestContext
-        private let clientCallbacks: ClientCallbacks?
+        private let clientCallbacks: KvClientCallbacks?
 
 
         // MARK: : KvHttpRequestHandler
@@ -510,7 +532,11 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
     // MARK: : KvHttpRequestBodyInternal
 
     @usableFromInline
-    func makeRequestHandler(_ requestContext: KvHttpRequestContext, _ clientCallbacks: ClientCallbacks?, responseBlock: @escaping ResponseBlock) -> KvHttpRequestHandler {
+    func makeRequestHandler(
+        _ requestContext: KvHttpRequestContext,
+        _ clientCallbacks: KvClientCallbacks?,
+        responseBlock: @escaping ResponseBlock
+    ) -> KvHttpRequestHandler {
         RequestHandler(configuration, requestContext, clientCallbacks, responseBlock: responseBlock)
     }
 
@@ -519,7 +545,11 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
 
     private class RequestHandler : KvHttpJsonRequestHandler<Value> {
 
-        init(_ configuration: Configuration, _ requestContext: KvHttpRequestContext, _ clientCallbacks: ClientCallbacks?, responseBlock: @escaping KvHttpJsonRequestHandler<Value>.ResponseBlock) {
+        init(_ configuration: Configuration,
+             _ requestContext: KvHttpRequestContext,
+             _ clientCallbacks: KvClientCallbacks?,
+             responseBlock: @escaping KvHttpJsonRequestHandler<Value>.ResponseBlock
+        ) {
             self.requestContext = requestContext
             self.clientCallbacks = clientCallbacks
 
@@ -528,7 +558,7 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
 
 
         private let requestContext: KvHttpRequestContext
-        private let clientCallbacks: ClientCallbacks?
+        private let clientCallbacks: KvClientCallbacks?
 
 
         // MARK: : KvHttpRequestHandler

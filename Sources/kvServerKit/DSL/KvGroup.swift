@@ -26,6 +26,16 @@ import NIOHTTP1
 
 
 
+/// It's designated to wrap responses and response groups in a root group and then handle it as a single entity.
+/// For example modifiers can be applied to whole group.
+@inlinable
+public func KvRootGroup<Content : KvResponseRootGroup>(
+    @KvResponseRootGroupBuilder content: @escaping () -> Content
+) -> some KvResponseRootGroup {
+    content()
+}
+
+
 /// It's designated to wrap responses and response groups in a group and then handle it as a single entity.
 /// For example modifiers can be applied to whole group.
 @inlinable
@@ -38,7 +48,7 @@ public func KvGroup<Content : KvResponseGroup>(
 
 // MARK: Network
 
-/// Declares parameters of HTTP connections for HTTP responses in the group contents. Existing values of the contents are replaced with provided values.
+/// - Returns: A root response group with parameters of HTTP connections for HTTP responses in the group contents.
 ///
 /// - Parameter httpEndpoints: Sequence of network addresses (IP addresses or host names), ports and HTTP protocol configurations.
 ///
@@ -50,21 +60,21 @@ public func KvGroup<Content : KvResponseGroup>(
 /// }
 /// ```
 ///
-/// See: ``KvGroup(http:at:content:)``, ``KvGroup(http:at:on:content:)``, ``KvResponseGroup/http(_:)``.
+/// See: ``KvGroup(http:at:content:)``, ``KvGroup(http:at:on:content:)``, ``KvResponseRootGroup/http(_:)``.
 ///
 /// - Note: By default HTTP responses are available at IPv6 local machine address `::1`, on port 80, via insecure HTTP/1.1.
 @inlinable
-public func KvGroup<HttpEndpoints, Content : KvResponseGroup>(
+public func KvGroup<HttpEndpoints, Content : KvResponseRootGroup>(
     httpEndpoints: HttpEndpoints,
-    @KvResponseGroupBuilder content: @escaping () -> Content
-) -> some KvResponseGroup
-where HttpEndpoints : Sequence, HttpEndpoints.Element == (KvNetworkEndpoint, KvResponseGroup.HTTP)
+    @KvResponseRootGroupBuilder content: @escaping () -> Content
+) -> some KvResponseRootGroup
+where HttpEndpoints : Sequence, HttpEndpoints.Element == (KvNetworkEndpoint, KvResponseRootGroup.HTTP)
 {
-    let network: KvResponseGroup.Configuration.Network = .init(
+    let network: KvResponseRootGroup.Configuration.Network = .init(
         httpEndpoints: .init(uniqueKeysWithValues: httpEndpoints)
     )
 
-    return KvModifiedResponseGroup(configuration: .init(network: network), source: content)
+    return KvModifiedResponseRootGroup(configuration: .init(network: network), source: content)
 }
 
 
@@ -78,13 +88,13 @@ where HttpEndpoints : Sequence, HttpEndpoints.Element == (KvNetworkEndpoint, KvR
 /// }
 /// ```
 ///
-/// See: ``KvResponseGroup/http(_:at:)``.
+/// See: ``KvResponseRootGroup/http(_:at:)``.
 @inlinable
-public func KvGroup<Endpoints, Content : KvResponseGroup>(
-    http: KvResponseGroup.HTTP,
+public func KvGroup<Endpoints, Content : KvResponseRootGroup>(
+    http: KvResponseRootGroup.HTTP,
     at endpoints: Endpoints,
-    @KvResponseGroupBuilder content: @escaping () -> Content
-) -> some KvResponseGroup
+    @KvResponseRootGroupBuilder content: @escaping () -> Content
+) -> some KvResponseRootGroup
 where Endpoints : Sequence, Endpoints.Element == KvNetworkEndpoint
 {
     KvGroup(httpEndpoints: endpoints.lazy.map { ($0, http) }, content: content)
@@ -101,14 +111,14 @@ where Endpoints : Sequence, Endpoints.Element == KvNetworkEndpoint
 /// }
 /// ```
 ///
-/// See: ``KvResponseGroup/http(_:at:on:)``.
+/// See: ``KvResponseRootGroup/http(_:at:on:)``.
 @inlinable
-public func KvGroup<Addresses, Ports, Content : KvResponseGroup>(
-    http: KvResponseGroup.HTTP,
+public func KvGroup<Addresses, Ports, Content : KvResponseRootGroup>(
+    http: KvResponseRootGroup.HTTP,
     at addresses: Addresses,
     on ports: Ports,
-    @KvResponseGroupBuilder content: @escaping () -> Content
-) -> some KvResponseGroup
+    @KvResponseRootGroupBuilder content: @escaping () -> Content
+) -> some KvResponseRootGroup
 where Addresses : Sequence, Addresses.Element == KvNetworkEndpoint.Address, Ports : Sequence, Ports.Element == KvNetworkEndpoint.Port
 {
     KvGroup(httpEndpoints: KvCartesianProductSequence(addresses, ports).lazy.map { (KvNetworkEndpoint($0, on: $1), http) }, content: content)
@@ -117,7 +127,7 @@ where Addresses : Sequence, Addresses.Element == KvNetworkEndpoint.Address, Port
 
 // MARK: Response Dispatching
 
-/// Declares a response group with HTTP method filter containing given elements.
+/// - Returns: A response group with HTTP method filter containing given elements.
 ///
 /// See ``KvResponseGroup/httpMethods(_:)-6fbma`` for details.
 @inlinable
@@ -131,7 +141,7 @@ where Methods : Sequence, Methods.Element == KvHttpMethod
 }
 
 
-/// Declares a response group with HTTP method filter containing given elements.
+/// - Returns: A response group with HTTP method filter containing given elements.
 ///
 /// See ``KvResponseGroup/httpMethods(_:)-6fbma`` for details.
 @inlinable
@@ -143,7 +153,7 @@ public func KvGroup<Content : KvResponseGroup>(
 }
 
 
-/// Declares a response group with user filter containing given elements.
+/// - Returns: A response group with user filter containing given elements.
 ///
 /// - Important: HTTP responses are unavailable when user filter is declared.
 ///
@@ -159,7 +169,7 @@ where Users : Sequence, Users.Element == String
 }
 
 
-/// Declares a response group with user filter containing given elements.
+/// - Returns: A response group with user filter containing given elements.
 ///
 /// - Important: HTTP responses are unavailable when user filter is declared.
 ///
@@ -173,60 +183,50 @@ public func KvGroup<Content : KvResponseGroup>(
 }
 
 
-/// Adds given values into list of hosts.
-///
-/// Host lists of nested response groups are united. Nested lists of hosts are resolved for each response and used to filter requests.
-/// If the resolved list is empty then the response available for any or no host.
-///
-/// Usually host is provided as a component of an URL.
-///
-/// See ``KvGroup(hosts:content:)-872vb`` for examples.
-///
-/// See: ``KvResponseGroup/hosts(_:)-3ilz3``.
+/// A shorthand for ``KvGroup(hosts:hostAliases:optionalSubdomains:content:)-6clfy``.
 @inlinable
-public func KvGroup<Hosts, Content : KvResponseGroup>(
+public func KvGroup<Hosts, HostAliases, OptionalSubdomains, Content : KvResponseRootGroup>(
     hosts: Hosts,
-    @KvResponseGroupBuilder content: @escaping () -> Content
-) -> some KvResponseGroup
-where Hosts : Sequence, Hosts.Element == String
+    hostAliases: HostAliases = EmptyCollection<String>(),
+    optionalSubdomains: OptionalSubdomains = EmptyCollection<String>(),
+    @KvResponseRootGroupBuilder content: @escaping () -> Content
+) -> some KvResponseRootGroup
+where Hosts : Sequence, Hosts.Element == String,
+      HostAliases : Sequence, HostAliases.Element == String,
+      OptionalSubdomains : Sequence, OptionalSubdomains.Element == String
 {
-    KvModifiedResponseGroup(configuration: .init(dispatching: .init(hosts: .init(hosts))), source: content)
+    KvModifiedResponseRootGroup(
+        configuration: .init(dispatching: .init(hosts: .init(hosts),
+                                                hostAliases: .init(hostAliases),
+                                                optionalSubdomains: .init(optionalSubdomains))),
+        source: content
+    )
 }
 
 
-/// Adds given values into list of hosts.
+/// - Returns: A root response group with given host parameters.
 ///
 /// Host lists of nested response groups are united. Nested lists of hosts are resolved for each response and used to filter requests.
-/// If the resolved list is empty then the response available for any or no host.
-///
-/// Usually host is provided as a component of an URL.
+/// If the resolved list is unset then the response available for any or no host.
+/// If the resolved list is empty then the responses are ignored.
 ///
 /// Below is an example of typical usage:
 ///
 /// ```swift
-/// KvGroup(hosts: "example.com", "example.org") {
-///     Responses()
+/// KvGroup(hosts: "example.com", hostAliases: "example.org", "example.net", optionalSubdomains: "www", "an") {
+///     responses
 /// }
 /// ```
 ///
-/// Below is an example where `Response1` is available for "user1", "user2" and "admin" users but `Response2` is available only for "user1" and "user2" users.
-///
-/// ```swift
-/// KvGroup(users: "user1", "user2") {
-///     KvGroup(users: "admin") {
-///         Response1()
-///     }
-///     Response2()
-/// }
-/// ```
-///
-/// See: ``KvResponseGroup/hosts(_:)-1pv6b``.
+/// - SeeAlso: ``KvResponseRootGroup/hosts(_:)-9jenr``, ``KvResponseRootGroup/hosts(aliases:)-6nalk``, ``KvResponseRootGroup/subdomains(optional:)-7x9it``.
 @inlinable
-public func KvGroup<Content : KvResponseGroup>(
+public func KvGroup<Content : KvResponseRootGroup>(
     hosts: String...,
-    @KvResponseGroupBuilder content: @escaping () -> Content
-) -> some KvResponseGroup {
-    KvGroup(hosts: hosts, content: content)
+    hostAliases: String...,
+    optionalSubdomains: String...,
+    @KvResponseRootGroupBuilder content: @escaping () -> Content
+) -> some KvResponseRootGroup {
+    KvGroup(hosts: hosts, hostAliases: hostAliases, optionalSubdomains: optionalSubdomains, content: content)
 }
 
 

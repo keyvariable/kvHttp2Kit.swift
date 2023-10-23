@@ -29,12 +29,9 @@ import Foundation
 
 struct KvHttpResponseContext {
 
-    typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
-
-
     var subpathComponents: ArraySlice<String>
 
-    var clientCallbacks: ClientCallbacks?
+    var clientCallbacks: KvClientCallbacks?
 
 }
 
@@ -84,7 +81,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
     typealias HeadCallback = (KvHttpServer.RequestHeaders) -> Result<Headers, Error>
     typealias SubpathFilterCallback = (Subpath) -> KvFilterResult<SubpathValue>
 
-    typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
+    typealias ClientCallbacks = KvClientCallbacks
 
     typealias Input = KvHttpResponseInput<QueryParser.Value, Headers, BodyValue, SubpathValue>
     typealias ResponseContext = KvHttpResponseContext
@@ -97,6 +94,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
 
 
 
+    /// - Parameter clientCallbacks: The response's (unresolved) client callbacks.
     init(subpathFilter: @escaping SubpathFilterCallback,
          urlQueryParser: QueryParser,
          headCallback: @escaping HeadCallback,
@@ -120,6 +118,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
 
     private let body: any KvHttpRequestBodyInternal
 
+    /// The response's (unresolved) client callbacks.
     private let clientCallbacks: ClientCallbacks?
 
     private let responseProvider: ResponseProvider
@@ -236,11 +235,13 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
 
 
 
-extension KvHttpResponseImplementation : KvHttpSubpathResponseImplementation where Subpath == KvUrlSubpath {
-    // MARK: : KvHttpSubpathResponseImplementation
-}
+// MARK: : KvHttpSubpathResponseImplementation
+
+extension KvHttpResponseImplementation : KvHttpSubpathResponseImplementation where Subpath == KvUrlSubpath { }
 
 
+
+// MARK: Simple Response Case
 
 extension KvHttpResponseImplementation
 where QueryParser == KvEmptyUrlQueryParser,
@@ -249,9 +250,10 @@ where QueryParser == KvEmptyUrlQueryParser,
       Subpath == KvUnavailableUrlSubpath,
       SubpathValue == Void
 {
-    // MARK: Simple Response Case
-
+    
     /// Initializes implementation for emptry URL query, requiring head-only request, providing no analysis of request headers.
+    ///
+    /// - Parameter clientCallbacks: The response's (unresolved) client callbacks.
     init(clientCallbacks: ClientCallbacks?, responseProvider: @escaping () throws -> KvHttpResponseProvider) {
         self.init(subpathFilter: { _ in .accepted(()) },
                   urlQueryParser: .init(),

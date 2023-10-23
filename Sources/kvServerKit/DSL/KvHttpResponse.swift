@@ -100,10 +100,6 @@ public struct KvHttpResponse : KvResponse {
     fileprivate typealias ImplementationBlock = (ImplementationConfiguration) -> Implementation
 
 
-    @usableFromInline
-    typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
-
-
 
     @usableFromInline
     var configuration: Configuration = .empty
@@ -256,7 +252,7 @@ public struct KvHttpResponse : KvResponse {
 
 
         @usableFromInline
-        var clientCallbacks: ClientCallbacks?
+        var clientCallbacks: KvClientCallbacks?
 
     }
 
@@ -339,7 +335,7 @@ extension KvHttpResponse : KvResponseInternalProtocol {
     fileprivate struct ImplementationConfiguration {
 
         let httpRequestBody: KvResponseGroupConfiguration.HttpRequestBody?
-        let clientCallbacks: ClientCallbacks?
+        let clientCallbacks: KvClientCallbacks?
 
 
         init(_ responseGroupConfiguration: KvResponseGroupConfiguration?, _ responseConfiguration: Configuration?) {
@@ -1158,11 +1154,13 @@ extension KvHttpResponse.DynamicResponse where Subpath == KvUnavailableUrlSubpat
     /// Below is a simple example returning the subpath:
     /// ```swift
     /// struct Server : KvServer {
-    ///     var body: some KvResponseGroup {
-    ///     KvGroup("a/b") {
-    ///         KvHttpResponse.dynamic
-    ///             .subpath
-    ///             .content { input in .string { input.subpath.joined } }
+    ///     var body: some KvResponseRootGroup {
+    ///         KvGroup("a/b") {
+    ///             KvHttpResponse.dynamic
+    ///                 .subpath
+    ///                 .content { input in
+    ///                     .string { input.subpath.joined }
+    ///                 }
     ///         }
     ///     }
     /// }
@@ -1197,8 +1195,13 @@ extension KvHttpResponse.DynamicResponse where Subpath == KvUnavailableUrlSubpat
     ///     }
     ///     KvHttpResponse.dynamic
     ///         .subpathFilter { $0.components.count == 1 }
-    ///         .subpathFlatMap { Int($0.components.first!).map { .accepted($0) } ?? .rejected }
-    ///         .content { input in .string { "Profile \(input.subpath)" } }
+    ///         .subpathFlatMap {
+    ///             Int($0.components.first!).map { .accepted($0) }
+    ///             ?? .rejected
+    ///         }
+    ///         .content { input in
+    ///             .string { "Profile \(input.subpath)" }
+    ///         }
     /// }
     /// ```
     ///

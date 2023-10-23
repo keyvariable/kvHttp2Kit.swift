@@ -33,28 +33,32 @@ import NIOHTTP1
 /// A type that represents hierarchical structure of responses.
 ///
 /// Groups are used to manage their contents as a single entity and to customize handling of responses in the group.
-/// Customizations are declared via modifiers of response groups. Also there are various overloads of `KvGroup`() method providing the same functionality in convenient way.
+/// Customizations are declared via modifiers of response groups.
+/// Also there are various overloads of `KvGroup`() method providing the same functionality in convenient way.
 ///
-/// Below is an example where response group is used to provide some responses on two hosts with optional subdomain "www".
+/// Below is an example where `response1` is available at "a" path, `response2` is available at "a/b" path and both responses are available for GET method only.
 ///
 /// ```swift
-/// KvGroup(hosts: "example.com", "example.org") {
-///     Response1()
-///     Response2()
+/// KvGroup(httpMethods: .GET) {
+///     KvGroup("a") {
+///         response1
+///         KvGroup("b") {
+///             response2
+///         }
+///     }
 /// }
-/// .subdomains(optional: "www")
 /// ```
 ///
 /// Below is a more complicated example where response group is used to incapsulate some part of response hierarchy with options.
 ///
 /// ```swift
 /// struct TestableServer : KvServer {
-///     var body: some KvResponseGroup {
-///         RootResponseGroup(options: [ ])
-///         RootResponseGroup(options: .testMode)
+///     var body: some KvResponseRootGroup {
+///         ResponseGroup(options: [ ])
+///         ResponseGroup(options: .testMode)
 ///     }
 ///
-///     private struct RootResponseGroup : KvResponseGroup {
+///     private struct ResponseGroup : KvResponseGroup {
 ///         let options: Options
 ///
 ///         var body: some KvResponseGroup {
@@ -72,9 +76,11 @@ import NIOHTTP1
 ///     }
 /// }
 /// ```
+///
+/// - SeeAlso: ``KvResponseRootGroup``.
 public protocol KvResponseGroup {
 
-    /// It's inferred from your implementation of the required property ``KvResponseGroup/body-swift.property-79vqj``.
+    /// It's inferred from your implementation of the required property ``KvResponseGroup/body-swift.property``.
     associatedtype Body : KvResponseGroup
 
 
@@ -85,7 +91,6 @@ public protocol KvResponseGroup {
     var body: Body { get }
 
 }
-
 
 
 extension KvResponseGroup {
@@ -104,9 +109,6 @@ extension KvResponseGroup {
 
     // MARK: Modifiers
 
-    public typealias HTTP = KvHttpConfiguration
-
-
     @usableFromInline
     typealias Configuration = KvModifiedResponseGroup.Configuration
 
@@ -118,74 +120,6 @@ extension KvResponseGroup {
     }
 
 
-    /// Declares parameters of HTTP connections for HTTP responses in the group contents.
-    ///
-    /// - Parameter httpEndpoints: Sequence of network addresses (IP addresses or host names), ports and HTTP protocol configurations.
-    ///
-    /// Existing values of the contents are replaced with provided values.
-    /// Arguments of cascade invocations of the modifier are merged. Existing configurations are replaced with new values on the same endpoints.
-    ///
-    /// Below is an example where the contents of `SomeResposeGroup` are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
-    ///
-    /// ```swift
-    /// SomeResposeGroup()
-    ///     .http(Host.current().addresses.lazy.map { (.init($0, on: 8080), .v2(ssl: ssl)) })
-    /// ```
-    ///
-    /// See: ``KvHttpConfiguration``, ``KvGroup(httpEndpoints:content:)``, ``http(_:at:)``, ``http(_:at:on:)``.
-    ///
-    /// - Note: By default HTTP responses are available at IPv6 local machine address `::1`, on port 80, via insecure HTTP/1.1.
-    @inlinable
-    public func http<HttpEndpoints>(_ httpEndpoints: HttpEndpoints) -> some KvResponseGroup
-    where HttpEndpoints : Sequence, HttpEndpoints.Element == (KvNetworkEndpoint, HTTP)
-    {
-        modified { configuration in
-            configuration.network.insert(httpEndpoints)
-        }
-    }
-
-
-    /// A shorthand for ``http(_:)`` providing the same HTTP configuration on given *endpoints*. See it's documentation for details.
-    ///
-    /// Below is an example where the contents of `SomeResposeGroup` are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
-    ///
-    /// ```swift
-    /// SomeResposeGroup()
-    ///     .http(.v2(ssl: ssl), at: Host.current().addresses.lazy.map { .init($0, on: 8080) })
-    /// ```
-    ///
-    /// See: ``KvHttpConfiguration``, ``KvGroup(http:at:content:)``.
-    @inlinable
-    public func http<Endpoints>(_ http: HTTP = .init(), at endpoints: Endpoints) -> some KvResponseGroup
-    where Endpoints : Sequence, Endpoints.Element == KvNetworkEndpoint
-    {
-        self.http(endpoints.lazy.map { ($0, http) })
-    }
-
-
-    /// A shorthand for ``http(_:)`` providing the same HTTP configuration on all combinations of *addresses* and *ports*. See it's documentation for details.
-    ///
-    /// Below is an example where the contents of `SomeResposeGroup` are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
-    ///
-    /// ```swift
-    /// SomeResposeGroup()
-    ///     .http(.v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ])
-    /// ```
-    ///
-    /// See: ``KvHttpConfiguration``, ``KvGroup(http:at:on:content:)``.
-    @inlinable
-    public func http<Addresses, Ports>(
-        _ http: HTTP = .init(),
-        at addresses: Addresses,
-        on ports: Ports
-    ) -> some KvResponseGroup
-    where Addresses : Sequence, Addresses.Element == String,
-          Ports : Sequence, Ports.Element == UInt16
-    {
-        self.http(http, at: KvCartesianProductSequence(addresses, ports).lazy.map { KvNetworkEndpoint($0.0, on: $0.1) })
-    }
-
-
     /// Adds given values into HTTP method filter.
     ///
     /// The result is the same as ``KvResponseGroup/httpMethods(_:)-6fbma``. See it's documentation for details.
@@ -194,12 +128,13 @@ extension KvResponseGroup {
     where Methods : Sequence, Methods.Element == KvHttpMethod
     {
         modified {
-            $0.dispatching.insert(httpMethods: httpMethods)
+            $0.dispatching?.insert(httpMethods: httpMethods)
+            ?? ($0.dispatching = .init(httpMethods: .init(httpMethods)))
         }
     }
 
 
-    /// Adds given values into HTTP method filter.
+    /// This modifier adds given values into HTTP method filter.
     ///
     /// By default HTTP method filter accepts any value. Once this modifier is called, the filter is cleared and provided values are inserted.
     ///
@@ -220,7 +155,7 @@ extension KvResponseGroup {
     }
 
 
-    /// Adds given values into URL filter by user.
+    /// This modifier adds given values into URL filter by user.
     ///
     /// The result is the same as ``KvResponseGroup/users(_:)-48ll0``. See it's documentation for details.
     @inlinable
@@ -228,12 +163,13 @@ extension KvResponseGroup {
     where Users : Sequence, Users.Element == String
     {
         modified {
-            $0.dispatching.insert(users: users)
+            $0.dispatching?.insert(users: users)
+            ?? ($0.dispatching = .init(users: .init(users)))
         }
     }
 
 
-    /// Adds given values into URL filter by user.
+    /// This modifier adds given values into URL filter by user.
     ///
     /// By default user filter accepts any value. Once this modifier is called, the filter is cleared and provided values are inserted.
     ///
@@ -258,73 +194,7 @@ extension KvResponseGroup {
     }
 
 
-    /// Adds given values into list of hosts.
-    ///
-    /// The result is the same as ``KvResponseGroup/hosts(_:)-1pv6b``. See it's documentation for details.
-    @inlinable
-    public func hosts<Hosts>(_ hosts: Hosts) -> some KvResponseGroup
-    where Hosts : Sequence, Hosts.Element == String
-    {
-        modified {
-            $0.dispatching.hosts.formUnion(hosts)
-        }
-    }
-
-
-    /// Adds given values into list of hosts.
-    ///
-    /// Host lists of nested response groups are united. Nested lists of hosts are resolved for each response and used to filter requests.
-    /// If the resolved list is empty then the response available for any or no host.
-    ///
-    /// Usually host is provided as a component of an URL.
-    ///
-    /// Below is a simple example:
-    ///
-    /// ```swift
-    /// SomeResponseGroup()
-    ///     .hosts("example.com", "example.org")
-    /// ```
-    ///
-    /// See: ``KvGroup(hosts:content:)-872vb``, ``KvResponseGroup/subdomains(optional:)-9g9xv``.
-    @inlinable
-    public func hosts(_ hosts: String...) -> some KvResponseGroup {
-        self.hosts(hosts)
-    }
-
-
-    /// Adds given values into list of optional subdomains.
-    ///
-    /// The result is the same as ``KvResponseGroup/subdomains(optional:)-9g9xv``. See it's documentation for details.
-    @inlinable
-    public func subdomains<Subdomains>(optional subdomains: Subdomains) -> some KvResponseGroup
-    where Subdomains : Sequence, Subdomains.Element == String
-    {
-        modified {
-            $0.dispatching.optionalSubdomains.formUnion(subdomains)
-        }
-    }
-
-
-    /// Adds given values into list of optional subdomains.
-    ///
-    /// Optional subdomain lists of nested response groups are united. Nested lists of optional subdomains are resolved for each response and used to filter requests.
-    ///
-    /// Below is an example where `SomeResponseGroup` is available on "example.com", "example.org", "www.example.com", "www.example.org":
-    ///
-    /// ```swift
-    /// SomeResponseGroup()
-    ///     .hosts("example.com", "example.org")
-    ///     .subdomains(optional: "www")
-    /// ```
-    ///
-    /// See: ``KvResponseGroup/hosts(_:)-1pv6b``.
-    @inlinable
-    public func subdomains(optional subdomains: String...) -> some KvResponseGroup {
-        self.subdomains(optional: subdomains)
-    }
-
-
-    /// Appends the group's relative path to it's contents.
+    /// This modifier appends the group's relative path to it's contents.
     ///
     /// Paths of nested groups are correctly joined, duplicated path separators are removed. Special directories "." and ".." are not resolved.
     /// E.g. "///b/./c/..//b///e///./f/../" path is equivalent to "/b/./c/../b/e/./f/..".
@@ -362,12 +232,13 @@ extension KvResponseGroup {
     @inlinable
     public func path(_ pathComponent: String) -> some KvResponseGroup {
         modified {
-            $0.dispatching.appendPathComponent(pathComponent)
+            $0.dispatching?.appendPathComponent(pathComponent)
+            ?? ($0.dispatching = .init(path: pathComponent))
         }
     }
 
 
-    /// Declares default body length limit in bytes for HTTP requests in the receiver and it's descendant groups.
+    /// This modifier declares default body length limit in bytes for HTTP requests in the receiver and it's descendant groups.
     ///
     /// Previously declared value is replaced.
     ///
@@ -375,12 +246,19 @@ extension KvResponseGroup {
     @inlinable
     public func httpBodyLengthLimit(_ value: UInt) -> some KvResponseGroup {
         modified {
-            $0.httpRequestBody.bodyLengthLimit = value
+            _ = {
+                switch $0 {
+                case .none:
+                    $0 = .init(bodyLengthLimit: value)
+                case .some:
+                    $0!.bodyLengthLimit = value
+                }
+            }(&$0.httpRequestBody)
         }
     }
 
 
-    /// Declares handler of incidents in the receiver's context. It's a place to customize default response content.
+    /// This modifier declares handler of incidents in the receiver's context. It's a place to customize default response content.
     ///
     /// - Parameter block:  A block returning custom response or `nil` for given *incident*.
     ///                     If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
@@ -412,7 +290,7 @@ extension KvResponseGroup {
     }
 
 
-    /// Declares callback for errors in the receiver's context.
+    /// This modifier declares callback for errors in the receiver's context.
     ///
     /// Previously declared value is replaced.
     ///
@@ -440,25 +318,20 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
 
     @usableFromInline
-    var network: Network
+    var dispatching: Dispatching?
 
     @usableFromInline
-    var dispatching: Dispatching
+    var httpRequestBody: HttpRequestBody?
 
     @usableFromInline
-    var httpRequestBody: HttpRequestBody
-
-    @usableFromInline
-    var clientCallbacks: ClientCallbacks?
+    var clientCallbacks: KvClientCallbacks?
 
 
     @usableFromInline
-    init(network: Network = .empty,
-         dispatching: Dispatching = .empty,
-         httpRequestBody: HttpRequestBody = .empty,
-         clientCallbacks: ClientCallbacks? = nil
+    init(dispatching: Dispatching? = nil,
+         httpRequestBody: HttpRequestBody? = nil,
+         clientCallbacks: KvClientCallbacks? = nil
     ) {
-        self.network = network
         self.dispatching = dispatching
         self.httpRequestBody = httpRequestBody
         self.clientCallbacks = clientCallbacks
@@ -469,8 +342,7 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
     @usableFromInline
     static func overlay(_ addition: Self, over base: Self) -> Self {
-        .init(network: .overlay(addition.network, over: base.network),
-              dispatching: .overlay(addition.dispatching, over: base.dispatching),
+        .init(dispatching: .overlay(addition.dispatching, over: base.dispatching),
               httpRequestBody: .overlay(addition.httpRequestBody, over: base.httpRequestBody),
               clientCallbacks: .overlay(addition.clientCallbacks, over: base.clientCallbacks)
         )
@@ -479,190 +351,10 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
     @usableFromInline
     static func accumulate(_ addition: Self, into base: Self) -> Self {
-        .init(network: .accumulate(addition.network, into: base.network),
-              dispatching: .accumulate(addition.dispatching, into: base.dispatching),
+        .init(dispatching: .accumulate(addition.dispatching, into: base.dispatching),
               httpRequestBody: .accumulate(addition.httpRequestBody, into: base.httpRequestBody),
               clientCallbacks: .accumulate(addition.clientCallbacks, into: base.clientCallbacks)
         )
-    }
-
-
-    // MARK: .Network
-
-    @usableFromInline
-    struct Network : KvDefaultOverlayCascadable, KvDefaultAccumulationCascadable {
-
-        @usableFromInline
-        typealias Address = String
-
-        @usableFromInline
-        typealias Port = UInt16
-
-
-        @usableFromInline
-        static let empty: Self = .init()
-
-
-        /// Protocol IDs for endpoints.
-        @usableFromInline
-        private(set) var protocolIDs: [KvNetworkEndpoint : ProtocolID]
-
-        /// Prepared data to configure HTTP channels.
-        @usableFromInline
-        private(set) var httpEndpoints: HttpEndpoints
-
-
-        private init() {
-            protocolIDs = [:]
-            httpEndpoints = .empty
-        }
-
-
-        @usableFromInline
-        init(httpEndpoints: HttpEndpoints) {
-            self.protocolIDs = .init(uniqueKeysWithValues: httpEndpoints.elements.lazy.map { ($0, .http) })
-            self.httpEndpoints = httpEndpoints
-        }
-
-
-        // MARK: : KvCascadable
-
-        @usableFromInline
-        static func overlay(_ addition: Self, over base: Self) -> Self {
-            !base.isEmpty ? base : addition  // Addition are ignored when base is non-empty.
-        }
-
-
-        @usableFromInline
-        static func accumulate(_ addition: Self, into base: Self) -> Self {
-            var result = base
-
-            result.protocolIDs.merge(addition.protocolIDs, uniquingKeysWith: { base, addition in addition })
-            addition.httpEndpoints.configurations.forEach {
-                result.httpEndpoints.insert($0.value, for: $0.key)
-            }
-
-            return result
-        }
-
-
-        // MARK: .ProtocolID
-
-        @usableFromInline
-        enum ProtocolID : Equatable {
-            case http
-        }
-
-
-        // MARK: .HttpEndpoints
-
-        @usableFromInline
-        struct HttpEndpoints : ExpressibleByDictionaryLiteral, Equatable {
-
-            @usableFromInline
-            typealias Configurations = [KvNetworkEndpoint : Configuration]
-
-
-            static let empty: Self = .init()
-
-
-            /// All endpoints from ``configurations``.
-            private(set) var elements: Set<KvNetworkEndpoint> = [ ]
-            /// Protocol configurations for endpoints.
-            private(set) var configurations: Configurations = [:]
-
-
-            private init() { }
-
-
-            private init(elements: Set<KvNetworkEndpoint>, configurations: Configurations) {
-                self.elements = elements
-                self.configurations = configurations
-            }
-
-
-            @usableFromInline
-            init<E>(uniqueKeysWithValues elements: E) where E : Sequence, E.Element == (KvNetworkEndpoint, Configuration) {
-                configurations = .init(uniqueKeysWithValues: elements)
-                self.elements = .init(configurations.keys)
-            }
-
-
-            // MARK: : ExpressibleByDictionaryLiteral
-
-            @usableFromInline
-            init(dictionaryLiteral elements: (KvNetworkEndpoint, Configuration)...) {
-                self.init(uniqueKeysWithValues: elements)
-            }
-
-
-            // MARK: Equatable
-
-            @usableFromInline
-            static func ==(lhs: Self, rhs: Self) -> Bool { lhs.configurations == rhs.configurations }
-
-
-            // MARK: .Configuration
-
-            @usableFromInline
-            typealias Configuration = KvHttpConfiguration
-
-
-            // MARK: Operations
-
-            var isEmpty: Bool { configurations.isEmpty }
-
-
-            mutating func insert(_ configuration: Configuration, for endpoint: KvNetworkEndpoint) {
-                elements.insert(endpoint)
-                configurations[endpoint] = configuration
-            }
-
-
-            mutating func remove(_ endpoint: KvNetworkEndpoint) {
-                elements.remove(endpoint)
-                configurations.removeValue(forKey: endpoint)
-            }
-
-
-            func intersection(_ endpoints: Set<KvNetworkEndpoint>) -> Self {
-                .init(elements: elements.subtracting(endpoints),
-                      configurations: configurations.filter({ endpoints.contains($0.key) }))
-            }
-
-        }
-
-
-        // MARK: Operations
-
-        @usableFromInline
-        var isEmpty: Bool { protocolIDs.isEmpty }
-
-
-        @usableFromInline
-        mutating func insert<H>(_ httpEndpoints: H) where H : Sequence, H.Element == (KvNetworkEndpoint, HttpEndpoints.Configuration) {
-            httpEndpoints.forEach { (endpoint, httpConfiguration) in
-                insert(protocolID: .http, for: endpoint)
-                self.httpEndpoints.insert(httpConfiguration, for: endpoint)
-            }
-        }
-
-
-        /// Inserts *protocolID* for *endpoint* key. If some other ID has already been inserted then it's correctly deleted.
-        @inline(__always)
-        private mutating func insert(protocolID: ProtocolID, for endpoint: KvNetworkEndpoint) {
-            let oldProtocolID = protocolIDs.updateValue(protocolID, forKey: endpoint)
-
-            guard let oldProtocolID = oldProtocolID,
-                  oldProtocolID != protocolID
-            else { return /* Nothing to do */ }
-
-            switch oldProtocolID {
-            case .http:
-                httpEndpoints.remove(endpoint)
-            }
-        }
-
     }
 
 
@@ -670,10 +362,6 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
     @usableFromInline
     struct Dispatching : KvDefaultOverlayCascadable, KvDefaultAccumulationCascadable {
-
-        @usableFromInline
-        static let empty: Self = .init()
-
 
         /// - Note: `nil` means any method.
         @usableFromInline
@@ -683,14 +371,7 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
         @usableFromInline
         var users: CascadableSet<String>?
 
-        /// - Note: Empty set means any host.
-        @usableFromInline
-        var hosts: Set<String>
-
-        @usableFromInline
-        var optionalSubdomains: Set<String>
-
-        /// See: ``appendPathComponent(_:)``.
+        /// - SeeAlso: ``appendPathComponent(_:)``.
         @usableFromInline
         private(set) var path: String
 
@@ -698,14 +379,10 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
         @usableFromInline
         init(httpMethods: CascadableSet<KvHttpMethod>? = nil,
              users: CascadableSet<String>? = nil,
-             hosts: Set<String> = [ ],
-             optionalSubdomains: Set<String> = [ ],
              path: String = ""
         ) {
             self.httpMethods = httpMethods
             self.users = users
-            self.hosts = hosts
-            self.optionalSubdomains = optionalSubdomains
             self.path = Self.normalizedPath(path)
         }
 
@@ -716,8 +393,6 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
         static func overlay(_ addition: Self, over base: Self) -> Self {
             .init(httpMethods: .overlay(addition.httpMethods, over: base.httpMethods),
                   users: .overlay(addition.users, over: base.users),
-                  hosts: base.hosts.union(addition.hosts),
-                  optionalSubdomains: base.optionalSubdomains.union(addition.optionalSubdomains),
                   path: base.path + addition.path)    // Assuming paths are safe and always have leading path separators
         }
 
@@ -726,8 +401,6 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
         static func accumulate(_ addition: Self, into base: Self) -> Self {
             .init(httpMethods: .accumulate(addition.httpMethods, into: base.httpMethods),
                   users: .accumulate(addition.users, into: base.users),
-                  hosts: base.hosts.union(addition.hosts),
-                  optionalSubdomains: base.optionalSubdomains.union(addition.optionalSubdomains),
                   path: base.path + addition.path)    // Assuming paths are safe and always have leading path separators
         }
 
@@ -792,15 +465,6 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
         @inline(__always)
         @usableFromInline
-        static func join<T>(_ lhs: [T], _ rhs: [T]) -> [T] {
-            var result = lhs
-            result.append(contentsOf: rhs)
-            return result
-        }
-
-
-        @inline(__always)
-        @usableFromInline
         mutating func insert<HttpMethods>(httpMethods: HttpMethods)
         where HttpMethods : Sequence, HttpMethods.Element == KvHttpMethod
         {
@@ -832,45 +496,6 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
     @usableFromInline
     typealias HttpRequestBody = KvHttpRequestBodyConfiguration
-
-
-    // MARK: .ClientCallbacks
-
-    @usableFromInline
-    struct ClientCallbacks : KvCascadable, KvReplacingOverlayCascadable, KvDefaultAccumulationCascadable {
-
-        @usableFromInline
-        typealias ErrorCallback = (Error, KvHttpRequestContext) -> Void
-        
-        @usableFromInline
-        typealias IncidentCallback = (KvHttpIncident, KvHttpRequestContext) -> KvHttpResponseProvider?
-
-
-        /// Handles incidents.
-        @usableFromInline
-        var onHttpIncident: IncidentCallback?
-
-        /// Handles errors from clients and requests.
-        @usableFromInline
-        var onError: ErrorCallback?
-
-
-        @usableFromInline
-        init(onHttpIncident: IncidentCallback? = nil, onError: ErrorCallback? = nil) {
-            self.onHttpIncident = onHttpIncident
-            self.onError = onError
-        }
-
-
-        // MARK: : KvCascadable
-
-        @usableFromInline
-        static func accumulate(_ addition: Self, into base: Self) -> Self {
-            .init(onHttpIncident: addition.onHttpIncident ?? base.onHttpIncident,
-                  onError: addition.onError ?? base.onError)
-        }
-
-    }
 
 }
 
@@ -915,7 +540,7 @@ struct KvModifiedResponseGroup : KvResponseGroupInternalProtocol {
     // MARK: : KvResponseGroup
 
     @usableFromInline
-    typealias Body = KvNeverResponseGroup
+    var body: KvNeverResponseGroup { KvNeverResponseGroup() }
 
 
     // MARK: : KvResponseGroupInternalProtocol
@@ -955,19 +580,18 @@ struct KvModifiedResponseGroup : KvResponseGroupInternalProtocol {
 
 
 
-// MARK: - KvNeverResponseGroupProtocol
+// MARK: - KvNeverResponseGroup
 
-public protocol KvNeverResponseGroupProtocol : KvResponseGroup {
+/// Special type for implementations of ``KvResponseGroup`` providing no body.
+///
+/// - Note: It calls *fatalError()* when instantiated.
+public struct KvNeverResponseGroup : KvResponseGroup {
 
-    init()
-
-}
+    public typealias Body = KvNeverResponseGroup
 
 
-// This approach helps to prevent substitution of `KvNeverResponseGroup` as `Body` in the Xcode's code completion for `body` properties
-// when declaring structures conforming to `KvResponseGroup`.
-// If body constraint were `Body == KvNeverResponseGroup` then the code completion would always produce `var body: KvNeverResponseGroup`.
-extension KvResponseGroup where Body : KvNeverResponseGroupProtocol {
+    init() { fatalError("KvNeverResponseGroup must never be instantiated") }
+
 
     public var body: Body { Body() }
 
@@ -975,16 +599,29 @@ extension KvResponseGroup where Body : KvNeverResponseGroupProtocol {
 
 
 
-// MARK: - KvNeverResponseGroup
+// MARK: - KvEmptyResponseGroup
 
-/// Special type for implementations of ``KvResponseGroup`` providing no body.
-///
-/// - Note: It calls *fatalError()* when instantiated.
-public struct KvNeverResponseGroup : KvNeverResponseGroupProtocol {
+/// It's designated to explicitly declare empty response groups.
+public struct KvEmptyResponseGroup : KvResponseGroup {
 
     public typealias Body = KvNeverResponseGroup
 
 
-    public init() { fatalError("KvNeverResponseGroup must never be instantiated") }
+    @inlinable
+    public init() { }
+
+
+    public var body: Body { Body() }
+
+}
+
+
+// MARK: : KvResponseGroupInternalProtocol
+
+extension KvEmptyResponseGroup : KvResponseGroupInternalProtocol {
+
+    func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
+        // Nothing to do
+    }
 
 }

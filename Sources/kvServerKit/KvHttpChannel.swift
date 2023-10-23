@@ -1111,6 +1111,9 @@ open class KvHttpChannel {
                     if let modificationDate = response.modificationDate {
                         headers.add(name: "Last-Modified", value: self.dateFormatterRFC9110.string(from: modificationDate))
                     }
+                    if let location = response.location {
+                        headers.add(name: "Location", value: location.absoluteString)
+                    }
 
                     response.customHeaderCallback?(&headers)
 

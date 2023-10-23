@@ -37,7 +37,7 @@ class KvHttpResponseDispatcher {
 
 
 
-    private let rootNode: Node
+    private let rootNode: RootNode
 
 
 
@@ -48,10 +48,7 @@ class KvHttpResponseDispatcher {
     /// It's a class to minimize consumption of memory when a node has no attributes provided.
     class Attributes {
 
-        typealias ClientCallbacks = KvResponseGroupConfiguration.ClientCallbacks
-
-
-        var clientCallbacks: ClientCallbacks?
+        var clientCallbacks: KvClientCallbacks?
 
 
         /// - Important: Use ``from(_:)`` and ``merge(addition:into:)``.
@@ -59,7 +56,7 @@ class KvHttpResponseDispatcher {
 
 
         /// - Important: Use ``from(_:)`` and ``merge(addition:into:)``.
-        private init(clientCallbacks: ClientCallbacks?) {
+        private init(clientCallbacks: KvClientCallbacks?) {
             self.clientCallbacks = clientCallbacks
         }
 
@@ -263,25 +260,139 @@ extension KvHttpResponseDispatcher.Scheme {
 
 extension KvHttpResponseDispatcher {
 
-    struct Scheme {
+    class Scheme {
 
         private let methods: Methods = .init()
+
+        /// Hosts to hosts.
+        private var redirections: [String : String] = .init()
 
 
         // MARK: Operations
 
-        func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
+        func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: DispatchConfiguration) {
             methods.insert(response, for: configuration)
         }
 
 
-        func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
+        func insert(_ attributes: Attributes, for configuration: DispatchConfiguration) {
             methods.insert(attributes, for: configuration)
         }
 
 
-        fileprivate func build() -> Node? {
-            methods.build()
+        func insertRedirections(for configuration: KvResponseRootGroupConfiguration.Dispatching) {
+            guard let targetHost = configuration.hosts.first else { return }
+
+
+            func InsertRedirection(from source: String) {
+                if let replacedTarget = redirections.updateValue(targetHost, forKey: source),
+                   replacedTarget != targetHost
+                {
+                    KvDebug.pause("Target of redirection from «\(source)» host to «\(replacedTarget)» was replaced with «\(targetHost)»")
+                }
+            }
+
+
+            if !configuration.optionalSubdomains.isEmpty {
+                configuration.hosts
+                    .lazy.flatMap { host in configuration.optionalSubdomains.lazy.map { subdomain in "\(host).\(subdomain)" } }
+                    .forEach(InsertRedirection(from:))
+            }
+
+            configuration.hostAliases.forEach { host in
+                InsertRedirection(from: host)
+
+                configuration.optionalSubdomains.forEach { subdomain in
+                    InsertRedirection(from: "\(host).\(subdomain)")
+                }
+            }
+        }
+
+
+        fileprivate func build() -> RootNode? {
+            RootNode(subnode: methods.build(),
+                     redirections: .init(hosts: redirections))
+        }
+
+
+        // MARK: Auxiliaries
+
+        static func encodedHost(_ value: String) -> String? {
+            var urlComponents = URLComponents()
+
+            urlComponents.host = value
+
+            // TODO: Review if URLComponents.encodedHost is available on non-Apple platforms.
+#if canImport(Darwin)
+            // TODO: Review when target minimum OS versions are changed.
+            if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
+                return urlComponents.encodedHost
+            } else {
+                return urlComponents.url?.host
+            }
+#else // !canImport(Darwin)
+            return urlComponents.url?.host
+#endif // !canImport(Darwin)
+        }
+
+
+        // MARK: .DispatchConfiguration
+
+        struct DispatchConfiguration {
+
+            init(_ rootConfiguration: KvResponseRootGroupConfiguration.Dispatching?,
+                 _ configuration: KvResponseGroupConfiguration.Dispatching?
+            ) {
+                self.hosts = rootConfiguration?.hosts
+                self.group = configuration
+            }
+
+
+            /// Hosts from the root group.
+            private let hosts: Set<String>?
+
+            /// Dispatching configuratoin of a non-root response group.
+            private let group: KvResponseGroupConfiguration.Dispatching?
+
+
+            // MARK: Operations
+
+            /// Invokes *body* callback with each HTTP method in the configuration.
+            /// `nil` means wildcard method.
+            func forEachHttpMethod(_ body: (KvHttpMethod?) -> Void) {
+                guard let methods = group?.httpMethods else { return body(nil) }
+
+                methods.elements.forEach(body)
+            }
+
+
+            /// Invokes *body* callback with each user in the configuration.
+            /// `nil` means wildcard user.
+            func forEachUser(_ body: (String?) -> Void) {
+                guard let users = group?.users else { return body(nil) }
+
+                users.elements.forEach(body)
+            }
+
+
+            /// Invokes *body* callback with each encoded host in the configuration.
+            /// `nil` means wildcard user.
+            func forEachHost(_ body: (String?) -> Void) {
+                guard let hosts = hosts else { return body(nil) }
+
+                hosts
+                    .lazy.compactMap(Scheme.encodedHost(_:))
+                    .forEach(body)
+            }
+
+
+            var pathComponents: [String] {
+                guard let path = group?.path else { return [ ] }
+
+                // TODO: Avoid redundant parsing.
+                return URL(fileURLWithPath: path.starts(with: "/") ? path : ("/" + path)).pathComponents
+            }
+
         }
 
 
@@ -453,15 +564,15 @@ extension KvHttpResponseDispatcher {
 
         private class Methods : DictionaryContainer<Users, MethodNode> {
 
-            func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachKey(in: configuration.httpMethods?.elements) { method in
+            func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: DispatchConfiguration) {
+                configuration.forEachHttpMethod { method in
                     child(for: method).insert(response, for: configuration)
                 }
             }
 
 
-            func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachKey(in: configuration.httpMethods?.elements) { method in
+            func insert(_ attributes: Attributes, for configuration: DispatchConfiguration) {
+                configuration.forEachHttpMethod { method in
                     child(for: method).insert(attributes, for: configuration)
                 }
             }
@@ -476,15 +587,15 @@ extension KvHttpResponseDispatcher {
 
         private class Users : DictionaryContainer<Hosts, UserNode> {
 
-            func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachKey(in: configuration.users?.elements) { user in
+            func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: DispatchConfiguration) {
+                configuration.forEachUser { user in
                     child(for: user).insert(response, for: configuration)
                 }
             }
 
 
-            func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachKey(in: configuration.users?.elements) { user in
+            func insert(_ attributes: Attributes, for configuration: DispatchConfiguration) {
+                configuration.forEachUser { user in
                     child(for: user).insert(attributes, for: configuration)
                 }
             }
@@ -499,69 +610,21 @@ extension KvHttpResponseDispatcher {
 
         private class Hosts : DictionaryContainer<Paths, HostDictionaryNode> {
 
-            func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachHost(in: configuration) { host in
+            func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: DispatchConfiguration) {
+                configuration.forEachHost { host in
                     child(for: host).insert(response, for: configuration)
                 }
             }
 
 
-            func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                Self.forEachHost(in: configuration) { host in
+            func insert(_ attributes: Attributes, for configuration: DispatchConfiguration) {
+                configuration.forEachHost { host in
                     child(for: host).insert(attributes, for: configuration)
                 }
             }
 
 
             private func child(for key: Key?) -> Child { child(for: key, fabric: Child.init) }
-
-
-            // MARK: Auxiliaries
-
-            private static func forEachHost(in configuration: KvResponseGroupConfiguration.Dispatching, _ body: (Key?) -> Void) {
-                guard !configuration.hosts.isEmpty
-                else { return body(nil) }
-
-
-                func Body(_ host: String) {
-
-                    func EncodedHost(_ value: String) -> String? {
-                        var urlComponents = URLComponents()
-
-                        urlComponents.host = value
-
-                        // TODO: Review if URLComponents.encodedHost is available on non-Apple platforms.
-#if canImport(Darwin)
-                        // TODO: Review when target minimum OS versions are changed.
-                        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
-                            return urlComponents.encodedHost
-                        } else {
-                            return urlComponents.url?.host
-                        }
-#else // !canImport(Darwin)
-                        return urlComponents.url?.host
-#endif // !canImport(Darwin)
-                    }
-
-
-                    guard let host = EncodedHost(host) else { return }
-
-                    body(host)
-                }
-
-
-                switch configuration.optionalSubdomains.isEmpty {
-                case true:
-                    configuration.hosts.forEach(Body(_:))
-
-                case false:
-                    configuration.optionalSubdomains.forEach { optionalSubdomain in
-                        configuration.hosts.forEach { host in
-                            Body("\(optionalSubdomain).\(host)")
-                        }
-                    }
-                }
-            }
 
         }
 
@@ -570,15 +633,15 @@ extension KvHttpResponseDispatcher {
 
         private class Paths : HierarchyContainer<Responses, PathNode> {
 
-            func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                let keys = PathNode.safePathComponens(Self.pathComponents(from: configuration))
+            func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: DispatchConfiguration) {
+                let keys = PathNode.safePathComponens(configuration.pathComponents)
 
                 child(for: keys).insert(response)
             }
 
 
-            func insert(_ attributes: Attributes, for configuration: KvResponseGroupConfiguration.Dispatching) {
-                let keys = PathNode.safePathComponens(Self.pathComponents(from: configuration))
+            func insert(_ attributes: Attributes, for configuration: DispatchConfiguration) {
+                let keys = PathNode.safePathComponens(configuration.pathComponents)
 
                 child(for: keys).insert(attributes)
             }
@@ -596,6 +659,7 @@ extension KvHttpResponseDispatcher {
             private static func pathComponents(from configuration: KvResponseGroupConfiguration.Dispatching) -> [String] {
                 let path = configuration.path
 
+                // TODO: Avoid redundant parsing.
                 return URL(fileURLWithPath: path.starts(with: "/") ? path : ("/" + path)).pathComponents
             }
 
@@ -799,6 +863,104 @@ extension KvHttpResponseDispatcher {
 
 
 
+    // MARK: .RootNode
+
+    fileprivate class RootNode : Node {
+
+        init?(subnode: Node?, redirections: RedirectionNode?) {
+            guard subnode != nil || redirections != nil else { return nil }
+
+            self.subnode = subnode
+            self.redirections = redirections
+        }
+
+
+        private let subnode: Node?
+        private let redirections: RedirectionNode?
+
+
+        // MARK: : Node
+
+        func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: KvHttpResponseDispatcher.RequestProcessorResult) {
+            subnode?.accumulateRequestProcessors(for: requestContext, into: accumulator)
+
+            if case .notFound = accumulator.match {
+                redirections?.accumulateRequestProcessors(for: requestContext, into: accumulator)
+            }
+        }
+    }
+
+
+
+    // MARK: .RedirectionNode
+
+    class RedirectionNode : Node {
+
+        init?(hosts: [String : String]) {
+            self.requestProcessors = hosts.reduce(into: .init(), { partialResult, redirection in
+                guard let encodedSource = Scheme.encodedHost(redirection.key)
+                else { return KvDebug.pause("Warning: unable to encode source of redirection «\(redirection.key)» to «\(redirection.value)»") }
+
+                partialResult[encodedSource] = RedirectionRequestProcessor(targetHost: redirection.value)
+            })
+
+            guard !requestProcessors.isEmpty else { return nil }
+        }
+
+
+        /// Keys are encoded host names.
+        private let requestProcessors: [String : KvHttpRequestProcessorProtocol]
+
+
+        // MARK: : Node
+
+        func accumulateRequestProcessors(for requestContext: KvHttpRequestContext, into accumulator: KvHttpResponseDispatcher.RequestProcessorResult) {
+            guard let requestProcessor = requestContext.urlComponents.host.flatMap({ requestProcessors[$0] }) else { return }
+
+            accumulator.collect(.unambiguous(requestProcessor))
+        }
+
+
+        // MARK: .RedirectionRequestProcessor
+
+        private class RedirectionRequestProcessor : KvHttpRequestProcessorProtocol {
+
+            init(targetHost: String) {
+                self.targetHost = targetHost
+            }
+
+
+            private let targetHost: String
+
+
+            // MARK: : KvHttpRequestProcessorProtocol
+
+            func process(_ requestHeaders: KvHttpServer.RequestHeaders) -> Result<Void, Error> { .success(()) }
+
+
+            func makeRequestHandler(_ requestContext: KvHttpRequestContext) -> Result<KvHttpRequestHandler, Error> {
+                let targetURL: URL
+                do {
+                    var targetComponents = requestContext.urlComponents
+                    targetComponents.host = targetHost
+
+                    guard let url = targetComponents.url else { return .failure(KvHttpResponseError.invalidRedirectionTarget(targetComponents)) }
+
+                    targetURL = url
+                }
+
+                return .success(KvHttpHeadOnlyRequestHandler(response: .found(location: targetURL)))
+            }
+
+
+            func onIncident(_ incident: KvHttpIncident, _ context: KvHttpRequestContext) -> KvHttpResponseProvider? { nil }
+
+        }
+
+    }
+
+
+
     // MARK: .MethodNode
 
     fileprivate class MethodNode : DictionaryContainer<KvHttpMethod>, DictionaryNode {
@@ -827,7 +989,7 @@ extension KvHttpResponseDispatcher {
     fileprivate class UserNode : DictionaryContainer<String>, DictionaryNode {
 
         static func key(from requestContext: KvHttpRequestContext) -> String? {
-            requestContext.url.user
+            requestContext.urlComponents.user
         }
 
 
@@ -842,7 +1004,7 @@ extension KvHttpResponseDispatcher {
     fileprivate class HostDictionaryNode : DictionaryContainer<String>, DictionaryNode {
 
         static func key(from requestContext: KvHttpRequestContext) -> String? {
-            requestContext.url.host
+            requestContext.urlComponents.host
         }
 
 
@@ -988,7 +1150,7 @@ extension KvHttpResponseDispatcher {
 
             // MARK: Operations
 
-            func makeProcessor(_ requestContext: KvHttpRequestContext, _ clientCallbacks: Attributes.ClientCallbacks?) -> RequestProcessorResult.Match {
+            func makeProcessor(_ requestContext: KvHttpRequestContext, _ clientCallbacks: KvClientCallbacks?) -> RequestProcessorResult.Match {
                 let responseContext = KvHttpResponseContext(
                     subpathComponents: requestContext.pathComponents[(requestContext.pathComponents.startIndex + pathLevel)...],
                     clientCallbacks: clientCallbacks
@@ -1256,7 +1418,7 @@ extension KvHttpResponseDispatcher {
             static func withMatchResult(
                 _ elements: [Element],
                 in requestContext: KvHttpRequestContext,
-                body: (Match<(KvHttpRequestContext, Attributes.ClientCallbacks?) -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
+                body: (Match<(KvHttpRequestContext, KvClientCallbacks?) -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
             ) -> RequestProcessorResult.Match {
                 let query = requestContext.urlComponents.queryItems
 
@@ -1313,7 +1475,7 @@ extension KvHttpResponseDispatcher {
             @inline(__always)
             static func withMatchResult(_ elements: [Element],
                                         in requestContext: KvHttpRequestContext,
-                                        body: (Match<(KvHttpRequestContext, Attributes.ClientCallbacks?) -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
+                                        body: (Match<(KvHttpRequestContext, KvClientCallbacks?) -> RequestProcessorResult.Match>) -> RequestProcessorResult.Match
             ) -> RequestProcessorResult.Match {
                 guard let query = requestContext.urlComponents.queryItems,
                       !query.isEmpty

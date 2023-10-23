@@ -15,10 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvResponseGroupBuilder.swift
+//  KvResponseRootGroupBuilder.swift
 //  kvServerKit
 //
-//  Created by Svyatoslav Popov on 09.06.2023.
+//  Created by Svyatoslav Popov on 22.10.2023.
 //
 
 import Foundation
@@ -26,92 +26,59 @@ import Foundation
 
 
 @resultBuilder
-public struct KvResponseGroupBuilder {
+public struct KvResponseRootGroupBuilder {
 
-    public typealias Group = KvResponseGroup
+    public typealias Group = KvResponseRootGroup
 
 
 
-    /// Group expression builder.
+    /// Root response group expression builder.
     @inlinable
     public static func buildExpression<Component>(_ expression: Component) -> Component
     where Component : Group
     { expression }
 
-    
+
+    /// Response group expression builder.
+    @inlinable
+    public static func buildExpression<G>(_ responseGroup: G) -> WrapperGroup<G>
+    where G : KvResponseGroup
+    { WrapperGroup(responseGroup) }
+
+
     /// Response expression builder.
     @inlinable
-    public static func buildExpression<R>(_ response: R) -> WrapperGroup<R>
+    public static func buildExpression<R>(_ response: R) -> some Group
     where R : KvResponse
-    { WrapperGroup(response) }
+    { buildExpression(KvResponseGroupBuilder.buildExpression(response)) }
 
 
     /// URL expression builder.
     @inlinable
-    public static func buildExpression(_ url: URL) -> ConditionalGroup<WrapperGroup<KvDirectory>, WrapperGroup<KvFiles>> {
-        switch url.hasDirectoryPath {
-        case true:
-            var directory = KvDirectory(at: url)
-
-            if url.isFileURL {
-                var isDirectory: ObjCBool = false
-                
-                // Searching for status directory for local URLs.
-                if let statusURL = [ "Status", "status" ]
-                    .lazy.map({ url.appendingPathComponent($0) })
-                    .first(where: { FileManager.default.fileExists(atPath: $0.path, isDirectory: &isDirectory) && isDirectory.boolValue })
-                {
-                    directory = directory.httpStatusDirectory(url: statusURL)
-                }
-            }
-
-            return .init(trueGroup: .init(directory))
-
-        case false:
-            return .init(falseGroup: .init(KvFile(at: url)))
-        }
-    }
+    public static func buildExpression(_ url: URL) -> some Group { buildExpression(KvResponseGroupBuilder.buildExpression(url)) }
 
 
     /// Optional URL expression builder.
     @inlinable
-    public static func buildExpression(_ url: URL?) -> some Group {
-        buildOptional(url.map(buildExpression(_:)))
-    }
+    public static func buildExpression(_ url: URL?) -> some Group { buildExpression(KvResponseGroupBuilder.buildExpression(url)) }
 
 
     /// MultiURL expression builder.
     @inlinable
     public static func buildExpression<URLs>(_ urls: URLs) -> some Group
     where URLs : Sequence, URLs.Element == URL
-    {
-        let urls = urls.reduce(into: (directory: Set<URL>(), file: Set<URL>()), { partialResult, url in
-            switch url.hasDirectoryPath {
-            case true:
-                partialResult.directory.insert(url)
-            case false:
-                partialResult.file.insert(url)
-            }
-        })
-
-        return KvGroup(content: {
-            KvForEach(urls.directory) {
-                KvDirectory.init(at: $0)
-            }
-            KvFiles(at: urls.file)
-        })
-    }
+    { buildExpression(KvResponseGroupBuilder.buildExpression(urls)) }
 
 
     /// Optional MultiURL expression builder.
     @inlinable
     public static func buildExpression<URLs>(_ urls: URLs?) -> some Group
     where URLs : Sequence, URLs.Element == URL
-    { buildOptional(urls.map(buildExpression(_:))) }
+    { buildExpression(KvResponseGroupBuilder.buildExpression(urls)) }
 
 
     @inlinable
-    public static func buildBlock() -> KvEmptyResponseGroup { KvEmptyResponseGroup() }
+    public static func buildBlock() -> KvEmptyResponseRootGroup { KvEmptyResponseRootGroup() }
 
 
     @inlinable
@@ -121,7 +88,7 @@ public struct KvResponseGroupBuilder {
 
 
     @inlinable
-    public static func buildOptional<Component>(_ component: Component?) -> ConditionalGroup<Component, KvEmptyResponseGroup>
+    public static func buildOptional<Component>(_ component: Component?) -> ConditionalGroup<Component, KvEmptyResponseRootGroup>
     where Component : Group
     {
         component.map { .init(trueGroup: $0) } ?? .init(falseGroup: .init())
@@ -172,7 +139,7 @@ public struct KvResponseGroupBuilder {
 
     // MARK: - WrapperGroup
 
-    public struct WrapperGroup<E : KvResponse> : Group, KvResponseGroupInternalProtocol {
+    public struct WrapperGroup<E : KvResponseGroup> : Group, KvResponseRootGroupInternalProtocol {
 
         let wrapped: E
 
@@ -183,13 +150,13 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
+        public var body: KvNeverResponseRootGroup { KvNeverResponseRootGroup() }
 
 
-        // MARK: : KvResponseGroupInternalProtocol
+        // MARK: : KvResponseRootGroupInternalProtocol
 
         func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
-            (wrapped as! any KvResponseInternalProtocol).insert(to: accumulator)
+            wrapped.resolvedGroup.insertResponses(to: accumulator)
         }
 
     }
@@ -198,7 +165,7 @@ public struct KvResponseGroupBuilder {
 
     // MARK: - ConditionalGroup
 
-    public struct ConditionalGroup<TrueGroup, FalseGroup> : Group, KvResponseGroupInternalProtocol
+    public struct ConditionalGroup<TrueGroup, FalseGroup> : Group, KvResponseRootGroupInternalProtocol
     where TrueGroup : Group, FalseGroup : Group
     {
 
@@ -227,10 +194,10 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
+        public var body: KvNeverResponseRootGroup { KvNeverResponseRootGroup() }
 
 
-        // MARK: : KvResponseGroupInternalProtocol
+        // MARK: : KvResponseRootGroupInternalProtocol
 
         func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
             switch content {
@@ -246,7 +213,7 @@ public struct KvResponseGroupBuilder {
 
     // MARK: - GroupOfTwo
 
-    public struct GroupOfTwo<E0, E1> : Group, KvResponseGroupInternalProtocol
+    public struct GroupOfTwo<E0, E1> : Group, KvResponseRootGroupInternalProtocol
     where E0 : Group, E1 : Group
     {
 
@@ -263,10 +230,10 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
+        public var body: KvNeverResponseRootGroup { KvNeverResponseRootGroup() }
 
 
-        // MARK: : KvResponseGroupInternalProtocol
+        // MARK: : KvResponseRootGroupInternalProtocol
 
         func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
             e0.resolvedGroup.insertResponses(to: accumulator)
@@ -279,7 +246,7 @@ public struct KvResponseGroupBuilder {
 
     // MARK: - GroupOfThree
 
-    public struct GroupOfThree<E0, E1, E2> : Group, KvResponseGroupInternalProtocol
+    public struct GroupOfThree<E0, E1, E2> : Group, KvResponseRootGroupInternalProtocol
     where E0 : Group, E1 : Group, E2 : Group
     {
 
@@ -298,10 +265,10 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
+        public var body: KvNeverResponseRootGroup { KvNeverResponseRootGroup() }
 
 
-        // MARK: : KvResponseGroupInternalProtocol
+        // MARK: : KvResponseRootGroupInternalProtocol
 
         func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
             e0.resolvedGroup.insertResponses(to: accumulator)
@@ -315,7 +282,7 @@ public struct KvResponseGroupBuilder {
 
     // MARK: - GroupOfFour
 
-    public struct GroupOfFour<E0, E1, E2, E3> : Group, KvResponseGroupInternalProtocol
+    public struct GroupOfFour<E0, E1, E2, E3> : Group, KvResponseRootGroupInternalProtocol
     where E0 : Group, E1 : Group, E2 : Group, E3 : Group
     {
 
@@ -336,10 +303,10 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
+        public var body: KvNeverResponseRootGroup { KvNeverResponseRootGroup() }
 
 
-        // MARK: : KvResponseGroupInternalProtocol
+        // MARK: : KvResponseRootGroupInternalProtocol
 
         func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
             e0.resolvedGroup.insertResponses(to: accumulator)

@@ -99,7 +99,7 @@ class KvServerTestKit {
     static func secureHttpConfiguration() -> Configuration { return .init(port: nextPort(), http: .v2(ssl: ssl)) }
 
 
-    static func baseURL(for configuration: Configuration) -> URL {
+    static func baseURL(for configuration: Configuration, host: String? = nil) -> URL {
         var components = URLComponents()
 
         components.scheme = {
@@ -112,7 +112,14 @@ class KvServerTestKit {
         }()
 
         assert(configuration.endpoint.address == "::1")
-        components.host = "localhost"
+        components.host = host ?? {
+            switch $0 {
+            case "::1":
+                return "localhost"
+            default:
+                return $0
+            }
+        }(configuration.endpoint.address)
 
         components.port = numericCast(configuration.endpoint.port)
 
@@ -307,26 +314,26 @@ extension KvServerTestKit {
     // MARK: .NetworkGroup
 
     /// Applies given configuration to given content.
-    struct NetworkGroup<Configurations, Content> : KvResponseGroup
+    struct NetworkGroup<Configurations, Content> : KvResponseRootGroup
     where Configurations : Sequence, Configurations.Element == KvHttpChannel.Configuration,
-          Content : KvResponseGroup
+          Content : KvResponseRootGroup
     {
 
         let configurations: Configurations
 
-        @KvResponseGroupBuilder
+        @KvResponseRootGroupBuilder
         let content: () -> Content
 
 
-        init(with configurations: Configurations, @KvResponseGroupBuilder content: @escaping () -> Content) {
+        init(with configurations: Configurations, @KvResponseRootGroupBuilder content: @escaping () -> Content) {
             self.configurations = configurations
             self.content = content
         }
 
 
-        // MARK: : KvResponseGroup
+        // MARK: : KvResponseRootGroup
 
-        var body: some KvResponseGroup {
+        var body: some KvResponseRootGroup {
             KvGroup(httpEndpoints: configurations.lazy.map { ($0.endpoint, .init(http: $0.http, connection: $0.connection)) },
                     content: content)
         }
@@ -341,7 +348,7 @@ extension KvServerTestKit {
 
 extension KvServerTestKit.NetworkGroup where Configurations == CollectionOfOne<KvHttpChannel.Configuration> {
 
-    init(with configuration: KvHttpChannel.Configuration, @KvResponseGroupBuilder content: @escaping () -> Content) {
+    init(with configuration: KvHttpChannel.Configuration, @KvResponseRootGroupBuilder content: @escaping () -> Content) {
         self.init(with: CollectionOfOne(configuration), content: content)
     }
 

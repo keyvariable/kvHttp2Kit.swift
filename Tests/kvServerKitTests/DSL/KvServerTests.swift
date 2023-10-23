@@ -39,7 +39,7 @@ final class KvServerTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            var body: some KvResponseGroup {
+            var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("a") {
                         KvHttpResponse.static { .string { "a" } }

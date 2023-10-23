@@ -31,6 +31,9 @@ public enum KvHttpResponseError : LocalizedError, Equatable {
     /// File at URL doesn't exist.
     case fileDoesNotExist(URL)
 
+    /// Unable to compose target location for a redirection.
+    case invalidRedirectionTarget(URLComponents)
+
     /// Scheme of URL is "file:" but resource at URL is not a file.
     case isNotAFile(URL)
 
