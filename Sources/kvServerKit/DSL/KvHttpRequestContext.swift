@@ -30,9 +30,10 @@ public class KvHttpRequestContext {
 
     public let method: KvHttpMethod
     public let urlComponents: URLComponents
+
     /// Decomposed path.
     /// - Note: *URLComponents* contains only composed path.
-    public let path: KvUrlSubpath
+    public private(set) lazy var path: KvUrlSubpath = .init(path: urlComponents.path)
 
 
     init?(_ client: KvHttpChannel.Client, _ head: KvHttpServer.RequestHead) {
@@ -44,7 +45,6 @@ public class KvHttpRequestContext {
 
         self.method = head.method
         self.urlComponents = urlComponents
-        self.path = .init(path: urlComponents.path)
     }
 
 }
