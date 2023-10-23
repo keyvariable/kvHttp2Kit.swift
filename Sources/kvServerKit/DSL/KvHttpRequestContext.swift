@@ -29,10 +29,10 @@ import Foundation
 public class KvHttpRequestContext {
 
     public let method: KvHttpMethod
-    public let url: URL
     public let urlComponents: URLComponents
-    /// Path components are not part of *URLComponents*.
-    public let pathComponents: ArraySlice<String>
+    /// Decomposed path.
+    /// - Note: *URLComponents* contains only composed path.
+    public let path: KvUrlSubpath
 
 
     init?(_ client: KvHttpChannel.Client, _ head: KvHttpServer.RequestHead) {
@@ -40,28 +40,11 @@ public class KvHttpRequestContext {
 
         let uri = "\(isSecureHTTP ? "https" : "http")://\((head.headers.first(name: "host") ?? ""))\(head.uri)"
 
-        guard let urlComponents = URLComponents(string: uri),
-              let url = urlComponents.url
-        else { return nil }
+        guard let urlComponents = URLComponents(string: uri) else { return nil }
 
-        method = head.method
-        self.url = url
+        self.method = head.method
         self.urlComponents = urlComponents
-        pathComponents = KvHttpRequestContext.normalizedPathComponents(from: url)
-    }
-
-
-    // MARK: Auxiliaries
-
-    private static func normalizedPathComponents(from url: URL) -> ArraySlice<String> {
-        let c = url.pathComponents
-
-        guard !c.isEmpty else { return [ ] }
-
-        let lowerBound = c.startIndex.advanced(by: c.first! != "/" ? 0 : 1)
-        let upperBound = c.endIndex.advanced(by: c.count <= 1 || c.last! != "/" ? 0 : -1)
-
-        return c[lowerBound ..< upperBound]
+        self.path = .init(path: urlComponents.path)
     }
 
 }

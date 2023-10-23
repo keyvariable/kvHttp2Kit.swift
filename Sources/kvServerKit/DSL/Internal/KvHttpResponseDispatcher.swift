@@ -1037,7 +1037,7 @@ extension KvHttpResponseDispatcher {
         // MARK: : HierarchyNode
 
         static func keys(from requestContext: KvHttpRequestContext) -> ArraySlice<Key> {
-            requestContext.pathComponents
+            requestContext.path.components
         }
 
 
@@ -1056,7 +1056,7 @@ extension KvHttpResponseDispatcher {
             }
 
 
-            var iterator = Self.safePathComponens(requestContext.pathComponents).enumerated().makeIterator()
+            var iterator = requestContext.path.components.enumerated().makeIterator()
             var node: PathNode = self
 
             Process(node, pathLevel: 0)
@@ -1076,6 +1076,7 @@ extension KvHttpResponseDispatcher {
 
         // MARK: Auxiliaries
 
+        // TODO: Delete when DispatchConfiguration's pathComponents will be refactored to KvUrlSubpath.
         static func safePathComponens<S>(_ components: S) -> LazyFilterSequence<S>
         where S : Sequence, S.Element == String
         {
@@ -1152,7 +1153,7 @@ extension KvHttpResponseDispatcher {
 
             func makeProcessor(_ requestContext: KvHttpRequestContext, _ clientCallbacks: KvClientCallbacks?) -> RequestProcessorResult.Match {
                 let responseContext = KvHttpResponseContext(
-                    subpathComponents: requestContext.pathComponents[(requestContext.pathComponents.startIndex + pathLevel)...],
+                    subpath: requestContext.path.dropFirst(pathLevel),
                     clientCallbacks: clientCallbacks
                 )
 
