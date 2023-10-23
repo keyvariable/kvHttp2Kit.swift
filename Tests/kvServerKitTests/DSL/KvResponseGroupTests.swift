@@ -35,7 +35,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     func testMultichannelServer() async throws {
 
-        /// A server provifing single static response at the root receiving requests on several channels.
+        /// A server provifing a simple response at the root receiving requests on several channels.
         struct MultichannelServer : KvServer {
 
             static let configurations = TestKit.testConfigurations
@@ -43,7 +43,7 @@ final class KvResponseGroupTests : XCTestCase {
             var body: some KvResponseRootGroup {
                 KvForEach(Self.configurations) { configuration in
                     NetworkGroup(with: configuration) {
-                        KvHttpResponse.static {
+                        KvHttpResponse {
                             .string { Self.greeting(for: configuration) }
                         }
                     }
@@ -82,25 +82,25 @@ final class KvResponseGroupTests : XCTestCase {
                     KvGroup("a") {
                         KvGroup("b") {
                             KvGroup("c") {
-                                KvHttpResponse.static { .string { "/a/b/c" } }
+                                KvHttpResponse { .string { "/a/b/c" } }
                             }
                         }
                         KvGroup("б/") {
-                            KvHttpResponse.static { .string { "/a/б" } }
+                            KvHttpResponse { .string { "/a/б" } }
                         }
                     }
 
                     KvGroup("/a/b/d") {
                         KvGroup(httpMethods: .POST) {
-                            KvHttpResponse.static { .string { "POST /a/b/d" } }
+                            KvHttpResponse { .string { "POST /a/b/d" } }
                         }
                     }
 
                     KvGroup("///b/./c/..//b///e///./f/../") {
-                        KvHttpResponse.static { .string { "/b/./c/../b/e/./f/.." } }
+                        KvHttpResponse { .string { "/b/./c/../b/e/./f/.." } }
                     }
 
-                    KvHttpResponse.static { .string { "/" } }
+                    KvHttpResponse { .string { "/" } }
                 }
             }
 
@@ -183,7 +183,7 @@ final class KvResponseGroupTests : XCTestCase {
                 NetworkGroup(with: configuration) {
                     KvGroup("a") {
                         KvGroup {
-                            KvHttpResponse.static { .string { Self.greeting } }
+                            KvHttpResponse { .string { Self.greeting } }
                         }
                         .httpMethods(.DELETE)
                         .httpMethods(.GET, .PUT)
@@ -267,7 +267,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             /// Empty query response.
             private var voidResponse: some KvResponse {
-                KvHttpResponse.static { .string { "()" } }
+                KvHttpResponse { .string { "()" } }
             }
 
             @KvResponseGroupBuilder
@@ -277,13 +277,13 @@ final class KvResponseGroupTests : XCTestCase {
             }
 
             private var optionalIntResponse: some KvResponse {
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .query(.optional("int", of: Int.self))
                     .content { input in .string { "\(input.query.map(String.init(_:)) ?? "nil") as Int?" } }
             }
 
             private var requiredStringResponse: some KvResponse {
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .query(.required("string"))
                     .content { input in .string { "\"\(input.query)\"" } }
             }
@@ -293,10 +293,10 @@ final class KvResponseGroupTests : XCTestCase {
                 let r = {
                     switch strict {
                     case false:
-                        return KvHttpResponse.dynamic
+                        return KvHttpResponse.with
                             .queryMap { $0?.first.flatMap { $0.name == "echo" ? ($0.value ?? "") : nil } }
                     case true:
-                        return KvHttpResponse.dynamic
+                        return KvHttpResponse.with
                             .queryFlatMap { query -> QueryResult<String?> in
                                 guard let first = query?.first,
                                       query!.count == 1,
@@ -312,7 +312,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             /// Produces comma-separated list of query item names whether there are 2+ items.
             private var namesResponse: some KvResponse {
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .queryFlatMap { query -> QueryResult<String> in
                         guard let query = query, query.count > 1 else { return .failure }
                         return .success(query.lazy.map({ $0.name }).joined(separator: ","))
@@ -323,7 +323,7 @@ final class KvResponseGroupTests : XCTestCase {
             /// Group of unambiguous responses.
             @KvResponseGroupBuilder
             private var rangeResponses: some KvResponseGroup {
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .query(.required("from", of: Float.self))
                     .query(.optional("to", of: Float.self))
                     .content {
@@ -335,11 +335,11 @@ final class KvResponseGroupTests : XCTestCase {
                         }
                     }
 
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .query(.required("to", of: Float.self))
                     .content { input in .string { "..< \(input.query)" } }
 
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .query(.optional("from", of: Float.self))
                     .query(.required("through", of: Float.self))
                     .content {
@@ -355,7 +355,7 @@ final class KvResponseGroupTests : XCTestCase {
             // Group of ambiguous responses.
             @KvResponseGroupBuilder
             private var abcAmbiguousResponses: some KvResponseGroup {
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .query(.required("a"))
                     .query(.required("b"))
                     .content {
@@ -363,7 +363,7 @@ final class KvResponseGroupTests : XCTestCase {
                         return .string { "a: \"\(a)\", b: \"\(b)\"" }
                     }
 
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .query(.required("a"))
                     .query(.required("c"))
                     .content {
@@ -486,7 +486,7 @@ final class KvResponseGroupTests : XCTestCase {
 
             private var httpsServer: some KvResponseRootGroup {
                 NetworkGroup(with: TestKit.secureHttpConfiguration()) {
-                    KvHttpResponse.static { .string { Self.greeting } }
+                    KvHttpResponse { .string { Self.greeting } }
                 }
             }
 
@@ -509,23 +509,23 @@ final class KvResponseGroupTests : XCTestCase {
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvHttpResponse.static { .string { "/" } }
+                    KvHttpResponse { .string { "/" } }
 
                     KvGroup("a") {
-                        KvHttpResponse.static { .string { "/a" } }
+                        KvHttpResponse { .string { "/a" } }
 
                         KvGroup("b") {
-                            KvHttpResponse.static { .string { "/a/b" } }
+                            KvHttpResponse { .string { "/a/b" } }
 
                             KvGroup("c") {
-                                KvHttpResponse.static { .string { "/a/b/c" } }
+                                KvHttpResponse { .string { "/a/b/c" } }
                             }
                             .httpMethods(.POST)
                         }
                         .httpMethods(.POST, .PUT)
 
                         KvGroup("d") {
-                            KvHttpResponse.static { .string { "/a/d" } }
+                            KvHttpResponse { .string { "/a/d" } }
                         }
                         .httpMethods(.PUT)
                     }
@@ -572,23 +572,23 @@ final class KvResponseGroupTests : XCTestCase {
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvHttpResponse.static { .string { "/" } }
+                    KvHttpResponse { .string { "/" } }
 
                     KvGroup("a") {
-                        KvHttpResponse.static { .string { "/a" } }
+                        KvHttpResponse { .string { "/a" } }
 
                         KvGroup("b") {
-                            KvHttpResponse.static { .string { "/a/b" } }
+                            KvHttpResponse { .string { "/a/b" } }
 
                             KvGroup("c") {
-                                KvHttpResponse.static { .string { "/a/b/c" } }
+                                KvHttpResponse { .string { "/a/b/c" } }
                             }
                             .users("Y")
                         }
                         .users("Y", "Z")
 
                         KvGroup("d") {
-                            KvHttpResponse.static { .string { "/a/d" } }
+                            KvHttpResponse { .string { "/a/d" } }
                         }
                         .users("Z")
                     }
@@ -654,7 +654,7 @@ final class KvResponseGroupTests : XCTestCase {
                         KvGroup("a") {
                             greetingResponse
                             KvGroup {
-                                KvHttpResponse.dynamic
+                                KvHttpResponse.with
                                     .query(.void("count"))
                                     .requestBody(.data.bodyLengthLimit(Self.bodyLimit))
                                     .content { input in .string { "\(input.requestBody?.count ?? 0)" } }
@@ -696,7 +696,7 @@ final class KvResponseGroupTests : XCTestCase {
             }
 
             private var greetingResponse: some KvResponse {
-                KvHttpResponse.static { .string { Self.greetingString } }
+                KvHttpResponse { .string { Self.greetingString } }
             }
 
             static let bodyLimit: UInt = 16

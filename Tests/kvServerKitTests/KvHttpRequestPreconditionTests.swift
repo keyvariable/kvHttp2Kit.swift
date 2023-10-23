@@ -128,10 +128,10 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvHttpResponse.static { .string { "-" } }
+                    KvHttpResponse { .string { "-" } }
 
-                    KvGroup("s") { KvHttpResponse.static { .string({ "s" }).entityTag(Self.etag.strong) } }
-                    KvGroup("w") { KvHttpResponse.static { .string({ "w" }).entityTag(Self.etag.weak) } }
+                    KvGroup("s") { KvHttpResponse { .string({ "s" }).entityTag(Self.etag.strong) } }
+                    KvGroup("w") { KvHttpResponse { .string({ "w" }).entityTag(Self.etag.weak) } }
                 }
             }
 
@@ -205,10 +205,10 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvHttpResponse.static { .string { "-" } }
+                    KvHttpResponse { .string { "-" } }
 
                     KvGroup("d") {
-                        KvHttpResponse.static { .string({ "d" }).modificationDate(Self.date) }
+                        KvHttpResponse { .string({ "d" }).modificationDate(Self.date) }
                     }
                 }
             }

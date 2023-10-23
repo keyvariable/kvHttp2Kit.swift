@@ -67,9 +67,9 @@ struct DeclarativeServer : KvServer {
             /// See `KvDirectory` and `KvFiles` for details.
             Bundle.module.resourceURL!.appendingPathComponent("Resources/Frontend")
 
-            /// Dynamic responses provide customizable processing of request content.
+            /// Parameterized responses provide customizable processing of request content.
             /// For example the response below uses structured URL query handling.
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 /// This modifier adds required string value of query item named `name` to the response input.
                 .query(.required("name"))
                 .content { input in
@@ -82,7 +82,7 @@ struct DeclarativeServer : KvServer {
             KvGroup("generate") {
                 /// The contents of the group below will be available at /generate/int path.
                 KvGroup("int") {
-                    KvHttpResponse.dynamic
+                    KvHttpResponse.with
                         /// Arguments can be optional.
                         /// Also arguments can be decoded like shown below when the type conforms to `LosslessStringConvertible`.
                         /// Custom decoding block can be provided too.
@@ -99,7 +99,7 @@ struct DeclarativeServer : KvServer {
                 }
 
                 KvGroup("uuid") {
-                    KvHttpResponse.dynamic
+                    KvHttpResponse.with
                         /// Boolean query items handle various cases of URL query item values.
                         .query(.bool("string"))
                         /// - Note: Content of response depends on query flag.
@@ -148,7 +148,7 @@ struct DeclarativeServer : KvServer {
 
             KvGroup("first") {
                 /// Note the way arbitrary queries can be handled.
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     /// Value of first URL query item is returned or an empty string.
                     /// If some queries should be declined then `queryFlatMap()` modifier can be used.
                     .queryMap { queryItems in
@@ -177,7 +177,7 @@ struct DeclarativeServer : KvServer {
             KvGroup("body") {
                 KvGroup("echo") {
                     /// This response returns binary data provided in the request body.
-                    KvHttpResponse.dynamic
+                    KvHttpResponse.with
                         /// This modifier and the argument provide collecting of data before it is processed.
                         ///
                         /// - Note: The resulting body value is optional. It's `nil` when request has no body.
@@ -189,7 +189,7 @@ struct DeclarativeServer : KvServer {
                 }
                 KvGroup("bytesum") {
                     /// This response returns plain text representation of cyclic sum of bytes in a request body.
-                    KvHttpResponse.dynamic
+                    KvHttpResponse.with
                         /// This modifier and the argument provide processing of the body on the fly as each portion of the data becomes available.
                         /// This way helps to minimize memory consumption and optimize performance of requests having large bodies.
                         ///
@@ -219,7 +219,7 @@ struct DeclarativeServer : KvServer {
                 if #available(macOS 12.0, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
                     KvGroup(httpMethods: .POST) {
                         /// Returns ISO 8601 representation of date components in JSON format.
-                        KvHttpResponse.dynamic
+                        KvHttpResponse.with
                             /// This modifier and the argument provide decoding of the request data as given decodable type.
                             ///
                             /// - Note: Decoding errors are handled automatically and 400 (bad request) response is produced.
@@ -232,7 +232,7 @@ struct DeclarativeServer : KvServer {
                 }
                 KvGroup(httpMethods: .GET) {
                     /// Returns JSON representation of current date.
-                    KvHttpResponse.static {
+                    KvHttpResponse {
                         .json {
                             Calendar.current.dateComponents(
                                 [ .calendar, .year, .month, .day, .hour, .minute, .second, .nanosecond, .timeZone ],
@@ -282,7 +282,7 @@ struct DeclarativeServer : KvServer {
 
     /// Responses can be wrapped in properties and functions. Responses can depend on arguments.
     private func randomIntArrayResponse(limit: Int) -> some KvResponse {
-        KvHttpResponse.dynamic
+        KvHttpResponse.with
             .query(.required("count", of: Int.self))
             .content { input in
                 let count = input.query
@@ -303,13 +303,13 @@ struct DeclarativeServer : KvServer {
     @KvResponseGroupBuilder
     private var mathResponses: some KvResponseGroup {
         KvGroup("add") {
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 .query(.required("lhs", of: Double.self))
                 .query(.required("rhs", of: Double.self))
                 .content { input in .string { "\(input.query.0 + input.query.1)" } }
         }
         KvGroup("sub") {
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 .query(.required("lhs", of: Double.self))
                 .query(.required("rhs", of: Double.self))
                 .content { input in .string { "\(input.query.0 - input.query.1)" } }
@@ -326,7 +326,7 @@ struct DeclarativeServer : KvServer {
 
         /// - Note: Three responses at the same path are unambiguous and produce correct result for any valid input.
         var body: some KvResponseGroup {
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 .query(.required("from", of: Value.self))
                 .query(.optional("to", of: Value.self))
                 .content {
@@ -339,11 +339,11 @@ struct DeclarativeServer : KvServer {
                     }
                 }
 
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 .query(.required("to", of: Value.self))
                 .content { input in .string { "..< \(input.query)" } }
 
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 .query(.optional("from", of: Value.self))
                 .query(.required("through", of: Value.self))
                 .content {
@@ -362,7 +362,7 @@ struct DeclarativeServer : KvServer {
 
     /// Example of buffered output instead of collecting entire response body.
     private var randomBytesResponse: some KvResponse {
-        KvHttpResponse.dynamic
+        KvHttpResponse.with
             /// See custom parser providing additional validation.
             .query(.required("count", parseBlock: { rawValue -> KvUrlQueryParseResult<Int> in
                 guard let value = rawValue.flatMap(Int.init(_:)), value > 0 else { return .failure }
@@ -399,7 +399,7 @@ struct DeclarativeServer : KvServer {
                     /// Also it can be used to provide responses for all cases of an enumeration.
                     KvForEach(urls) { url in
                         KvGroup(url.lastPathComponent) {
-                            KvHttpResponse.static {
+                            KvHttpResponse {
                                 /// Use of `.file` fabric and modifier helps to reduce memory consumption and improve performance.
                                 /// Also consider `.binary`  fabric and modifier for input streams.
                                 try .file(at: url).contentType(.image(.png))
@@ -429,7 +429,7 @@ struct DeclarativeServer : KvServer {
 
         var body: some KvResponseGroup {
             KvGroup(httpMethods: .GET) {
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     /// At first subpaths are filtered accepting single component subpaths.
                     ///
                     /// This modifier accepts or rejects requests by subpath.
@@ -451,7 +451,7 @@ struct DeclarativeServer : KvServer {
                 /// Entity list.
                 ///
                 /// Note that there is no ambiguity due to the subpath processing response requires non-empty subpath.
-                KvHttpResponse.static {
+                KvHttpResponse {
                     .json { Self.sampleDB.values.lazy.map { $0 } }
                 }
 
@@ -459,7 +459,7 @@ struct DeclarativeServer : KvServer {
                 ///
                 /// Note that there is no ambiguity due to the subpath processing response requires first subpath component to be a number.
                 KvGroup("top") {
-                    KvHttpResponse.static {
+                    KvHttpResponse {
                         .json { Self.sampleDB.values.max(by: { $0.rate < $1.rate }) }
                     }
                 }

@@ -28,7 +28,7 @@
 /// ```swift
 /// KvForEach(urls) { url in
 ///     KvGroup(url.path) {
-///         KvHttpResponse.static {
+///         KvHttpResponse {
 ///             guard let stream = InputStream(url: url) else { return .internalServerError }
 ///             return .binary(stream)
 ///         }

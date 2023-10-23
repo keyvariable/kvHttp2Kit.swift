@@ -43,7 +43,7 @@ final class KvHttpResponseTests : XCTestCase {
                 NetworkGroup(with: configuration) {
                     KvGroup(httpMethods: .POST) {
                         KvGroup("echo") {
-                            KvHttpResponse.dynamic
+                            KvHttpResponse.with
                                 .requestBody(.data)
                                 .content { input in
                                     guard let data: Data = input.requestBody else { return .badRequest }
@@ -52,7 +52,7 @@ final class KvHttpResponseTests : XCTestCase {
                         }
 
                         KvGroup("bytesum") {
-                            KvHttpResponse.dynamic
+                            KvHttpResponse.with
                                 .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
                                     buffer.reduce(accumulator, &+)
                                 }))
@@ -93,7 +93,7 @@ final class KvHttpResponseTests : XCTestCase {
                 NetworkGroup(with: configuration) {
                     if #available(macOS 12.0, *) {
                         KvGroup(httpMethods: .POST) {
-                            KvHttpResponse.dynamic
+                            KvHttpResponse.with
                                 .requestBody(.json(of: DateComponents.self))
                                 .content {
                                     guard let date = $0.requestBody.date else { return .badRequest }
@@ -102,7 +102,7 @@ final class KvHttpResponseTests : XCTestCase {
                         }
                     }
                     KvGroup(httpMethods: .GET) {
-                        KvHttpResponse.static {
+                        KvHttpResponse {
                             .json { echoDateComponents }
                         }
                     }
@@ -137,12 +137,12 @@ final class KvHttpResponseTests : XCTestCase {
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("boolean") {
-                        KvHttpResponse.dynamic
+                        KvHttpResponse.with
                             .query(.bool("value"))
                             .content { input in .string { "\(input.query)" } }
                     }
                     KvGroup("void") {
-                        KvHttpResponse.dynamic
+                        KvHttpResponse.with
                             .query(.void("value"))
                             .content { _ in .string { "()" } }
                     }
@@ -181,7 +181,7 @@ final class KvHttpResponseTests : XCTestCase {
                 NetworkGroup(with: configuration) {
                     KvGroup(httpMethods: .POST) {
                         KvGroup("no_body") {
-                            KvHttpResponse.static { .string { "0" } }
+                            KvHttpResponse { .string { "0" } }
                         }
                         KvGroup("default_limit") {
                             response
@@ -208,7 +208,7 @@ final class KvHttpResponseTests : XCTestCase {
             private func response(limit: UInt) -> some KvResponse { response(body: .data.bodyLengthLimit(limit)) }
 
             private func response(body: KvHttpRequestDataBody) -> some KvResponse {
-                KvHttpResponse.dynamic
+                KvHttpResponse.with
                     .requestBody(body)
                     .content { input in .string { "\(input.requestBody?.count ?? 0)" } }
             }
@@ -288,23 +288,23 @@ final class KvHttpResponseTests : XCTestCase {
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvHttpResponse.static { .string { "-" } }
+                    KvHttpResponse { .string { "-" } }
 
                     KvGroup("a") {
-                        KvHttpResponse.static { .string { "-a" } }
+                        KvHttpResponse { .string { "-a" } }
 
                         KvGroup("b") {
-                            KvHttpResponse.static { .string { "-a-b" } }
+                            KvHttpResponse { .string { "-a-b" } }
                         }
                     }
 
                     KvGroup("c") {
-                        KvHttpResponse.dynamic
+                        KvHttpResponse.with
                             .subpath
                             .content { input in .string { "/" + input.subpath.joined } }
                     }
                     KvGroup("c") {
-                        KvHttpResponse.dynamic
+                        KvHttpResponse.with
                             .query(.required("separator"))
                             .subpath
                             .content { input in
@@ -360,11 +360,11 @@ final class KvHttpResponseTests : XCTestCase {
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("profiles") {
-                        KvHttpResponse.static { .string { "/" } }
+                        KvHttpResponse { .string { "/" } }
 
-                        KvGroup("top") { KvHttpResponse.static { .string { "/top" } } }
+                        KvGroup("top") { KvHttpResponse { .string { "/top" } } }
 
-                        KvHttpResponse.dynamic
+                        KvHttpResponse.with
                             .subpathFilter { $0.components.count == 1 }
                             .subpathFlatMap {
                                 UInt($0.components.first!)

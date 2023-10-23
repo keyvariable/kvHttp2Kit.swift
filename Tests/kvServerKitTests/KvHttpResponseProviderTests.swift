@@ -42,7 +42,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvHttpResponse.dynamic
+                    KvHttpResponse.with
                         .query(.required("from", of: Value.self))
                         .query(.required("through", of: Value.self))
                         .queryFlatMap { $0 <= $1 ? .success($0...$1) : .failure }
@@ -137,7 +137,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
                     let url = Self.url
 
                     KvGroup(url.lastPathComponent) {
-                        KvHttpResponse.static {
+                        KvHttpResponse {
                             guard let stream = InputStream(url: url) else { return .internalServerError }
                             return .binary(stream).contentType(.text(.plain))
                         }
@@ -174,13 +174,13 @@ final class KvHttpResponseProviderTests : XCTestCase {
                         do {
                             let sampleURL = Self.sampleURL
                             KvGroup(sampleURL.lastPathComponent) {
-                                KvHttpResponse.static { try .file(at: sampleURL) }
+                                KvHttpResponse { try .file(at: sampleURL) }
                             }
                         }
                         do {
                             let missingURL = Self.missingURL
                             KvGroup(missingURL.lastPathComponent) {
-                                KvHttpResponse.static { try .file(at: missingURL) }
+                                KvHttpResponse { try .file(at: missingURL) }
                             }
                         }
                     }

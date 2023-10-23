@@ -42,10 +42,10 @@ final class KvServerTests : XCTestCase {
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup("a") {
-                        KvHttpResponse.static { .string { "a" } }
+                        KvHttpResponse { .string { "a" } }
                     }
                     KvGroup("b") {
-                        KvHttpResponse.static { .string({ "b" }).contentLength(1) }
+                        KvHttpResponse { .string({ "b" }).contentLength(1) }
                     }
                     .httpMethods(.GET)
                 }

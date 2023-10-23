@@ -28,7 +28,7 @@
 /// Below is an example for various URL query item declarations:
 ///
 /// ```swift
-/// KvHttpResponse.dynamic
+/// KvHttpResponse.with
 ///     .query(.required("int", of: Int.self))
 ///     .query(.optional("string"))
 ///     .query(.optional("float", of: Float.self))

@@ -403,7 +403,7 @@ extension KvDirectory : KvResponseInternalProtocol {
 
         let httpRepresentation =
         KvGroup(httpMethods: .GET) {
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 .subpathFlatMap { subpath -> KvFilterResult<ResolvedURL> in
                     guard let url = KvDirectory.resolvedSubpath(subpath, rootURL: rootURL, accessList: accessList)
                     else { return .rejected }

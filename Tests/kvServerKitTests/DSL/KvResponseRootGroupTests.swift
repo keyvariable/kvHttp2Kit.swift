@@ -47,14 +47,14 @@ final class KvResponseRootGroupTests: XCTestCase {
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     KvGroup(hosts: Self.host, hostAliases: Self.hostAlias) {
-                        KvHttpResponse.dynamic
+                        KvHttpResponse.with
                             .subpath
                             .content { input in .string { Self.host + "/" + input.subpath.joined  } }
                     }
 
                     KvGroup(hosts: Self.hostAlias) {
                         KvGroup("uuid") {
-                            KvHttpResponse.static { .string { Self.uuid.uuidString } }
+                            KvHttpResponse { .string { Self.uuid.uuidString } }
                         }
                     }
                 }

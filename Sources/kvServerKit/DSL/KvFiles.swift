@@ -172,7 +172,7 @@ extension KvFiles : KvResponseInternalProtocol {
 
         let httpRepresentation =
         KvGroup {
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 .subpathFlatMap { subpath -> KvFilterResult<URL> in
                     guard subpath.components.count == 1,
                           let url = urls[subpath.components.first!]

@@ -62,7 +62,7 @@ public struct KvUnavailableUrlSubpath : KvUrlSubpathProtocol {
 
 // MARK: - KvUrlSubpath
 
-/// Representation of subpath in ``KvHttpResponse/DynamicResponse/Input`` of ``KvHttpResponse/DynamicResponse``.
+/// Representation of subpath in ``KvHttpResponse/ParameterizedResponse/Input`` of ``KvHttpResponse/ParameterizedResponse``.
 public struct KvUrlSubpath : KvUrlSubpathProtocol {
 
     /// Sequence of path components.

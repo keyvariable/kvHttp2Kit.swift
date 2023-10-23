@@ -38,7 +38,7 @@ import Foundation
 ///                 URL(string: "file:///var/www/example.com/")
 ///
 ///                 KvGroup("echo") {
-///                     KvHttpResponse.dynamic
+///                     KvHttpResponse.with
 ///                         .requestBody(.data)
 ///                         .content { input in
 ///                             guard let data: Data = input.requestBody else { return .badRequest }
@@ -48,7 +48,7 @@ import Foundation
 ///                 .httpMethods(.POST)
 ///
 ///                 KvGroup("uuid") {
-///                     KvHttpResponse.static { .string { UUID().uuidString } }
+///                     KvHttpResponse { .string { UUID().uuidString } }
 ///                 }
 ///             }
 ///         }

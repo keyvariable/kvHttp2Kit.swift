@@ -24,17 +24,17 @@
 /// Type representing processed content of an HTTP request declared as ``KvHttpResponse``. It's passed to the response's content callback.
 public struct KvHttpResponseInput<QueryValue, RequestHeaders, RequestBodyValue, SubpathValue> {
 
-    /// Result of URL query processing. Use related modifiers of ``KvHttpResponse/DynamicResponse`` to enable processing of URL query.
+    /// Result of URL query processing. Use related modifiers of ``KvHttpResponse/ParameterizedResponse`` to enable processing of URL query.
     public let query: QueryValue
 
-    /// Result of custom handler of HTTP request headers. Use related modifiers of ``KvHttpResponse/DynamicResponse`` to provide custom handler of HTTP request headers.
+    /// Result of custom handler of HTTP request headers. Use related modifiers of ``KvHttpResponse/ParameterizedResponse`` to provide custom handler of HTTP request headers.
     public let requestHeaders: RequestHeaders
 
-    /// Result of HTTP request body processing. Use related modifiers of ``KvHttpResponse/DynamicResponse`` to enable processing of HTTP request body.
+    /// Result of HTTP request body processing. Use related modifiers of ``KvHttpResponse/ParameterizedResponse`` to enable processing of HTTP request body.
     public let requestBody: RequestBodyValue
 
     /// When processing of URL subpath is enabled it's a path relative to response's position the URL hierarchy or value tranformed by custom callback.
-    /// See ``KvHttpResponse/DynamicResponse/subpath`` modifier for details.
+    /// See ``KvHttpResponse/ParameterizedResponse/subpath`` modifier for details.
     public let subpath: SubpathValue
 
 }

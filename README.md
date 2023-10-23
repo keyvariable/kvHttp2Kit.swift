@@ -64,7 +64,7 @@ struct ExampleServer : KvServer {
                 URL(string: "file:///var/www/example.com/")
 
                 KvGroup("echo") {
-                    KvHttpResponse.dynamic
+                    KvHttpResponse.with
                         .requestBody(.data)
                         .content { input in
                             guard let data: Data = input.requestBody else { return .badRequest }
@@ -91,10 +91,10 @@ struct ExampleServer : KvServer {
 struct RandomValueResponseGroup : KvResponseGroup {
     var body: some KvResponseGroup {
         KvGroup("bool") {
-            KvHttpResponse.static { .string { "\(Bool.random())" } }
+            KvHttpResponse { .string { "\(Bool.random())" } }
         }
         KvGroup("int") {
-            KvHttpResponse.dynamic
+            KvHttpResponse.with
                 .query(.optional("from", of: Int.self))
                 .query(.optional("through", of: Int.self))
                 .queryFlatMap { from, through -> QueryResult<ClosedRange<Int>> in

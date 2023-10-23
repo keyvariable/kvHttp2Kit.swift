@@ -317,7 +317,7 @@ final class KvDirectoryTests : XCTestCase {
                         KvDirectory(at: TestKit.htmlDirectoryURL)
                             .httpStatusDirectory(url: TestKit.htmlStatusDirectoryURL)
 
-                        KvHttpResponse.dynamic
+                        KvHttpResponse.with
                             .query(.required("uuid"))
                             .content { _ in .string { UUID().uuidString } }
                     }
@@ -375,15 +375,15 @@ final class KvDirectoryTests : XCTestCase {
                     KvDirectory(at: TestKit.htmlDirectoryURL)
                         .httpStatusDirectory(url: TestKit.htmlStatusDirectoryURL)
 
-                    KvHttpResponse.dynamic
+                    KvHttpResponse.with
                         .query(.required("uuid"))
                         .content { _ in .string { Self.uuid.0.uuidString } }
 
                     KvGroup("index.html") {
-                        KvHttpResponse.static { .string { Self.uuid.1.uuidString } }
+                        KvHttpResponse { .string { Self.uuid.1.uuidString } }
                     }
                     KvGroup("bytes") {
-                        KvHttpResponse.static { .string { Self.uuid.2.uuidString } }
+                        KvHttpResponse { .string { Self.uuid.2.uuidString } }
                     }
                     .onHttpIncident { incident, _ in
                         guard incident.defaultStatus == .notFound else { return nil }

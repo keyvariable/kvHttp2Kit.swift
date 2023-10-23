@@ -300,7 +300,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
     /// Below is an example of response returning plain text representation of cyclic sum of bytes in an HTTP request body.
     ///
     /// ```swift
-    /// KvHttpResponse.dynamic
+    /// KvHttpResponse.with
     ///     .requestBody(.reduce(0 as UInt8, { accumulator, buffer in
     ///         buffer.reduce(accumulator, &+)
     ///     }))
@@ -433,7 +433,7 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
     /// Below is an example of an echo response:
     ///
     /// ```swift
-    /// KvHttpResponse.dynamic
+    /// KvHttpResponse.with
     ///     .requestBody(.data)
     ///     .content { input in
     ///         guard let data: Data = input.requestBody else { return .badRequest }
@@ -518,7 +518,7 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
     /// Below is an example of response decoding JSON respresentation of standard *DateComponents* and returning received date in ISO 8601 format.
     ///
     /// ```swift
-    /// KvHttpResponse.dynamic
+    /// KvHttpResponse.with
     ///     .requestBody(.json(of: DateComponents.self))
     ///     .content {
     ///         guard let date = $0.requestBody.date else { return .badRequest }
