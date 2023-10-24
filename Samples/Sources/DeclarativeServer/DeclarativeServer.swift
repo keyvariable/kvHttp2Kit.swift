@@ -65,7 +65,11 @@ struct DeclarativeServer : KvServer {
             /// Also directory declarations via URL provide automatic search of "Status" or "status" subdirectory
             /// to provide non-200 responses from files named "\(statusCode).html".
             /// See `KvDirectory` and `KvFiles` for details.
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
             Bundle.module.resourceURL!.appendingPathComponent("Resources/Frontend")
+#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+            Bundle.module.resourceURL!.appendingPathComponent("Frontend")
+#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
 
             /// Parameterized responses provide customizable processing of request content.
             /// For example the response below uses structured URL query handling.
@@ -270,9 +274,8 @@ struct DeclarativeServer : KvServer {
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
             let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: Self.resourceDirectory)!.path
 #else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            // - NOTE: Currently there is a bug in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
-            //         So assuming that application is launched with `swift run` shell command in directory containing the package file.
-            let pemPath = "./Sources/DeclarativeServer/\(Self.resourceDirectory)/\(fileName).\(fileExtension)"
+            // - NOTE: Currently there is a bug (fatalError) in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
+            let pemPath = Bundle.module.resourceURL!.appendingPathComponent("\(fileName).\(fileExtension)").path
 #endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
 
             return try .init(pemPath: pemPath)

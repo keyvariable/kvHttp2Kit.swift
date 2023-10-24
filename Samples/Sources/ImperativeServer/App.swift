@@ -87,9 +87,8 @@ struct App {
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
             let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: resourceDirectory)!.path
 #else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            /// - NOTE: Currently there is a bug in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
-            ///         So assuming that application is launched with `swift run` shell command in directory containing the package file.
-            let pemPath = "./Sources/ImperativeServer/\(resourceDirectory)/\(fileName).\(fileExtension)"
+            // - NOTE: Currently there is a bug (fatalError) in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
+            let pemPath = Bundle.module.resourceURL!.appendingPathComponent("\(fileName).\(fileExtension)").path
 #endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
 
             return try .init(pemPath: pemPath)
