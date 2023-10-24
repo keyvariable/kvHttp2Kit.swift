@@ -42,8 +42,8 @@ If there are two or more matching responses then *declarative API* automatically
 *Declarative API* builds fast single-pass URL query parser for several responses with declared structure of URL query at the same routing point.
 
 Below is an example of a server providing simple responses over secure HTTP/2.0 and HTTP/1.1 at all available IP addresses on 8080 port
-on "example.com" host and redirections from "www.example.com", "example.org", "www.example.org", "example.net", "www.example.net" hosts:
-- frontend files at "/var/www/example.com" directory with support of index files and status pages named "\(statusCode).html"
+on `example.com` host and redirections from `www.example.com`, `example.org`, `www.example.org`, `example.net`, `www.example.net` hosts:
+- frontend files at `/var/www/example.com` directory with support of index files and status pages named `"\(statusCode).html"`
   in "Status" or "status" subdirectory;
 - echo binary response with *POST* request's body at `/echo` path;
 - random boolean text response at `/random/bool` path;
