@@ -107,14 +107,14 @@ struct RandomValueResponseGroup : KvResponseGroup {
 }
 ```
 
-See well-commented [*DeclarativeServer*](./Samples/DeclarativeServer) sample project in [`Samples`](./Samples) directory for more examples.
+See well-commented [*DeclarativeServer*](./Samples/Sources/DeclarativeServer) target in [*Samples*](./Samples) package for more examples.
 
 
 ## Imperative API
 
 Imperative API provides classes and delegate protocols to implement servers in an object-oriented way.
 
-See [*ImperativeServer*](./Samples/ImperativeServer) sample project in [`Samples`](./Samples) directory.
+See [*ImperativeServer*](./Samples/Sources/ImperativeServer) target in [*Samples*](./Samples) package.
 
 
 ## Supported Platforms
