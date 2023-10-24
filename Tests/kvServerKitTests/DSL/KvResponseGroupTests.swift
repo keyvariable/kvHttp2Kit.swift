@@ -764,10 +764,10 @@ final class KvResponseGroupTests : XCTestCase {
                         TestKit.htmlDirectoryURL
                     }
                     KvGroup("file") {
-                        Bundle.module.url(forResource: "sample", withExtension: "txt", subdirectory: "Resources")
+                        Bundle.module.url(forResource: "sample", withExtension: "txt")
                     }
                     KvGroup("files") {
-                        Bundle.module.urls(forResourcesWithExtension: "html", subdirectory: "Resources/html_status")
+                        Bundle.module.urls(forResourcesWithExtension: "html", subdirectory: "html_status")
                     }
                 }
             }

@@ -651,7 +651,6 @@ extension KvHttpResponse.ParameterizedResponse where QueryItemGroup : KvUrlQuery
 
 // MARK: Query of Two Elements
 
-// TODO: Apply parameter packs from Swift 5.9.
 extension KvHttpResponse.ParameterizedResponse where QueryItemGroup : KvUrlQueryItemGroupOfTwoProtocol {
 
     public typealias AmmendedUpToThree<T> = KvHttpResponse.ParameterizedResponse<QueryItemGroup.Ammended<T>, RequestHeaders, RequestBodyValue, Subpath, SubpathValue>

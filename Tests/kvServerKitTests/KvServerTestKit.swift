@@ -41,10 +41,9 @@ class KvServerTestKit {
 
     // MARK: Constants
 
-    static let resourceDirectoryURL = Bundle.module.resourceURL!.appendingPathComponent("Resources", isDirectory: true)
-    static let htmlDirectoryURL = resourceDirectoryURL.appendingPathComponent("html", isDirectory: true)
+    static let htmlDirectoryURL = Bundle.module.resourceURL!.appendingPathComponent("html", isDirectory: true)
     static let htmlStatusDirectoryURL = htmlDirectoryURL.appendingPathComponent("status", isDirectory: true)
-    static let externalHtmlStatusDirectoryURL = resourceDirectoryURL.appendingPathComponent("html_status", isDirectory: true)
+    static let externalHtmlStatusDirectoryURL = Bundle.module.resourceURL!.appendingPathComponent("html_status", isDirectory: true)
 
     /// Data at /uuid.txt.
     static let data_uuid_txt = try! Data(contentsOf: htmlDirectoryURL.appendingPathComponent("uuid.txt"))
@@ -54,7 +53,7 @@ class KvServerTestKit {
     // MARK: Configurations
 
     static var ssl: KvHttpChannel.Configuration.SSL {
-        try! .init(pemPath: Bundle.module.url(forResource: "https", withExtension: "pem", subdirectory: "Resources")!.path)
+        try! .init(pemPath: Bundle.module.url(forResource: "https", withExtension: "pem")!.path)
     }
 
     static var testConfigurations: [KvHttpChannel.Configuration] {

@@ -80,16 +80,7 @@ struct App {
     /// - Warning: Don't use this certificate in your projects.
     private static var ssl: KvHttpChannel.Configuration.SSL {
         get throws {
-            let resourceDirectory = "Resources"
-            let fileName = "https"
-            let fileExtension = "pem"
-
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-            let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: resourceDirectory)!.path
-#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            // - NOTE: Currently there is a bug (fatalError) in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
-            let pemPath = Bundle.module.resourceURL!.appendingPathComponent("\(fileName).\(fileExtension)").path
-#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+            let pemPath = Bundle.module.url(forResource: "https", withExtension: "pem")!.path
 
             return try .init(pemPath: pemPath)
         }

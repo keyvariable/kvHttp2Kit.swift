@@ -40,12 +40,16 @@ let package = Package(
         .executableTarget(
             name: "DeclarativeServer",
             dependencies: [ .product(name: "kvServerKit", package: "kvServerKit.swift") ],
-            resources: [ .copy("Resources") ]
+            resources: [ .copy("Resources/Frontend"),
+                         .copy("Resources/blue.png"),
+                         .copy("Resources/orange.png"),
+                         .copy("Resources/https.pem") ]
         ),
         .executableTarget(
             name: "ImperativeServer",
             dependencies: [ .product(name: "kvServerKit", package: "kvServerKit.swift") ],
-            resources: [ .copy("Resources") ]
+            resources: [ .copy("Resources/404.html"),
+                         .copy("Resources/https.pem") ]
         ),
     ]
 )

@@ -130,7 +130,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
             let configuration = TestKit.secureHttpConfiguration()
 
-            static var url: URL { Bundle.module.url(forResource: "sample", withExtension: "txt", subdirectory: "Resources")! }
+            static var url: URL { Bundle.module.url(forResource: "sample", withExtension: "txt")! }
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
@@ -165,7 +165,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
 
             static var errorMessage: String { "Error message" }
 
-            static var sampleURL: URL { Bundle.module.url(forResource: "sample", withExtension: "txt", subdirectory: "Resources")! }
+            static var sampleURL: URL { Bundle.module.url(forResource: "sample", withExtension: "txt")! }
             static var missingURL: URL { sampleURL.appendingPathExtension("missing") }
 
             var body: some KvResponseRootGroup {
