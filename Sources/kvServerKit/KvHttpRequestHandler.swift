@@ -24,23 +24,33 @@
 /// Protocol for request handlers. See provided common request handlers.
 public protocol KvHttpRequestHandler : AnyObject {
 
-    /// Maximum acceptable value of `Content-Length` header.
-    ///
-    /// See ``implicitBodyLengthLimit``.
-    var contentLengthLimit: UInt { get }
-    /// Maximum acceptable number of bytes in request body when `Content-Length` header is missing. Pass 0 if request must have no body or empty body.
-    ///
-    /// See ``contentLengthLimit``.
-    var implicitBodyLengthLimit: UInt { get }
+    /// Maximum acceptable number of bytes in request body. Zero means that request must have no body or empty body.
+    var bodyLengthLimit: UInt { get }
 
 
     /// It's invoked when server receives bytes from the client related with the request.
     /// This method can be invoked multiple times for each received part of the request body.
     /// When all the request body bytes are passed to request handler, ``httpClientDidReceiveEnd(_:)`` method is invoked.
-    func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer)
+    ///
+    /// - Tip: Thrown errors cause ``KvHttpChannel/RequestIncident/requestProcessingError(_:)`` incident.
+    func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) throws
 
     /// It's invoked when the request is completely received (including it's body bytes) and is ready to be handled.
-    func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider?
+    ///
+    /// - Tip: `nil` response causes ``KvHttpChannel/RequestIncident/noResponse`` incident.
+    /// - Tip: Thrown errors cause ``KvHttpChannel/RequestIncident/requestProcessingError(_:)`` incident.
+    func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider?
+
+    /// - Returns:  Optional custom response for an incident related to the request on a client.
+    ///             If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
+    ///
+    /// Use ``KvHttpIncident/defaultStatus`` to compose responses with default status codes for incidents.
+    /// Also you can return custom responses depending on default status.
+    ///
+    /// - Note: Server will close connection to the client just after the response will be submitted.
+    ///
+    /// - Important: Provided response should provide a valid optional body. If error occurs then server omits body.
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider?
 
     /// - Note: The client will continue to process requests.
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error)

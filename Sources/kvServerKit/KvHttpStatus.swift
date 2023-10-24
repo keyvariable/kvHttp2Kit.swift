@@ -15,31 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvEmptyResponseGroup.swift
+//  KvHttpStatus.swift
 //  kvServerKit
 //
-//  Created by Svyatoslav Popov on 03.07.2023.
+//  Created by Svyatoslav Popov on 16.10.2023.
 //
 
-/// It's designated to explicitely declare empty response groups.
-public struct KvEmptyResponseGroup : KvResponseGroup {
-
-    public typealias Body = KvNeverResponseGroup
-
-
-    @inlinable
-    public init() { }
-
-}
+import NIOHTTP1
 
 
 
-// MARK: : KvResponseGroupInternalProtocol
-
-extension KvEmptyResponseGroup : KvResponseGroupInternalProtocol {
-
-    func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
-        // Nothing to do
-    }
-
-}
+public typealias KvHttpStatus = HTTPResponseStatus

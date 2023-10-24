@@ -21,25 +21,93 @@
 //  Created by Svyatoslav Popov on 09.06.2023.
 //
 
+import Foundation
+
+
+
 @resultBuilder
 public struct KvResponseGroupBuilder {
 
     public typealias Group = KvResponseGroup
-    public typealias Element = KvResponse
 
 
 
+    /// Group expression builder.
     @inlinable
     public static func buildExpression<Component>(_ expression: Component) -> Component
     where Component : Group
     { expression }
 
-
+    
+    /// Response expression builder.
     @inlinable
-    public static func buildExpression<E>(_ expression: E) -> WrapperGroup<E>
-    where E : Element
-    { WrapperGroup(expression) }
+    public static func buildExpression<R>(_ response: R) -> WrapperGroup<R>
+    where R : KvResponse
+    { WrapperGroup(response) }
 
+
+    /// URL expression builder.
+    @inlinable
+    public static func buildExpression(_ url: URL) -> ConditionalGroup<WrapperGroup<KvDirectory>, WrapperGroup<KvFiles>> {
+        switch url.hasDirectoryPath {
+        case true:
+            var directory = KvDirectory(at: url)
+
+            if url.isFileURL {
+                var isDirectory: ObjCBool = false
+                
+                // Searching for status directory for local URLs.
+                if let statusURL = [ "Status", "status" ]
+                    .lazy.map({ url.appendingPathComponent($0) })
+                    .first(where: { FileManager.default.fileExists(atPath: $0.path, isDirectory: &isDirectory) && isDirectory.boolValue })
+                {
+                    directory = directory.httpStatusDirectory(url: statusURL)
+                }
+            }
+
+            return .init(trueGroup: .init(directory))
+
+        case false:
+            return .init(falseGroup: .init(KvFile(at: url)))
+        }
+    }
+
+
+    /// Optional URL expression builder.
+    @inlinable
+    public static func buildExpression(_ url: URL?) -> some Group {
+        buildOptional(url.map(buildExpression(_:)))
+    }
+
+
+    /// MultiURL expression builder.
+    @inlinable
+    public static func buildExpression<URLs>(_ urls: URLs) -> some Group
+    where URLs : Sequence, URLs.Element == URL
+    {
+        let urls = urls.reduce(into: (directory: Set<URL>(), file: Set<URL>()), { partialResult, url in
+            switch url.hasDirectoryPath {
+            case true:
+                partialResult.directory.insert(url)
+            case false:
+                partialResult.file.insert(url)
+            }
+        })
+
+        return KvGroup(content: {
+            KvForEach(urls.directory) {
+                KvDirectory.init(at: $0)
+            }
+            KvFiles(at: urls.file)
+        })
+    }
+
+
+    /// Optional MultiURL expression builder.
+    @inlinable
+    public static func buildExpression<URLs>(_ urls: URLs?) -> some Group
+    where URLs : Sequence, URLs.Element == URL
+    { buildOptional(urls.map(buildExpression(_:))) }
 
 
     @inlinable
@@ -56,13 +124,9 @@ public struct KvResponseGroupBuilder {
     public static func buildOptional<Component>(_ component: Component?) -> ConditionalGroup<Component, KvEmptyResponseGroup>
     where Component : Group
     {
-        switch component {
-        case .some(let component):
-            return .init(trueGroup: component)
-        case .none:
-            return .init(falseGroup: .init())
-        }
+        component.map { .init(trueGroup: $0) } ?? .init(falseGroup: .init())
     }
+
 
     @inlinable
     public static func buildEither<TrueComponent, FalseComponent>(first component: TrueComponent) -> ConditionalGroup<TrueComponent, FalseComponent>
@@ -80,6 +144,9 @@ public struct KvResponseGroupBuilder {
     public static func buildPartialBlock<Component>(first: Component) -> Component
     where Component : Group
     { first }
+
+
+    // TODO: Apply parameter packs from Swift 5.9.
 
     @inlinable
     public static func buildPartialBlock<C0, C1>(accumulated: C0, next: C1) -> GroupOfTwo<C0, C1>
@@ -105,25 +172,23 @@ public struct KvResponseGroupBuilder {
 
     // MARK: - WrapperGroup
 
-    public struct WrapperGroup<E : Element> : Group, KvResponseGroupInternalProtocol {
+    public struct WrapperGroup<E : KvResponse> : Group, KvResponseGroupInternalProtocol {
 
         let wrapped: E
 
 
         @usableFromInline
-        init(_ wrapped: E) {
-            self.wrapped = wrapped
-        }
+        init(_ wrapped: E) { self.wrapped = wrapped }
 
 
         // MARK: : Group
 
-        public typealias Body = KvNeverResponseGroup
+        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
 
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
             (wrapped as! any KvResponseInternalProtocol).insert(to: accumulator)
         }
 
@@ -162,17 +227,17 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public typealias Body = KvNeverResponseGroup
+        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
 
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
             switch content {
             case .falseGroup(let value):
-                value.insertResponses(to: accumulator)
+                value.resolvedGroup.insertResponses(to: accumulator)
             case .trueGroup(let value):
-                value.insertResponses(to: accumulator)
+                value.resolvedGroup.insertResponses(to: accumulator)
             }
         }
     }
@@ -198,14 +263,14 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public typealias Body = KvNeverResponseGroup
+        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
 
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
-            e0.insertResponses(to: accumulator)
-            e1.insertResponses(to: accumulator)
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
+            e0.resolvedGroup.insertResponses(to: accumulator)
+            e1.resolvedGroup.insertResponses(to: accumulator)
         }
 
     }
@@ -233,15 +298,15 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public typealias Body = KvNeverResponseGroup
+        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
 
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
-            e0.insertResponses(to: accumulator)
-            e1.insertResponses(to: accumulator)
-            e2.insertResponses(to: accumulator)
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
+            e0.resolvedGroup.insertResponses(to: accumulator)
+            e1.resolvedGroup.insertResponses(to: accumulator)
+            e2.resolvedGroup.insertResponses(to: accumulator)
         }
 
     }
@@ -271,16 +336,16 @@ public struct KvResponseGroupBuilder {
 
         // MARK: : Group
 
-        public typealias Body = KvNeverResponseGroup
+        public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
 
 
         // MARK: : KvResponseGroupInternalProtocol
 
-        func insertResponses<A : KvResponseAccumulator>(to accumulator: A) {
-            e0.insertResponses(to: accumulator)
-            e1.insertResponses(to: accumulator)
-            e2.insertResponses(to: accumulator)
-            e3.insertResponses(to: accumulator)
+        func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
+            e0.resolvedGroup.insertResponses(to: accumulator)
+            e1.resolvedGroup.insertResponses(to: accumulator)
+            e2.resolvedGroup.insertResponses(to: accumulator)
+            e3.resolvedGroup.insertResponses(to: accumulator)
         }
 
     }

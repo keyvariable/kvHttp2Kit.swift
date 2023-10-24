@@ -27,15 +27,16 @@
 ///
 /// Below is an example for various URL query item declarations:
 ///
-///     KvHttpResponse.dynamic
-///         .query(.required("int", of: Int.self))
-///         .query(.optional("string"))
-///         .query(.optional("float", of: Float.self))
-///         .query(.required("base64", parseBlock: { $0.flatMap { Data(base64Encoded: $0) } ?? .failure } ))
-///         .query(.bool("flag"))
-///         .query(.void("void"))
-///         .content(callback)
-///
+/// ```swift
+/// KvHttpResponse.with
+///     .query(.required("int", of: Int.self))
+///     .query(.optional("string"))
+///     .query(.optional("float", of: Float.self))
+///     .query(.required("base64", parseBlock: { $0.flatMap { Data(base64Encoded: $0) } ?? .failure } ))
+///     .query(.bool("flag"))
+///     .query(.void("void"))
+///     .content(callback)
+/// ```
 public struct KvUrlQueryItem<Value> {
 
     @usableFromInline
@@ -126,7 +127,7 @@ extension KvUrlQueryItem where Value == Bool {
     ///
     /// If an URL query doesn't contain item named *name* then the resulting value is `false`.
     /// Also:
-    /// - `false` is retuned for "false", "FALSE", "False", "no", "NO", "No", "0";
+    /// - `false` is returned for "false", "FALSE", "False", "no", "NO", "No", "0";
     /// - `true` is returned for `nil`, "true", "TRUE", "True", "yes", "YES", "Yes", "1".
     @inlinable
     public static func bool(_ name: String) -> Self {

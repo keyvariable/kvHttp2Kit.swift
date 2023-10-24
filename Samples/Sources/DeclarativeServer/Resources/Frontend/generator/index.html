@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Generator | DeclarativeServer</title>
+        <link href="/css/main.css" rel="stylesheet" type="text/css" />
+        <script src="/generator/generator.js"></script>
+    </head>
+    <body>
+        <h1>Generator</h1>
+
+        <hr>
+        <h3>UUID</h3>
+        <p>This generator requests new UUID from the server via AJAX.</p>
+        <button onclick="RequestUUID('uuid_output')">Get UUID</button>
+        <p id="uuid_output">&mdash;</p>
+
+        <hr>
+        <h3>Random Color</h3>
+        <p>This generator returns a random RGB color with JS.</p>
+        <button onclick="RandomColor('color_output')">Get color</button>
+        <p id="color_output">&mdash;</p>
+
+        <hr>
+    </body>
+</html>

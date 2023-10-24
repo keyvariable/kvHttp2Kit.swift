@@ -28,19 +28,19 @@ import kvKit
 class KvServerImplementation {
 
     init<S : KvServer>(from declaration: S) {
-        let schema = Schema()
+        let httpScheme = HttpScheme()
 
-        declaration.body.insertResponses(to: schema.makeAccumulator())
+        declaration.body.resolvedGroup.insertResponses(to: httpScheme.makeAccumulator())
 
         httpServer = .init()
 
-        schema.forEachChannel { channelSchema in
-            switch channelSchema {
-            case let httpChannelSchema as Schema.HttpChannel:
-                httpServer.createChannel(httpChannelSchema)
+        httpScheme.forEachChannel { channelScheme in
+            switch channelScheme {
+            case let httpChannelScheme as HttpScheme.HttpChannel:
+                httpServer.createChannel(httpChannelScheme)
 
             default:
-                KvDebug.pause("Unable to create a channel from unexpected \(channelSchema) schema")
+                KvDebug.pause("Unable to create a channel from unexpected \(channelScheme) scheme")
             }
         }
     }
@@ -78,9 +78,9 @@ class KvServerImplementation {
 
 
 
-// MARK: .Schema.ChannelSchema
+// MARK: .HttpScheme.ChannelScheme
 
-fileprivate protocol KvServerImplementationChannelSchema : AnyObject {
+fileprivate protocol KvServerImplementationChannelScheme : AnyObject {
 
     /// - Returns: The receiver's clone with dropped endpoints.
     func drop(_ endpoints: Set<KvNetworkEndpoint>) -> Self
@@ -88,21 +88,21 @@ fileprivate protocol KvServerImplementationChannelSchema : AnyObject {
 }
 
 
-extension KvServerImplementation.Schema {
+extension KvServerImplementation.HttpScheme {
 
-    fileprivate typealias ChannelSchema = KvServerImplementationChannelSchema
+    fileprivate typealias ChannelScheme = KvServerImplementationChannelScheme
 
 }
 
 
 
-// MARK: .Schema
-
 extension KvServerImplementation {
 
-    fileprivate class Schema {
+    // MARK: .HttpScheme
 
-        typealias HttpEndpoints = KvResponseGroup.Configuration.Network.HttpEndpoints
+    fileprivate class HttpScheme {
+
+        typealias HttpEndpoints = KvResponseRootGroup.Configuration.Network.HttpEndpoints
 
 
         private var channels: Channels = .init()
@@ -110,51 +110,84 @@ extension KvServerImplementation {
 
         // MARK: Operations
 
-        func makeAccumulator() -> KvResponseAccumulator { Accumulator(self) }
+        func makeAccumulator() -> Accumulator { Accumulator(self) }
 
 
-        func httpChannels(for configuration: KvResponseGroup.Configuration?) -> [HttpChannel] {
+        func httpChannels(for configuration: KvResponseRootGroupConfiguration?) -> [HttpChannel] {
             channels.httpChannels(for: configuration)
         }
 
 
-        func forEachChannel(_ body: (ChannelSchema) -> Void) {
+        func forEachChannel(_ body: (ChannelScheme) -> Void) {
             channels.elements.values.forEach(body)
         }
 
 
         // MARK: .Accumulator
 
-        private class Accumulator : KvResponseAccumulator {
+        // TODO: Review entire accumulation algorithm to optimize performance.
+        class Accumulator : KvHttpResponseAccumulator {
 
-            weak var schema: Schema!
-
-            let configuration: KvResponseGroup.Configuration?
-
-            private(set) lazy var httpChannels: [HttpChannel] = schema
-                .httpChannels(for: configuration)
+            typealias DispatchConfiguration = KvHttpResponseDispatcher.Scheme.DispatchConfiguration
 
 
-            init(_ schema: Schema, configuration: KvResponseGroup.Configuration? = nil, httpChannels: [HttpChannel]? = nil) {
-                self.schema = schema
-                self.configuration = configuration
+            weak var scheme: HttpScheme!
 
-                if let httpChannels {
-                    self.httpChannels = httpChannels
-                }
+            let responseRootGroupConfiguration: KvResponseRootGroupConfiguration?
+            let responseGroupConfiguration: KvResponseGroupConfiguration?
+
+            let dispatchConfiguration: DispatchConfiguration
+            let httpChannels: [HttpChannel]
+
+
+            convenience init(_ scheme: HttpScheme) { self.init(
+                scheme,
+                rootGroupConfiguration: nil,
+                groupConfiguration: nil,
+                httpChannels: nil
+            ) }
+
+
+            init(_ scheme: HttpScheme,
+                 rootGroupConfiguration: KvResponseRootGroupConfiguration?,
+                 groupConfiguration: KvResponseGroupConfiguration?,
+                 httpChannels: [HttpChannel]?
+            ) {
+                self.scheme = scheme
+                self.responseRootGroupConfiguration = rootGroupConfiguration
+                self.responseGroupConfiguration = groupConfiguration
+                self.dispatchConfiguration = .init(rootGroupConfiguration?.dispatching, groupConfiguration?.dispatching)
+                self.httpChannels = httpChannels ?? scheme.httpChannels(for: responseRootGroupConfiguration)
+
+                updateSchemeNode()
             }
 
 
-            // MARK: : KvResponseAccumulator
+            // MARK: : KvHttpResponseAccumulator
 
-            func with(_ configuration: KvResponseGroup.Configuration, body: (KvResponseAccumulator) -> Void) {
-                let newConfiguration = self.configuration.map { KvResponseGroup.Configuration(lhs: $0, rhs: configuration) } ?? configuration
+            func with(_ configuration: KvResponseRootGroupConfiguration, body: (KvServerImplementation.HttpScheme.Accumulator) -> Void) {
+                let newConfiguration = KvResponseRootGroupConfiguration.overlay(configuration, over: responseRootGroupConfiguration)
 
-                let isHttpConfigurationChanged = newConfiguration.network.httpEndpoints != self.configuration?.network.httpEndpoints
+                let isHttpConfigurationChanged = newConfiguration.network?.httpEndpoints != responseRootGroupConfiguration?.network?.httpEndpoints
 
-                let accumulator = Accumulator(schema,
-                                              configuration: newConfiguration,
+                let accumulator = Accumulator(scheme,
+                                              rootGroupConfiguration: newConfiguration,
+                                              groupConfiguration: responseGroupConfiguration,
                                               httpChannels: isHttpConfigurationChanged ? nil : httpChannels)
+
+                accumulator.updateRedirections()
+
+                body(accumulator)
+            }
+
+
+            func with(_ configuration: KvResponseGroupConfiguration, body: (Accumulator) -> Void) {
+                let newConfiguration = KvResponseGroupConfiguration.overlay(configuration, over: self.responseGroupConfiguration)
+
+                let accumulator = Accumulator(scheme,
+                                              rootGroupConfiguration: responseRootGroupConfiguration,
+                                              groupConfiguration: newConfiguration,
+                                              httpChannels: httpChannels)
 
                 body(accumulator)
             }
@@ -163,7 +196,30 @@ extension KvServerImplementation {
             func insert<HttpResponse>(_ response: HttpResponse)
             where HttpResponse : KvHttpResponseImplementationProtocol
             {
-                httpChannels.forEach { $0.dispatchSchema.insert(response, for: configuration?.dispatching ?? .empty) }
+                forEachDispatchScheme { $0.insert(response, for: dispatchConfiguration) }
+            }
+
+
+            // MARK: Operations
+
+            @inline(__always)
+            private func forEachDispatchScheme(_ body: (KvHttpResponseDispatcher.Scheme) -> Void) {
+                httpChannels.forEach { body($0.dispatchScheme) }
+            }
+
+
+            private func updateRedirections() {
+                guard let dispatching = responseRootGroupConfiguration?.dispatching else { return }
+
+                forEachDispatchScheme { $0.insertRedirections(for: dispatching) }
+            }
+
+
+            private func updateSchemeNode() {
+                guard let attributes = responseGroupConfiguration.flatMap(KvHttpResponseDispatcher.Attributes.from(_:))
+                else { return }
+
+                forEachDispatchScheme { $0.insert(attributes, for: dispatchConfiguration) }
             }
 
         }
@@ -174,7 +230,7 @@ extension KvServerImplementation {
         private struct Channels {
 
             typealias EndpointGroup = Set<KvNetworkEndpoint>
-            typealias Channels = [EndpointGroup : ChannelSchema]
+            typealias Channels = [EndpointGroup : ChannelScheme]
 
 
             private(set) var elements: Channels = .init()
@@ -201,7 +257,7 @@ extension KvServerImplementation {
             // MARK: Operations
 
             private mutating func fetch<C>(for endpoints: EndpointGroup, fabric: (EndpointGroup) -> C) -> [C]
-            where C : ChannelSchema
+            where C : ChannelScheme
             {
                 guard !endpoints.isEmpty else {
                     KvDebug.pause("Attempt to create a channel for empty group of endpoints. The responses will be ignored")
@@ -288,8 +344,10 @@ extension KvServerImplementation {
             }
 
 
-            mutating func httpChannels(for configuration: KvResponseGroup.Configuration?) -> [HttpChannel] {
-                let endpoints = configuration?.network.httpEndpoints ?? Defaults.httpEndpoints
+            mutating func httpChannels(for configuration: KvResponseRootGroupConfiguration?) -> [HttpChannel] {
+                let endpoints = {
+                    $0?.isEmpty == false ? $0! : Defaults.httpEndpoints
+                }(configuration?.network?.httpEndpoints)
 
                 return fetch(for: endpoints.elements, fabric: { slice in
                     HttpChannel(for: endpoints.intersection(slice))
@@ -301,34 +359,35 @@ extension KvServerImplementation {
 
         // MARK: .HttpChannel
 
-        final class HttpChannel : ChannelSchema {
+        final class HttpChannel : ChannelScheme {
 
             private(set) var configurations: HttpEndpoints.Configurations
 
-            let dispatchSchema: HttpServer.ChannelController.Dispatcher.Schema
+            let dispatchScheme: HttpServer.ChannelController.Dispatcher.Scheme
 
 
             private init(
                 configurations: [KvNetworkEndpoint : HttpEndpoints.Configuration] = [:],
-                dispatchSchema: HttpServer.ChannelController.Dispatcher.Schema = .init()
+                dispatchScheme: HttpServer.ChannelController.Dispatcher.Scheme = .init()
             ) {
                 self.configurations = configurations
-                self.dispatchSchema = dispatchSchema
+                self.dispatchScheme = dispatchScheme
             }
 
 
             init(for httpEndpoints: HttpEndpoints) {
                 self.configurations = httpEndpoints.configurations
-                self.dispatchSchema = .init()
+                self.dispatchScheme = .init()
             }
 
 
-            // MARK: : ChannelSchema
+            // MARK: : ChannelScheme
 
             func drop(_ endpoints: Set<KvNetworkEndpoint>) -> HttpChannel {
                 assert(!endpoints.isEmpty, "There is no need to call .drop() method for empty argument")
 
-                let dropped = HttpChannel(configurations: configurations.filter({ endpoints.contains($0.key) }), dispatchSchema: dispatchSchema)
+                let dropped = HttpChannel(configurations: configurations.filter({ endpoints.contains($0.key) }),
+                                          dispatchScheme: dispatchScheme)
 
                 endpoints.forEach { configurations.removeValue(forKey: $0) }
 
@@ -400,21 +459,12 @@ extension KvServerImplementation {
         private var channelControllers: [ChannelController] = .init()
 
 
-        // MARK: .Defaults
-
-        struct Defaults {
-
-            static var ignoredBodyLimits: KvHttpRequest.BodyLimits { 4046 /* 4 KiB */ }
-
-        }
-
-
         // MARK: Managing Channels
 
-        func createChannel(_ channelSchema: Schema.HttpChannel) {
-            guard let controller = ChannelController(from: channelSchema) else { return }
+        func createChannel(_ channelScheme: HttpScheme.HttpChannel) {
+            guard let controller = ChannelController(from: channelScheme) else { return }
 
-            channelSchema.configurations.forEach { (endpoint, configuration) in
+            channelScheme.configurations.forEach { (endpoint, configuration) in
                 let channel = KvHttpChannel(with: .init(endpoint: endpoint, http: configuration.http, connection: configuration.connection))
 
                 channel.delegate = controller
@@ -487,8 +537,8 @@ extension KvServerImplementation.HttpServer {
         typealias Dispatcher = KvHttpResponseDispatcher
 
 
-        init?(from schema: KvServerImplementation.Schema.HttpChannel) {
-            guard let dispatcher = Dispatcher(from: schema.dispatchSchema) else { return nil }
+        init?(from scheme: KvServerImplementation.HttpScheme.HttpChannel) {
+            guard let dispatcher = Dispatcher(from: scheme.dispatchScheme) else { return nil }
 
             self.dispatcher = dispatcher
         }
@@ -521,49 +571,59 @@ extension KvServerImplementation.HttpServer {
 
         // MARK: : KvHttpClientDelegate
 
-        // TODO: Find better way to ignore body of unexpected requests than `KvHttpIgnoringBodyRequestHandler`.
         func httpClient(_ httpClient: KvHttpChannel.Client, requestHandlerFor requestHead: KvHttpServer.RequestHead) -> KvHttpRequestHandler? {
-            guard let context = Dispatcher.Context(from: requestHead)
-            else { return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .badRequest } }
+            guard let requestContext = KvHttpRequestContext(httpClient, requestHead)
+            else { return KvHttpHeadOnlyRequestHandler { .badRequest } }
 
             let requestProcessor: KvHttpRequestProcessorProtocol
 
             // Dispatching request
-            switch dispatcher.requestProcessor(in: context) {
+            let dispatchingResult = dispatcher.requestProcessor(in: requestContext)
+            var onIncident = dispatchingResult.resolvedAttributes?.clientCallbacks?.onHttpIncident
+
+
+            func RequestHandler(for incident: KvHttpResponse.Incident, callback: KvClientCallbacks.IncidentCallback?) -> KvHttpRequestHandler {
+                return KvHttpHeadOnlyRequestHandler { callback?(incident, requestContext) ?? .status(incident.defaultStatus) }
+            }
+
+
+            switch dispatchingResult.match {
             case .unambiguous(let value):
                 requestProcessor = value
-
+                onIncident = requestProcessor.onIncident(_:_:)
             case .notFound:
-                return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .notFound }
-
+                return RequestHandler(for: .responseNotFound, callback: onIncident)
             case .ambiguous:
-                return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .badRequest }
+                return RequestHandler(for: .ambiguousRequest, callback: onIncident)
             }
 
             // Custom processing of headers
             switch requestProcessor.process(requestHead.headers) {
             case .success:
                 break
-
-            case .failure:
-                // TODO: pass the associated error and default response to user-declared handler.
-                return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .badRequest }
+            case .failure(let error):
+                return RequestHandler(for: .invalidHeaders(error), callback: onIncident)
             }
 
             // Creation of a request processor
-            switch requestProcessor.makeRequestHandler() {
+            switch requestProcessor.makeRequestHandler(requestContext) {
             case .success(let requestHandler):
                 return requestHandler
-
-            case .failure:
-                // TODO: pass the associated error and default response to user-declared handler.
-                return KvHttpIgnoringBodyRequestHandler(bodyLimits: Defaults.ignoredBodyLimits) { .internalServerError }
+            case .failure(let error):
+                return RequestHandler(for: .processingFailed(error), callback: onIncident)
             }
         }
 
 
-        // TODO: pass error to user-declared handler.
-        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) { }
+        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
+            // TODO: Pass to provided handler of channel incidents when implemented.
+            return nil
+        }
+
+
+        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
+            // TODO: Pass to provided handler of channel errors when implemented.
+        }
 
     }
 

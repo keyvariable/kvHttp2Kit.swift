@@ -21,9 +21,30 @@
 //  Created by Svyatoslav Popov on 28.06.2023.
 //
 
+// MARK: - KvResponseAccumulator
+
 protocol KvResponseAccumulator : AnyObject {
 
-    func with(_ configuration: KvResponseGroupConfiguration, body: (KvResponseAccumulator) -> Void)
+    associatedtype NestedAccumulator : KvResponseAccumulator
+
+
+    /// Resolved configuration of current response group.
+    var responseGroupConfiguration: KvResponseGroupConfiguration? { get }
+
+
+    func with(_ configuration: KvResponseRootGroupConfiguration, body: (NestedAccumulator) -> Void)
+
+    func with(_ configuration: KvResponseGroupConfiguration, body: (NestedAccumulator) -> Void)
+
+}
+
+
+
+// MARK: - KvHttpResponseAccumulator
+
+protocol KvHttpResponseAccumulator : KvResponseAccumulator
+where NestedAccumulator: KvHttpResponseAccumulator
+{
 
     func insert<HttpResponse>(_ response: HttpResponse) where HttpResponse : KvHttpResponseImplementationProtocol
 

@@ -28,13 +28,12 @@ import Foundation
 /// Request handler collecting body fragments and then handling entire body.
 open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
-    public typealias BodyLimits = KvHttpRequest.BodyLimits
-
-    public typealias ResponseBlock = (Data?) async -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (Data?) throws -> KvHttpResponseProvider?
 
 
 
-    public let bodyLimits: BodyLimits
+    /// See ``KvHttpRequestHandler/bodyLengthLimit`` for details.
+    public let bodyLengthLimit: UInt
 
 
 
@@ -46,10 +45,11 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
 
 
+    /// - Parameter bodyLengthLimit: See ``KvHttpRequestHandler/bodyLengthLimit`` for details. Default value is ``KvHttpRequest/Constants/bodyLengthLimit``.
     /// - Parameter responseBlock: Block passed with collected request body data if available and returning response to be send to a client.
     @inlinable
-    public init(bodyLimits: BodyLimits, responseBlock: @escaping ResponseBlock) {
-        self.bodyLimits = bodyLimits
+    public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit, responseBlock: @escaping ResponseBlock) {
+        self.bodyLengthLimit = bodyLengthLimit
         self.responseBlock = responseBlock
     }
 
@@ -57,13 +57,7 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
     // MARK: : KvHttpRequestHandler
 
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var contentLengthLimit: UInt { bodyLimits.contentLength }
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var implicitBodyLengthLimit: UInt { bodyLimits.implicit }
-
-
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) {
         bodyData?.append(bytes.assumingMemoryBound(to: UInt8.self))
@@ -75,16 +69,26 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
     ///
     /// - Returns: Invocation result of the receiver's `.responseBlock` passed with the colleted body data.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
-        await responseBlock(bodyData)
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+        return try responseBlock(bodyData)
+    }
+
+
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
+    /// Override it to provide custom incident handling.
+    ///
+    /// - SeeAlso ``KvHttpRequestHandler``.
+    @inlinable
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        return nil
     }
 
 
     /// Override it to handle errors. Default implementation just prints error message to console.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
         print("\(type(of: self)) did catch error: \(error)")

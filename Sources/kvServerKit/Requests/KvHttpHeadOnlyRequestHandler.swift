@@ -24,7 +24,7 @@
 /// Simple handler for requests having no body. It just sends response passed to the initializer.
 open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = () async -> KvHttpResponseProvider?
+    public typealias ResponseBlock = () throws -> KvHttpResponseProvider?
 
 
 
@@ -53,27 +53,36 @@ open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
     
     // MARK: : KvHttpRequestHandler
 
-    /// See ``KvHttpRequestHandler``.
-    public var contentLengthLimit: UInt { 0 }
-    /// See ``KvHttpRequestHandler``.
-    public var implicitBodyLengthLimit: UInt { 0 }
+    /// See ``KvHttpRequestHandler/bodyLengthLimit`` for details.
+    @inlinable public var bodyLengthLimit: UInt { 0 }
 
 
-    /// See ``KvHttpRequestHandler``.
-    public func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) { }
+    /// - SeeAlso ``KvHttpRequestHandler``.
+    @inlinable public func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) { }
 
 
     /// - Returns: Value of the receiver's `.response` property.
     ///
-    /// See ``KvHttpRequestHandler``.
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
-        await responseBlock()
+    /// - SeeAlso ``KvHttpRequestHandler``.
+    @inlinable
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+        return try responseBlock()
+    }
+
+
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
+    /// Override it to provide custom incident handling. 
+    ///
+    /// - SeeAlso ``KvHttpRequestHandler``.
+    @inlinable
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        return nil
     }
 
 
     /// Override it to handle errors. Default implementation just prints error message to console.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
         print("\(type(of: self)) did catch error: \(error)")

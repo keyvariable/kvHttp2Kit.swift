@@ -25,67 +25,70 @@
 ///
 /// This handler is designated to process request bodies on the fly minimizing memory usage and improving performance of large body processing.
 ///
-/// See: ``init(bodyLimits:initial:nextPartialResult:responseBlock:)``, ``init(bodyLimits:into:updateAccumulatingResult:responseBlock:)``.
+/// See: ``init(bodyLengthLimit:initial:nextPartialResult:responseBlock:)``, ``init(bodyLengthLimit:into:updateAccumulatingResult:responseBlock:)``.
 open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
-    public typealias BodyLimits = KvHttpRequest.BodyLimits
-
-    public typealias ResponseBlock = (PartialResult) async -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (PartialResult) throws -> KvHttpResponseProvider?
 
 
 
-    public let bodyLimits: BodyLimits
+    /// See ``KvHttpRequestHandler/bodyLengthLimit`` for details.
+    public let bodyLengthLimit: UInt
 
 
 
     @usableFromInline
-    let bodyCallback: (UnsafeRawBufferPointer) -> Void
+    let bodyCallback: (UnsafeRawBufferPointer) throws -> Void
 
     @usableFromInline
-    let responseBlock: () async -> KvHttpResponseProvider?
+    let responseBlock: () throws -> KvHttpResponseProvider?
 
 
 
+    /// - Parameter bodyLengthLimit: see ``KvHttpRequestHandler/bodyLengthLimit`` for details. Default value is ``KvHttpRequest/Constants/bodyLengthLimit``.
+    ///
     /// The partial result and received body fragments are passed to *nextPartialResult* block and partial result is replaced with value returned by *nextPartialResult*.
     /// When entire body is processed, last partial result is passed to *responseBlock*.
     ///
-    /// See: ``init(bodyLimits:into:updateAccumulatingResult:responseBlock:)``.
+    /// - SeeAlso: ``init(bodyLengthLimit:into:updateAccumulatingResult:responseBlock:)``.
     @inlinable
-    public init(bodyLimits: BodyLimits,
+    public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit,
                 initial initialResult: PartialResult,
-                nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) -> PartialResult,
+                nextPartialResult: @escaping (PartialResult, UnsafeRawBufferPointer) throws -> PartialResult,
                 responseBlock: @escaping ResponseBlock)
     {
         var partialResult = initialResult
 
-        self.bodyLimits = bodyLimits
+        self.bodyLengthLimit = bodyLengthLimit
         self.bodyCallback = { bytes in
-            partialResult = nextPartialResult(partialResult, bytes)
+            partialResult = try nextPartialResult(partialResult, bytes)
         }
         self.responseBlock = {
-            await responseBlock(partialResult)
+            try responseBlock(partialResult)
         }
     }
 
 
+    /// - Parameter bodyLengthLimit: see ``KvHttpRequestHandler/bodyLengthLimit`` for details. Default value is ``KvHttpRequest/Constants/bodyLengthLimit``.
+    ///
     /// The mutable partial result and received body fragments are passed to *updateAccumulatingResult* block.
     /// When entire body is processed, partial result is passed to *responseBlock*.
     ///
-    /// See: ``init(bodyLimits:initial:nextPartialResult:responseBlock:)``.
+    /// - SeeAlso: ``init(bodyLengthLimit:initial:nextPartialResult:responseBlock:)``.
     @inlinable
-    public init(bodyLimits: BodyLimits,
+    public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit,
                 into initialResult: PartialResult,
-                updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) -> Void,
+                updateAccumulatingResult: @escaping (inout PartialResult, UnsafeRawBufferPointer) throws -> Void,
                 responseBlock: @escaping ResponseBlock)
     {
         var partialResult = initialResult
 
-        self.bodyLimits = bodyLimits
+        self.bodyLengthLimit = bodyLengthLimit
         self.bodyCallback = { bytes in
-            updateAccumulatingResult(&partialResult, bytes)
+            try updateAccumulatingResult(&partialResult, bytes)
         }
         self.responseBlock = {
-            await responseBlock(partialResult)
+            try responseBlock(partialResult)
         }
     }
 
@@ -93,16 +96,10 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
     // MARK: : KvHttpRequestHandler
 
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var contentLengthLimit: UInt { bodyLimits.contentLength }
-    /// See ``KvHttpRequestHandler``.
-    @inlinable public var implicitBodyLengthLimit: UInt { bodyLimits.implicit }
-
-
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) {
-        bodyCallback(bytes)
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didReceiveBodyBytes bytes: UnsafeRawBufferPointer) throws {
+        try bodyCallback(bytes)
     }
 
 
@@ -110,16 +107,26 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     ///
     /// - Returns: Invocation result of the receiver's `.responseBlock` passed with the colleted body data.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) async -> KvHttpResponseProvider? {
-        await responseBlock()
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+        return try responseBlock()
+    }
+
+
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
+    /// Override it to provide custom incident handling. 
+    ///
+    /// - SeeAlso ``KvHttpRequestHandler``.
+    @inlinable
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        return nil
     }
 
 
     /// Override it to handle errors. Default implementation just prints error message to console.
     ///
-    /// See ``KvHttpRequestHandler``.
+    /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
     open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
         print("\(type(of: self)) did catch error: \(error)")

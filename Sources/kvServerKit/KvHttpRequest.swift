@@ -21,6 +21,10 @@
 //  Created by Svyatoslav Popov on 31.05.2023.
 //
 
+import NIOHTTP1
+
+
+
 public class KvHttpRequest {
 
     private init() { }
@@ -29,6 +33,8 @@ public class KvHttpRequest {
 
     // MARK: Typealiases
 
+    public typealias Method = HTTPMethod
+
     public typealias Handler = KvHttpRequestHandler
 
     public typealias CollectingBodyHandler = KvHttpCollectingBodyRequestHandler
@@ -36,33 +42,16 @@ public class KvHttpRequest {
     public typealias JsonHandler = KvHttpJsonRequestHandler
 
 
-
-    // MARK: .BodyLimits
-
-    public struct BodyLimits : ExpressibleByIntegerLiteral {
-
-        /// Maximum acceptable value of `Content-Length` header.
-        public var contentLength: UInt
-
-        /// Maximum acceptable number of bytes in request body when `Content-Length` header is missing. Pass 0 if request must have no body or empty body.
-        public var implicit: UInt
+    typealias Preconditions = KvHttpRequestPreconditions
 
 
-        /// Memberwise initializer.
-        @inlinable
-        public init(contentLength: UInt, implicit: UInt) {
-            self.contentLength = contentLength
-            self.implicit = implicit
-        }
 
+    // MARK: .Constants
 
-        /// Initializes an instance where all the limits are equal to given value.
-        @inlinable public init(_ value: UInt) { self.init(contentLength: value, implicit: value) }
+    public struct Constants {
 
-
-        // MARK: : ExpressibleByIntegerLiteral
-
-        @inlinable public init(integerLiteral value: UInt) { self.init(value) }
+        /// Default limit for requests having body.
+        @inlinable public static var bodyLengthLimit: UInt { 16_384 /* 16 KiB */ }
 
     }
 

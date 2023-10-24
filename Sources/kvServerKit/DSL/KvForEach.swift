@@ -25,18 +25,20 @@
 ///
 /// Let `urls` is an array of file URLs.  Then code providing responses with contents of the files can be implemented as shown below:
 ///
-///     KvForEach(urls) { url in
-///         KvGroup(url.path) {
-///             KvHttpResponse.static {
-///                 guard let stream = InputStream(url: url) else { return .internalServerError }
-///                 return .binary(stream)
-///             }
+/// ```swift
+/// KvForEach(urls) { url in
+///     KvGroup(url.path) {
+///         KvHttpResponse {
+///             guard let stream = InputStream(url: url) else { return .internalServerError }
+///             return .binary(stream)
 ///         }
 ///     }
+/// }
+/// ```
 ///
 /// Also it can be used to provide responses for all cases of an enumeration.
 ///
-/// - Note: The content is generated once before server is started. Any changes in ``data`` after ``content`` block is invoked take no effect.
+/// - Note: It's discouraged to mutate provided data. The content is generated once before server is started and there is no guaranties that changes will take effect.
 public struct KvForEach<Data, Content> where Data : Sequence {
 
     /// Collection of data that is used to generate content dynamically.
@@ -55,12 +57,42 @@ public struct KvForEach<Data, Content> where Data : Sequence {
 }
 
 
+// MARK: : KvResponseRootGroup where Content : KvResponseRootGroup
 
-// MARK: : KvResponseGroup where Content : KvResponse
+extension KvForEach : KvResponseRootGroup where Content : KvResponseRootGroup {
+
+    public var body: KvNeverResponseRootGroup { KvNeverResponseRootGroup() }
+
+
+    /// Creates dynamically generated collection of response groups from given *data* sequence.
+    @inlinable
+    public init(_ data: Data, @KvResponseRootGroupBuilder content: @escaping (Data.Element) -> Content) {
+        self.init(data: data, content: content)
+    }
+
+}
+
+
+
+// MARK: : KvResponseRootGroupInternalProtocol where Content : KvResponseRootGroup
+
+extension KvForEach : KvResponseRootGroupInternalProtocol where Self : KvResponseRootGroup {
+
+    func insertResponses<A>(to accumulator: A) where A : KvHttpResponseAccumulator {
+        data.forEach {
+            content($0).resolvedGroup.insertResponses(to: accumulator)
+        }
+    }
+
+}
+
+
+
+// MARK: : KvResponseGroup where Content : KvResponseGroup
 
 extension KvForEach : KvResponseGroup where Content : KvResponseGroup {
 
-    public typealias Body = KvNeverResponseGroup
+    public var body: KvNeverResponseGroup { KvNeverResponseGroup() }
 
 
     /// Creates dynamically generated collection of response groups from given *data* sequence.
@@ -73,13 +105,13 @@ extension KvForEach : KvResponseGroup where Content : KvResponseGroup {
 
 
 
-// MARK: : KvResponseGroup where Content : KvResponse
+// MARK: : KvResponseGroupInternalProtocol where Content : KvResponse
 
 extension KvForEach : KvResponseGroupInternalProtocol where Self : KvResponseGroup {
 
-    func insertResponses<A>(to accumulator: A) where A : KvResponseAccumulator {
+    func insertResponses<A>(to accumulator: A) where A : KvHttpResponseAccumulator {
         data.forEach {
-            content($0).insertResponses(to: accumulator)
+            content($0).resolvedGroup.insertResponses(to: accumulator)
         }
     }
 

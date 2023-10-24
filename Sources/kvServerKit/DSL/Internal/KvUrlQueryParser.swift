@@ -258,7 +258,7 @@ class KvUrlQueryParser<Value> : KvSerialUrlQueryParser, KvUrlQueryParseResultPro
             numberOfRequiredValues += parser.isRequired ? 1 : 0
 
             if let oldValue = itemParsers.updateValue(parser, forKey: name) {
-                assertionFailure("Warninig: value parser for URL query item named \"\(name)\" has been replaced")
+                assertionFailure("Warning: value parser for URL query item named \"\(name)\" has been replaced")
 
                 numberOfRequiredValues -= oldValue.isRequired ? 1 : 0
             }
@@ -415,7 +415,7 @@ public class KvUrlQueryValueParser<Value> : KvUrlQueryValueParserInternalProtoco
 
     // MARK: Operations
 
-    /// - Note: Nil means missing required value.
+    /// - Note: `Nil` means missing required value.
     fileprivate func result() -> KvUrlQueryParseResult<Value>? { value ?? defaultBlock.map { block in .success(block()) } }
 
 
@@ -451,7 +451,7 @@ public class KvUrlQueryValueParser<Value> : KvUrlQueryValueParserInternalProtoco
 // TODO: Make it fileprivate or internal
 public struct KvUrlQueryValueContainer<Value> {
 
-    /// - Note: Nil means missing required value.
+    /// - Note: `Nil` means missing required value.
     fileprivate typealias ValueBlock = () -> KvUrlQueryParseResult<Value>?
 
     /// It's invoked with name of URL query item and the item's value parser.

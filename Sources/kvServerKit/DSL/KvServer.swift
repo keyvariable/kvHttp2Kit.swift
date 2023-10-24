@@ -21,35 +21,42 @@
 //  Created by Svyatoslav Popov on 09.06.2023.
 //
 
+import Foundation
 
-/// A type that represents behaviour of a server.
+
+
+/// A type that represents behavior of a server.
 ///
 /// Below is an example of simple server:
 ///
-///     @main
-///     struct ExampleServer : KvServer {
-///         var body: some KvResponseGroup {
-///             KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
-///                 KvHttpResponse.static { .string("Hello, client") }
+/// ```swift
+/// @main
+/// struct ExampleServer : KvServer {
+///     var body: some KvResponseRootGroup {
+///         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
+///             KvGroup(hosts: "example.com", optionalSubdomains: "www") {
+///                 URL(string: "file:///var/www/example.com/")
 ///
 ///                 KvGroup("echo") {
-///                     KvHttpResponse.dynamic
+///                     KvHttpResponse.with
 ///                         .requestBody(.data)
-///                         .content { .binary($0.requestBody ?? Data()) }
+///                         .content { input in
+///                             guard let data: Data = input.requestBody else { return .badRequest }
+///                             return .binary({ data }).contentLength(data.count)
+///                         }
 ///                 }
 ///                 .httpMethods(.POST)
 ///
 ///                 KvGroup("uuid") {
-///                     KvHttpResponse.static
-///                         .content { .string(UUID().uuidString) }
+///                     KvHttpResponse { .string { UUID().uuidString } }
 ///                 }
 ///             }
-///             .hosts("example.com")
-///             .subdomains(optional: "www")
 ///         }
 ///     }
+/// }
+/// ```
 ///
-/// Note `@main` attribute in the exapmle above. This attribute makes the server's ``main()`` method to be the entry point of application.
+/// Note `@main` attribute in the example above. This attribute makes the server's ``main()`` method to be the entry point of application.
 ///
 /// Servers can be launched manually. See ``start()`` for details.
 public protocol KvServer {
@@ -57,13 +64,13 @@ public protocol KvServer {
     /// The type of connection and request dispatcher.
     ///
     /// It's inferred from your implementation of the required property ``body-swift.property``.
-    associatedtype Body : KvResponseGroup
+    associatedtype Body : KvResponseRootGroup
 
 
     /// The behavior of the server.
     ///
     /// It's a place to define server's configuration, routing of requests and responses.
-    @KvResponseGroupBuilder
+    @KvResponseRootGroupBuilder
     var body: Self.Body { get }
 
 
@@ -79,27 +86,40 @@ public protocol KvServer {
 
 extension KvServer {
 
-    /// Initializes and runs the server.
+    /// Initializes and runs the server until *SIGINT*, *SIGTERM*, *SIGQUIT* or *SIGHUP* process signal is received.
     ///
-    /// It's automatically called when application is launched if server implementation is annotated with
+    /// It's automatically provided as the process's entry point when server implementation is annotated with
     /// [@main](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/attributes/#main) attribute.
     ///
-    ///     @main
-    ///     struct ExampleServer : KvServer
+    /// ```swift
+    /// @main
+    /// struct ExampleServer : KvServer
+    /// ```
     ///
-    /// See: ``start()``.
+    /// - Important: This method never returns. Use ``start()`` method to start server programmatically and manage it's execution.
     public static func main() {
         let token: KvServerToken
 
         do { token = try Self().start() }
-        catch { return print("Unable to start \(Self.self). \(error)") }
+        catch {
+            print("Unable to start \(Self.self). \(error)")
+            exit(-2)
+        }
+
+        KvServerStopSignals.setCallback { _ in
+            token.stop()
+        }
 
         switch token.waitUntilStopped() {
         case .success:
             break
+
         case .failure(let error):
             print("\(Self.self) stopped with error. \(error)")
+            exit(-1)
         }
+
+        exit(0)
     }
 
 }
@@ -113,16 +133,22 @@ extension KvServer {
     /// Starts the server and returns a token. The token provides life-cycle management of started server instance.
     ///
     /// For example:
+    /// 
+    /// ```swift
+    /// let token = try ExampleServer().start()
     ///
-    ///     let token = try ExampleServer().start()
+    /// KvServerStopSignals.setCallback { _ in
+    ///     token.stop()
+    /// }
     ///
-    ///     try token.waitWhileStarting().get()
-    ///     CustomActions()
+    /// try token.waitWhileStarting().get()
+    /// CustomActions()
     ///
-    ///     try token.waitUntilStopped().get()
-    ///     CustomCompletion()
+    /// try token.waitUntilStopped().get()
+    /// CustomCompletion()
+    /// ```
     ///
-    /// See: ``main()``.
+    /// - SeeAlso: ``main()``.
     public func start() throws -> KvServerToken {
         let server = KvServerImplementation(from: self)
 
@@ -142,10 +168,6 @@ extension KvServer {
     public typealias QueryResult = KvUrlQueryParseResult
 
 }
-
-
-
-// TODO: .catch(_:) modifier for all server errors.
 
 
 
@@ -172,13 +194,13 @@ public class KvServerToken {
 
     // MARK: Operations
 
-    /// Intiates stop of the server. Given *completion* is invoked when the server is stopped and passed with the result.
+    /// Initiates stop of the server. Given *completion* is invoked when the server is stopped and passed with the result.
     public func stop(_ completion: ((Result<Void, Error>) -> Void)? = nil) {
         server.stop(completion)
     }
 
 
-    /// This method stops execution until server is started or stopeed and then returns the result.
+    /// This method stops execution until server is started or stopped and then returns the result.
     @discardableResult
     public func waitWhileStarting() -> Result<Void, Error> {
         server.waitWhileStarting()

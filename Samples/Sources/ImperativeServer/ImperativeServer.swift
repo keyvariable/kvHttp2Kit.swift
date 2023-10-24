@@ -31,7 +31,7 @@ import Foundation
 ///
 /// Server handles 3 requests:
 /// - simple greeting GET request at the root path. It just returns a constant string.
-/// - echo POST request at `/echo` path. It returns the same bytes as in the request body.
+/// - echo POST request at `/echo` path. It returns the same bytes as in the request body. Also it returns customized response for 413 (Payload Too Large) status.
 /// - number generator GET request at `/generator` path. It takes `from` and `through` URL query arguments and returns array of 32-bit integers in *from*...*through* range as raw bytes.
 ///
 /// Handling of requests is in ``httpClient(_:requestHandlerFor:)`` method.
@@ -61,13 +61,14 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
         struct Greeting {
 
             static let path = "/"
-            static var content: String { "Hello! It's a sample server on imperative API of kvServerKit framework" }
+            static var content: String { "Hello! It's a sample server on imperative API from kvServerKit framework." }
 
         }
 
         struct Echo {
 
             static let path = "/echo"
+            static let bodyLimit: UInt = 256 << 10 // 256 KiB
 
         }
 
@@ -95,7 +96,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
 
 
     @discardableResult
-    func waitUntilStarted() -> Result<Void, Error> { httpServer.waitWhileStarting() }
+    func waitWhileStarting() -> Result<Void, Error> { httpServer.waitWhileStarting() }
 
 
     @discardableResult
@@ -122,7 +123,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
     func httpServer(_ httpServer: KvHttpServer, didStopWith result: Result<Void, Error>) {
         switch result {
         case .failure(let error):
-            print("Simple test server did stop with error: \(error)")
+            print("ImperativeServer did stop with error: \(error)")
         case .success:
             break
         }
@@ -130,7 +131,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
 
 
     func httpServer(_ httpServer: KvHttpServer, didCatch error: Error) {
-        print("Simple test server did catch error: \(error)")
+        print("ImperativeServer did catch error: \(error)")
     }
 
 
@@ -142,7 +143,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
     func httpChannel(_ httpChannel: KvHttpChannel, didStopWith result: Result<Void, Error>) {
         switch result {
         case .failure(let error):
-            print("Simple test server did stop channel with error: \(error)")
+            print("ImperativeServer did stop channel with error: \(error)")
         case .success:
             break
         }
@@ -150,7 +151,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
 
 
     func httpChannel(_ httpChannel: KvHttpChannel, didCatch error: Error) {
-        print("Simple test server did catch error on channel \(httpChannel): \(error)")
+        print("ImperativeServer did catch error on channel \(httpChannel): \(error)")
     }
 
 
@@ -162,7 +163,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
     func httpChannel(_ httpChannel: KvHttpChannel, didStopClient httpClient: KvHttpChannel.Client, with result: Result<Void, Error>) {
         switch result {
         case .failure(let error):
-            print("Simple test server did stop client with error: \(error)")
+            print("ImperativeServer did stop client with error: \(error)")
         case .success:
             break
         }
@@ -181,14 +182,10 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
 
         switch urlComponents.path {
         case Constants.Greeting.path:
-            return KvHttpRequest.HeadOnlyHandler(response: .string(Constants.Greeting.content))
+            return KvHttpRequest.HeadOnlyHandler(response: .string { Constants.Greeting.content })
 
         case Constants.Echo.path:
-            return KvHttpRequest.CollectingBodyHandler(bodyLimits: 262_144 /* 256 KiB */) { body in
-                guard let body = body else { return nil }
-
-                return .binary(body)
-            }
+            return EchoRequestHandler()
 
         case Constants.Generator.path:
             guard let bodyStream = NumberGeneratorStream(queryItems: urlComponents.queryItems)
@@ -202,12 +199,58 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
             break
         }
 
-        return KvHttpRequest.HeadOnlyHandler(response: .notFound)
+        return nil
+    }
+
+
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
+        switch incident.defaultStatus {
+        case .notFound:
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+            return try? .notFound
+                .file(resource: "404", extension: "html", subdirectory: "Resources", bundle: .module)
+                .contentType(.text(.html))
+#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+            // - NOTE: Currently there is a bug (fatalError) in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
+            return .notFound.string { "Status code: 404 (Not Found)" }
+#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+        default:
+            return nil
+        }
     }
 
 
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error) {
-        print("Simple test server did catch client error: \(error)")
+        print("ImperativeServer did catch client error: \(error)")
+    }
+
+
+    // MARK: .EchoRequestHandler
+
+    /// Example of a class incapsulating handling of echo request.
+    private class EchoRequestHandler : KvHttpRequest.CollectingBodyHandler {
+
+        init() {
+            super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body in
+                guard let body = body else { return nil }
+
+                return .binary { body }
+                    .contentLength(body.count)
+            }
+        }
+
+
+        // MARK: : KvHttpRequestHandler
+
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+            switch incident {
+            case .byteLimitExceeded:
+                return .payloadTooLarge.string { "Payload exceeds \(Constants.Echo.bodyLimit) byte limit." }
+            default:
+                return super.httpClient(httpClient, didCatch: incident)
+            }
+        }
+
     }
 
 

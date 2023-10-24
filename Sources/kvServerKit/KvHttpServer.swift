@@ -40,9 +40,14 @@ public protocol KvHttpServerDelegate : AnyObject {
 
 
 
-/// An HTTP/2 server handling requests in HTTP1 style. HTTP1 is supported.
+/// *KvHttpServer* class provides ability to implement request handling in imperative paradigm.
 ///
-/// This implementation provides ability to implement request handling in structured manner.
+/// Usually there is no need to subclass *KvHttpServer* or ``KvHttpChannel`` classes.
+/// Most of work should be done via delegates and dedicated classes for request handling.
+/// See *ImperativeServer* sample in *Samples* package at `/Samples` directory.
+///
+/// When instance of running *KvHttpServer* is being destroyed, the deinitializer is waiting until server actually stopped.
+/// Use async ``KvHttpServer/stop()`` method or sync ``KvHttpServer/stop(_:)`` and ``KvHttpServer/waitUntilStopped()`` methods to wait explicitely.
 open class KvHttpServer {
 
     public typealias RequestHead = HTTPRequestHead
@@ -98,21 +103,34 @@ open class KvHttpServer {
     // MARK: Managing Life-cycle
 
     internal var eventLoopGroup: MultiThreadedEventLoopGroup? {
-        guard case .running(let eventLoopGroup) = stateCondition.withLock({ _state }) else { return nil }
-
-        return eventLoopGroup
+        switch stateCondition.withLock({ _state }) {
+        case .running(let eventLoopGroup), .starting(.some(let eventLoopGroup)):
+            return eventLoopGroup
+        case .starting(.none), .stopped(_), .stopping:
+            return nil
+        }
     }
 
 
     /// Starts server and all bound channels.
     ///
-    /// See: ``waitWhileStarting()``, ``stop()``, ``stop(_:)``.
+    /// Servers usually run in the background and stop on process signals.
+    /// See ``KvServerStopSignals`` helper providing handling of stop process signals:
+    ///
+    /// ```swift
+    /// try server.start()
+    /// KvServerStopSignals.setCallback { signal in
+    ///     server.stop()
+    /// }
+    /// ```
+    ///
+    /// - SeeAlso: ``waitWhileStarting()``, ``stop()``, ``stop(_:)``.
     public func start() throws {
         do {
             try stateCondition.withLock {
                 guard case .stopped = _state else { throw ServerError.unexpectedState(.init(for: _state)) }
 
-                _state = .starting
+                _state = .starting(nil)
             }
         }
         catch {
@@ -123,57 +141,88 @@ open class KvHttpServer {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
 
         stateCondition.withLock {
-            _state = .running(eventLoopGroup)
+            _state = .starting(eventLoopGroup)
         }
 
-        mutationLock.withLock {
-            _channels.values.forEach { channel in
-                Task.detached {
-                    channel.start()
+        // - NOTE:  Registered channels are started before server changes state to `.running`
+        //          to prevent case when server is running but a registered channel is in stopped state.
+
+        do {
+            let channelDispatchGroup = DispatchGroup()
+
+            mutationLock.withLock {
+                _channels.values.forEach { channel in
+                    DispatchQueue.global().async(group: channelDispatchGroup) {
+                        channel.start()
+                    }
                 }
             }
-        }
 
-        delegate?.httpServerDidStart(self)
+            channelDispatchGroup.notify(queue: .global()) {
+                self.stateCondition.withLock {
+                    self._state = .running(eventLoopGroup)
+                }
+
+                self.delegate?.httpServerDidStart(self)
+            }
+        }
     }
 
 
     /// Stops server.
     ///
-    /// See: ``waitUntilStopped()``, ``start()``.
+    /// Server can be stopped at any moment. If server is being started then this method will stop server just after it will be completely started.
+    /// This method can be called multiple times. If it is then *completion* is invoked multiple times with the same stop result.
+    ///
+    /// - SeeAlso: ``waitUntilStopped()``, ``start()``.
     public func stop(_ completion: ((Result<Void, Error>) -> Void)? = nil) {
-        let eventLoopGroup: MultiThreadedEventLoopGroup
 
-        do {
-            eventLoopGroup = try stateCondition.withLock {
-                guard case .running(let eventLoopGroup) = _state else { throw ServerError.unexpectedState(.init(for: _state)) }
+        /// - Returns: A *Result* instance where `.success(nil)` means that server has been successfuly stopped.
+        func CurrentEventLoopGroup() -> Result<MultiThreadedEventLoopGroup?, Error> {
+            return stateCondition.withLock {
+                // `while true` is used to prevent recursion.
+                while true {
+                    switch _state {
+                    case .running(let eventLoopGroup):
+                        _state = .stopping
+                        return .success(eventLoopGroup)
 
-                _state = .stopping
+                    case .starting, .stopping:
+                        stateCondition.wait()
 
-                return eventLoopGroup
+                    case .stopped(let result):
+                        return result.map { nil }
+                    }
+                }
             }
         }
-        catch {
-            completion?(.failure(error))
-            return
-        }
 
-        eventLoopGroup.shutdownGracefully { error in
-            let result: Result<Void, Error> = error.map(Result.failure(_:)) ?? .success(())
 
-            self.stateCondition.withLock {
-                self._state = .stopped(result)
+        switch CurrentEventLoopGroup() {
+        case .failure(let error):
+            return completion?(.failure(error)) ?? ()
+
+        case .success(.none):
+            return completion?(.success(())) ?? ()
+
+        case .success(.some(let eventLoopGroup)):
+            eventLoopGroup.shutdownGracefully { error in
+                let result: Result<Void, Error> = error.map(Result.failure(_:)) ?? .success(())
+
+                self.stateCondition.withLock {
+                    self._state = .stopped(result)
+                }
+
+                self.delegate?.httpServer(self, didStopWith: result)
+                completion?(result)
             }
-
-            self.delegate?.httpServer(self, didStopWith: result)
-            completion?(result)
         }
     }
 
 
-    /// Async wrapper around ``stop(completion:)`` method.
+    /// Async wrapper around ``stop(_:)`` method.
     ///
-    /// See: ``start()``.
+    /// - SeeAlso: ``start()``.
     @inlinable
     public func stop() async throws {
         try await withCheckedThrowingContinuation { continuation in
@@ -188,7 +237,7 @@ open class KvHttpServer {
     ///
     /// - Note: When server's status becomes *.running* it's channels can be in start process. Use ``KvHttpChannel/waitWhileStarting()`` to wait until channels are started.
     ///
-    /// See: ``waitUntilStopped()``.
+    /// - SeeAlso: ``waitUntilStopped()``.
     @discardableResult
     public func waitWhileStarting() -> Result<Void, Error> {
         stateCondition.withLock {
@@ -212,7 +261,7 @@ open class KvHttpServer {
     ///
     /// - Note: If the server is stopped then method just returns result of last stop.
     ///
-    /// See: ``waitWhileStarting()``.
+    /// - SeeAlso: ``waitWhileStarting()``.
     @discardableResult
     public func waitUntilStopped() -> Result<Void, Error> {
         let serverResult = stateCondition.withLock {
@@ -277,7 +326,8 @@ open class KvHttpServer {
 
     enum InternalState {
         case running(MultiThreadedEventLoopGroup)
-        case starting
+        /// Event loop group can become available before server is completely started.
+        case starting(MultiThreadedEventLoopGroup?)
         /// Associated type is result of last stop operation.
         case stopped(Result<Void, Error>)
         case stopping
@@ -291,7 +341,7 @@ open class KvHttpServer {
     ///
     /// - Note: This property is thread-safe so costs of mutual exclusion should be taken into account.
     ///
-    /// See: ``State-swift.enum``.
+    /// - SeeAlso: ``State-swift.enum``.
     public var state: State { stateCondition.withLock { .init(for: _state) } }
 
 
@@ -335,7 +385,7 @@ open class KvHttpServer {
     ///
     /// - Note: This property is thread-safe so costs of mutual exclusion should be taken into account.
     ///
-    /// See: ``addChannel``, ``KvHttpChannel/removeFromServer()``.
+    /// - SeeAlso: ``addChannel(_:)``, ``KvHttpChannel/removeFromServer()``.
     public func contains(channelWith id: KvHttpChannel.ID) -> Bool { mutationLock.withLock { _channels[id] != nil } }
 
 

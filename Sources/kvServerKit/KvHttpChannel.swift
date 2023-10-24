@@ -57,6 +57,15 @@ public protocol KvHttpClientDelegate : AnyObject {
     /// - Returns: Request handler that will be passed with the request body bytes and will produce response.
     func httpClient(_ httpClient: KvHttpChannel.Client, requestHandlerFor requestHead: KvHttpServer.RequestHead) -> KvHttpRequestHandler?
 
+    /// - Returns:  Optional custom response for an incident on a client.
+    ///             If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
+    ///
+    /// Use ``KvHttpIncident/defaultStatus`` to compose responses with default status codes for incidents.
+    /// Also you can return custom responses depending on default status.
+    ///
+    /// - Note: Server will close connection to the client just after the response will be submitted.
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider?
+
     /// - Note: The client will be disconnected.
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error)
 
@@ -119,7 +128,7 @@ open class KvHttpChannel {
 
 
 
-    // MARK: Configuration
+    // MARK: .Configuration
 
     public struct Configuration {
 
@@ -130,7 +139,7 @@ open class KvHttpChannel {
         public var connection: Connection
 
 
-        /// - Parameter http: Configuration of HTTP protocol. If `nil` is passed then ``Defaults``.http is used.
+        /// - Parameter http: Configuration of HTTP protocol. If `nil` is passed then  ``Defaults``.``Defaults/http`` is used.
         @inlinable
         public init(endpoint: KvNetworkEndpoint, http: HTTP? = nil, connection: Connection? = nil) {
             self.endpoint = endpoint
@@ -139,8 +148,8 @@ open class KvHttpChannel {
         }
 
 
-        /// - Parameter host: Host name or IP address to listen for connections at. If `nil` is passed then ``Defaults``.host is used.
-        /// - Parameter http: Configuration of HTTP protocol. If `nil` is passed then ``Defaults``.http is used.
+        /// - Parameter host: Host name or IP address to listen for connections at. If `nil` is passed then ``Defaults``.``Defaults/host`` is used.
+        /// - Parameter http: Configuration of HTTP protocol. If `nil` is passed then ``Defaults``.``Defaults/http`` is used.
         @inlinable
         public init(host: String? = nil,
                     port: UInt16,
@@ -208,9 +217,9 @@ open class KvHttpChannel {
             /// Initializes instance with contents of PEM file containing private key and certificate chain.
             ///
             /// For example an SSL certificate and the key pair for HTTPS can be created this way:
-            /// ```
-            /// $ openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout private_key.pem -out certificate.pem
-            /// $ cat private_key.pem certificate.pem > https.pem
+            /// ```sh
+            /// openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout private_key.pem -out certificate.pem
+            /// cat private_key.pem certificate.pem > https.pem
             /// ```
             @inlinable
             public init(pemPath: String) throws {
@@ -225,16 +234,39 @@ open class KvHttpChannel {
 
         public struct Connection : Equatable {
 
-            public var idleTimeInterval: TimeInterval
-            public var requestLimit: UInt
-
+            @inlinable
+            public var idleTimeInterval: TimeInterval {
+                get { _idleTimeInterval ?? Defaults.connectionIdleTimeInterval }
+                set { _idleTimeInterval = newValue }
+            }
+            @usableFromInline
+            var _idleTimeInterval: TimeInterval?
 
             @inlinable
-            public init(idleTimeInterval: TimeInterval = Defaults.connectionIdleTimeInterval,
-                        requestLimit: UInt = Defaults.connectionRequestLimit)
+            var requestLimit: UInt {
+                get { _requestLimit ?? Defaults.connectionRequestLimit }
+                set { _requestLimit = newValue }
+            }
+            @usableFromInline
+            var _requestLimit: UInt?
+
+
+            /// - Parameter idleTimeInterval: If `nil` then ``KvHttpChannel/Configuration/Defaults/connectionIdleTimeInterval-swift.type.property`` is used.
+            /// - Parameter requestLimit: If `nil` then ``KvHttpChannel/Configuration/Defaults/connectionRequestLimit-swift.type.property`` is used.
+            @inlinable
+            public init(idleTimeInterval: TimeInterval? = nil,
+                        requestLimit: UInt? = nil)
             {
-                self.idleTimeInterval = idleTimeInterval
-                self.requestLimit = requestLimit
+                self._idleTimeInterval = idleTimeInterval
+                self._requestLimit = requestLimit
+            }
+
+
+            /// Initializes the result of merging *rhs* into *lhs*.
+            @usableFromInline
+            init(lhs: Self, rhs: Self) {
+                self.init(idleTimeInterval: rhs._idleTimeInterval ?? lhs._idleTimeInterval,
+                          requestLimit: rhs._requestLimit ?? lhs._requestLimit)
             }
 
         }
@@ -247,6 +279,8 @@ open class KvHttpChannel {
 
     public enum ChannelError : LocalizedError {
 
+        /// ``KvHttpResponseProvider/BodyCallbackProvider`` has returned an error for an incident. Empty body is sent in this case.
+        case incidentResponseBodyError(Error)
         /// Unable to perform a task due to reference to server is not valid. Probably channel is not bound to a server.
         case missingServer
         /// Unable to perform a task due to the server is not running.
@@ -306,7 +340,7 @@ open class KvHttpChannel {
 
     /// Removes the receiver from server the receiver is bound to. Channel will be stopped.
     ///
-    /// See: ``waitUntilStopped()``.
+    /// - SeeAlso: ``waitUntilStopped()``.
     public func removeFromServer() {
         server?.removeChannel(self)
     }
@@ -314,7 +348,7 @@ open class KvHttpChannel {
 
     /// Channel have to be registered on a server.
     ///
-    /// See: ``waitWhileStarting()``.
+    /// - SeeAlso: ``waitWhileStarting()``.
     func start() {
 
         final class ErrorHandler : ChannelInboundHandler {
@@ -517,27 +551,33 @@ open class KvHttpChannel {
 
     /// This method is called by server.
     ///
-    /// See: ``waitUntilStopped()``.
+    /// - SeeAlso: ``waitUntilStopped()``.
     func stop() {
-        let listeningChannel: Channel? = stateCondition.withLock {
-            switch _state {
-            case .running(let listeningChannel):
-                _state = .stopping
 
-                return listeningChannel
+        func CurrentListeningChannel() -> Channel? {
+            return stateCondition.withLock {
+                // `while true` is used to prevent recursion.
+                while true {
+                    switch _state {
+                    case .running(let listeningChannel):
+                        _state = .stopping
+                        return listeningChannel
 
-            case .starting, .stopped, .stopping:
-                return nil
+                    case .starting, .stopping:
+                        stateCondition.wait()
+
+                    case .stopped(_):
+                        return nil
+                    }
+                }
             }
         }
 
-        guard let listeningChannel = listeningChannel else {
-            delegate?.httpChannel(self, didCatch: ChannelError.unexpectedState(.init(for: _state)))
-            return
-        }
 
-        // - Note: The result is ignored due to it's handled in completion handler of the channel's `.closeFuture`.
-        _ = listeningChannel.close()
+        guard let listeningChannel = CurrentListeningChannel() else { return }
+
+        // - Note: Close result is handled in completion handler of the channel's `.closeFuture`.
+        listeningChannel.close(promise: nil)
     }
 
 
@@ -554,7 +594,7 @@ open class KvHttpChannel {
     ///
     /// - Note: If the channel's status is not *.running* or *.stopped* then method just returns success or result of last stop.
     ///
-    /// See: ``waitUntilStopped()``.
+    /// - SeeAlso: ``waitUntilStopped()``.
     @discardableResult
     public func waitWhileStarting() -> Result<Void, Error> {
         stateCondition.withLock {
@@ -578,7 +618,7 @@ open class KvHttpChannel {
     ///
     /// - Note: If the channel is stopped then method just returns result of last stop.
     ///
-    /// See: ``waitWhileStarting()``.
+    /// - SeeAlso: ``waitWhileStarting()``.
     @discardableResult
     public func waitUntilStopped() -> Result<Void, Error> {
         stateCondition.withLock {
@@ -672,6 +712,99 @@ open class KvHttpChannel {
 
 
 
+    // MARK: .ClientIncident
+
+    /// Client specific incidents.
+    ///
+    /// - Note: Server closes connections with clients after incidents.
+    ///
+    /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
+    public enum ClientIncident : KvHttpIncident {
+
+        /// This incident is emitted when client's delegate returns no handler for a request.
+        /// By default `.notFound` (404) status is returned.
+        case noRequestHandler
+
+
+        // MARK: : KvHttpIncident
+
+        /// Default HTTP status code submitted to a client when incident occurs.
+        @inlinable
+        public var defaultStatus: KvHttpStatus {
+            switch self {
+            case .noRequestHandler:
+                return .notFound
+            }
+        }
+
+
+        // MARK: Operations
+
+        fileprivate func response(client: KvHttpChannel.Client) -> KvHttpResponseProvider {
+            client.delegate?.httpClient(client, didCatch: self) ?? .status(defaultStatus)
+        }
+
+    }
+
+
+
+    // MARK: .RequestIncident
+
+    /// Request specific incidents.
+    ///
+    /// - Note: Server closes connections with clients after incidents.
+    ///
+    /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
+    public enum RequestIncident : KvHttpIncident {
+
+        /// This incident is emitted when a request exceeds provided or default limit for a body.
+        /// By default `.payloadTooLarge` (413) status is returned.
+        ///
+        /// - SeeAlso: ``KvHttpRequestHandler/bodyLengthLimit``, ``KvResponseGroup/httpBodyLengthLimit(_:)``,
+        ///            ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
+        case byteLimitExceeded
+        /// Failed to process a request header. Details are in *message* associated value.
+        /// By default `.badRequest` (400) status is returned.
+        case invalidHeader(_ message: String)
+        /// This incident is emitted when request handler returns `nil` response from ``KvHttpRequestHandler/httpClientDidReceiveEnd(_:)`` method.
+        /// By default `.notFound` (404) status is returned.
+        case noResponse
+        /// This incident is emitted when error occurs while processing request body bytes or request end.
+        case requestProcessingError(Error)
+        /// An error occured when an incident's response body was requested.
+        case responseBodyError(Error)
+
+
+        // MARK: : KvHttpChannelIncident
+
+        /// Default HTTP status code submitted to a client when incident occurs.
+        @inlinable
+        public var defaultStatus: KvHttpStatus {
+            switch self {
+            case .byteLimitExceeded:
+                return .payloadTooLarge
+            case .invalidHeader:
+                return .badRequest
+            case .noResponse:
+                return .notFound
+            case .requestProcessingError(_):
+                return .internalServerError
+            case .responseBodyError(_):
+                return .internalServerError
+            }
+        }
+
+
+        // MARK: Operations
+
+        fileprivate func response(client: KvHttpChannel.Client, requestHandler: KvHttpRequestHandler) -> KvHttpResponseProvider {
+            requestHandler.httpClient(client, didCatch: self) ?? .status(defaultStatus)
+        }
+
+    }
+
+
+
     // MARK: .Client
 
     public class Client {
@@ -712,12 +845,20 @@ open class KvHttpChannel {
         /// - Warning: Access to this property must be protected with .mutationLock.
         private var _userInfo: Any?
         /// - Warning: Access to this property must be protected with .mutationLock.
-        private var _requestLimit: UInt
+        fileprivate var _requestLimit: UInt
 
 
         // MARK: Operations
 
-        public func disconnect() { channel?.close(promise: nil) }
+        /// Closes connection to the receiver.
+        public func disconnect() { disconnect(nil) }
+
+        /// Closes connection via context if avialble.
+        @usableFromInline
+        internal func disconnect(_ context: ChannelHandlerContext?) {
+            context?.close(promise: nil)
+            ?? channel?.close(promise: nil)
+        }
 
 
         // MARK: Locking
@@ -742,16 +883,6 @@ open class KvHttpChannel {
             set { withLock { _httpVersion = newValue } }
         }
 
-        weak var context: ChannelHandlerContext? {
-            didSet {
-                guard context !== oldValue, context != nil else { return }
-
-                if withLock({ _activeRequestCount <= 0 }) {
-                    startIdleTimeoutTask()
-                }
-            }
-        }
-
 
         init(_ httpChannel: KvHttpChannel?, httpVersion: HTTPVersion) {
             self._httpVersion = httpVersion
@@ -770,11 +901,18 @@ open class KvHttpChannel {
         /// - Warning: Access must be protected by ``ChannelHandler``'s locking methods.
         private var _httpVersion: HTTPVersion
 
-        /// Handler of request that is being received.
-        private var requestHandler: KvHttpRequestHandler?
 
-        /// Maximum number of bytes current request handler can process Number of received bytes passed to current `.requestHandler`.
-        private var requestByteLimit: ByteLimit = .exact(0)
+        /// A dispatch queue to process received requests.
+        private let dispatchQueue: DispatchQueue = .init(label: "Channel Response Queue", target: .global())
+
+
+        private var requestProcessingState: RequestProcessingState {
+            get { withLock { _requestProcessingState } }
+            set { withLock { _requestProcessingState = newValue } }
+        }
+        /// - Warning: Access must be protected by ``ChannelHandler``'s locking methods.
+        private var _requestProcessingState: RequestProcessingState = .idle
+
 
         /// Number of requests the responses have not been completely sent.
         ///
@@ -808,11 +946,8 @@ open class KvHttpChannel {
             return buffer
         }()
 
-        /// Value to insert in next response header for `connection` key.
-        ///
-        /// - Note: Used in HTTP1 only.
-        /// - Note: Assuming there is no request pooling.
-        private var nextResponseConnectionHeaderValue: String?
+
+        private let dateFormatterRFC9110 = KvRFC9110.makeDateFormatter()
 
 
         // MARK: .Constants
@@ -821,291 +956,215 @@ open class KvHttpChannel {
 
             static var responseBufferCapacity: Int { 1 << 14 }
 
-            static let connectionHeaderValues: Set<String> = [ "keep-alive", "close" ]
-
-        }
-
-
-        // MARK: .ByteLimit
-
-        private enum ByteLimit {
-
-            /// Exact number of bytes are expected to be received. Otherwise request is rejected.
-            case exact(UInt)
-            /// Maximum number of bytes allowed to be received. If larger number of bytes are received then request is rejected.
-            case maximum(UInt)
-
-
-            // MARK: Operations
-
-            /// A boolean value indicating whether the limit condition is met.
-            var isAcceptable: Bool {
-                switch self {
-                case .exact(let value):
-                    return value == 0
-                case .maximum:
-                    return true
-                }
-            }
-
-            /// Reduces *lhs* by *rhs* number of bytes.
-            ///
-            /// - Returns: Resulting limit or `nil` if the limit is exceeded.
-            static func -(lhs: Self, rhs: Int) -> Self? {
-                assert(rhs >= 0, "Internal inconsistency: number of bytes (\(rhs)) is negative")
-
-                let rhs: UInt = numericCast(rhs)
-
-                switch lhs {
-                case .exact(let value):
-                    guard value >= rhs else { return nil }
-                    return .exact(value - rhs)
-
-                case .maximum(let value):
-                    guard value >= rhs else { return nil }
-                    return .maximum(value - rhs)
-                }
-            }
-
         }
 
 
         // MARK: Operations
 
-        override func disconnect() {
-            guard let context = context
-            else { return super.disconnect() }
-
-            context.close(promise: nil)
+        private func processIncident(_ incident: ClientIncident,
+                                     isResponseComplete: Bool,
+                                     context: ChannelHandlerContext,
+                                     httpVersion: HTTPVersion,
+                                     httpMethod: HTTPMethod
+        ) {
+            processIncident(incident,
+                            isResponseComplete: isResponseComplete,
+                            context: context,
+                            httpVersion: httpVersion,
+                            httpMethod: httpMethod,
+                            responseBlock: { $0.response(client: self) })
         }
 
 
-        func process(request: InboundIn) {
-            switch request {
-            case .head(let head):
-                guard handleRequestHead(head) else { return disconnect() }
-
-            case .body(var byteBuffer):
-                handleRequestBodyBytes(&byteBuffer)
-
-            case .end(_):
-                handleRequestEnd()
-            }
+        private func processIncident(_ incident: RequestIncident, isResponseComplete: Bool, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext ) {
+            processIncident(incident,
+                            isResponseComplete: isResponseComplete,
+                            context: channelContext,
+                            httpVersion: requestContext.httpVersion,
+                            httpMethod: requestContext.httpMethod,
+                            responseBlock: { $0.response(client: self, requestHandler: requestContext.handler) })
         }
 
 
-        /// - Returns: A boolean value indicating whether request is valid.
-        private func handleRequestHead(_ head: HTTPRequestHead) -> Bool {
-            do {
-                let newRequestHandler = delegate?.httpClient(self, requestHandlerFor: head)
-
-                withLock {
-                    _activeRequestCount += (newRequestHandler != nil ? 1 : 0) - (requestHandler != nil ? 1 : 0)
-                    requestHandler = newRequestHandler
-                }
-            }
-
-            // Clients sending unexpected requests are disconnected immediately.
-            guard let requestHandler = requestHandler else { return false }
-
-            do {
-                let requestByteLimit: ByteLimit
-
-                switch head.headers.first(name: "Content-Length").flatMap(UInt.init(_:)) {
-                case .some(let contentLength):
-                    guard contentLength <= requestHandler.contentLengthLimit else { return false }
-                    requestByteLimit = .exact(contentLength)
-
-                case .none:
-                    requestByteLimit = .maximum(requestHandler.implicitBodyLengthLimit)
-                }
-
-                self.requestByteLimit = requestByteLimit
-            }
-
-            // Handling of `connection` header.
-            switch head.version {
-            case .http1_0:
-                // In HTTP 1.0 connections are closed by default. So when request has `keep-alive`, it should be mirrored in response.
-                nextResponseConnectionHeaderValue = Self.hasConnectionHeaders(head) && head.isKeepAlive ? "keep-alive" : nil
-
-            case .http1_1:
-                // In HTTP 1.1 connections are not closed by default. So when request has `close`, it should be mirrored in response.
-                nextResponseConnectionHeaderValue = Self.hasConnectionHeaders(head) && !head.isKeepAlive ? "close" : nil
-
-            default:
-                break
-            }
-
-            return true
-        }
-
-
-        private static func hasConnectionHeaders(_ head: HTTPRequestHead) -> Bool {
-            head.headers[canonicalForm: "connection"]
-                .lazy.map { $0.lowercased() }
-                .contains(where: Constants.connectionHeaderValues.contains(_:))
-        }
-
-
-        private func handleRequestBodyBytes(_ byteBuffer: inout ByteBuffer) {
-            guard let requestHandler = requestHandler,
-                  let byteLimit = requestByteLimit - byteBuffer.readableBytes
-            else { return disconnect() }
-
-            requestByteLimit = byteLimit
-
-            byteBuffer.readWithUnsafeReadableBytes { pointer in
-                requestHandler.httpClient(self, didReceiveBodyBytes: pointer)
-                return pointer.count
+        /// - Parameter isResponseComplete: A boolean value incicating whether the response is completely received. If `false` then client is disconnected.
+        private func processIncident<I>(_ incident: I,
+                                        isResponseComplete: Bool,
+                                        context: ChannelHandlerContext,
+                                        httpVersion: HTTPVersion,
+                                        httpMethod: HTTPMethod,
+                                        responseBlock: @escaping (I) -> KvHttpResponseProvider?
+        ) where I : KvHttpIncident {
+            dispatchQueue.async {
+                self.channelWrite(incident,
+                                  isResponseComplete: isResponseComplete,
+                                  context: context,
+                                  requestHandler: nil,
+                                  httpVersion: httpVersion,
+                                  httpMethod: httpMethod,
+                                  responseBlock: responseBlock)
             }
         }
 
 
-        private func handleRequestEnd() {
-            guard let requestHandler = requestHandler,
-                  requestByteLimit.isAcceptable
-            else { return disconnect() }
+        /// - Warning: This method must be used to access the body callback.
+        @inline(__always)
+        private static func responseBodyCallback(_ response: KvHttpResponseProvider, _ httpMethod: HTTPMethod) -> Result<KvHttpResponseProvider.BodyCallback?, Error> {
+            guard httpMethod != .HEAD,
+                  response.status != .notModified
+            else { return .success(nil) }
 
-            self.requestHandler = nil
-            requestByteLimit = .exact(0)
-
-            let connectionHeaderValue = nextResponseConnectionHeaderValue
-            nextResponseConnectionHeaderValue = nil
-
-
-            @Sendable func Catching(_ body: () throws -> Void) {
-                do { try body() }
-                catch { return requestHandler.httpClient(self, didCatch: error) }
-            }
+            return response.bodyCallbackProvider?().map { $0 } ?? .success(nil)
+        }
 
 
-            Task.detached {
-                guard let response = await requestHandler.httpClientDidReceiveEnd(self) else {
-                    self.withLock { self._activeRequestCount -= 1 }
-                    return
-                }
+        /// - Returns: `Nil` or replacement response whether the preconditions are met.
+        private func processPreconditions(for response: Response, in requestContext: RequestContext) -> Response? {
+            requestContext.preconditions.process(
+                for: response,
+                in: .init(method: requestContext.httpMethod,
+                          dateFormatterRFC9110: dateFormatterRFC9110)
+            )
+        }
 
-                // Note: _activeRequestCount will be decreased
-                Catching {
-                    guard let context = self.context else { throw KvError.inconsistency("Channel handler has no context") }
 
-                    context.eventLoop.execute {
-                        Catching {
-                            guard let context = self.context else { throw KvError.inconsistency("Channel handler has no context") }
+        private func channelWrite(_ response: Response, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext) {
+            let response = processPreconditions(for: response, in: requestContext) ?? response
 
-                            let httpVersion = self.withLock { self._httpVersion }
+            switch InternalChannelHandler.responseBodyCallback(response, requestContext.httpMethod) {
+            case .success(let bodyCallback):
+                channelWrite(response, bodyCallback, context: channelContext, httpVersion: requestContext.httpVersion)
 
-                            switch httpVersion {
-                            case .http2:
-                                let channel = context.channel
-
-                                channel.getOption(HTTP2StreamChannelOptions.streamID)
-                                    .whenComplete { result in
-                                        Catching {
-                                            guard case .success(let streamID) = result else {
-                                                defer { self.disconnect() }
-                                                throw KvError("Failed to get HTTP/2.0 stream ID channel option")
-                                            }
-
-                                            self.channelWrite(response: response,
-                                                              httpVersion: httpVersion,
-                                                              http2StreamID: String(Int(streamID)),
-                                                              connectionHeaderValue: connectionHeaderValue)
-                                        }
-                                    }
-
-                            default:
-                                self.channelWrite(response: response,
-                                                  httpVersion: httpVersion,
-                                                  http2StreamID: nil,
-                                                  connectionHeaderValue: connectionHeaderValue)
-                            }
-                        }
-                    }
-                }
+            case .failure(let error):
+                channelWrite(RequestIncident.responseBodyError(error),
+                             isResponseComplete: true,
+                             context: channelContext,
+                             requestHandler: requestContext.handler,
+                             httpVersion: requestContext.httpVersion,
+                             httpMethod: requestContext.httpMethod,
+                             responseBlock: { $0.response(client: self, requestHandler: requestContext.handler) })
             }
         }
 
 
-        private func channelWrite(response: Response, httpVersion: HTTPVersion, http2StreamID: String?, connectionHeaderValue: String?) {
-            guard let context = context else { return KvDebug.pause("Channel handler has no context") }
+        private func channelWrite<I>(_ incident: I,
+                                     isResponseComplete: Bool,
+                                     context: ChannelHandlerContext,
+                                     requestHandler: KvHttpRequestHandler?,
+                                     httpVersion: HTTPVersion,
+                                     httpMethod: HTTPMethod,
+                                     responseBlock: (I) -> KvHttpResponseProvider?)
+        where I : KvHttpIncident
+        {
+            var response = responseBlock(incident) ?? .status(incident.defaultStatus)
 
-            let channel = context.channel
+            if !isResponseComplete {
+                response = response.needsDisconnect()
 
-            let headers: HTTPHeaders = {
-                var headers = HTTPHeaders()
+                requestProcessingState = .stopped
+            }
 
-                if let contentType = response.contentType {
-                    headers.add(name: "Content-Type", value: contentType.value)
-                }
-                if let contentLength = response.contentLength {
-                    headers.add(name: "Content-Length", value: String(contentLength))
-                }
+            // Assuming this method is invoked on `.dispatchQueue`.
+            let bodyCallback: KvHttpResponseProvider.BodyCallback?
+            switch InternalChannelHandler.responseBodyCallback(response, httpMethod) {
+            case .success(let callback):
+                bodyCallback = callback
 
-                response.customHeaderCallback?(&headers)
+            case .failure(let error):
+                bodyCallback = nil
 
-                if let http2StreamID = http2StreamID {
-                    headers.add(name: "x-stream-id", value: http2StreamID)
-                }
-
-                return headers
-            }()
-
-            // Head
-            let head: HTTPResponseHead = {
-                var head = HTTPResponseHead(version: httpVersion, status: response.status, headers: headers)
-
-                if let connectionValue = connectionHeaderValue {
-                    head.headers.add(name: "Connection", value: connectionValue)
-                }
-
-                channel.write(wrapOutboundOut(HTTPServerResponsePart.head(head)), promise: nil)
-
-                return head
-            }()
-
-            // Body
-            if let bodyCallback = response.bodyCallback {
                 do {
-                    try withLock {
-                        while true {
-                            _responseBuffer.clear(minimumCapacity: Constants.responseBufferCapacity)
+                    let error = ChannelError.incidentResponseBodyError(error)
 
-                            let bytesRead = try _responseBuffer.writeWithUnsafeMutableBytes(minimumWritableBytes: 0) { dest in
-                                try bodyCallback(dest).get()
-                            }
-
-                            guard bytesRead > 0 else { break }
-
-                            channel.writeAndFlush(self.wrapOutboundOut(HTTPServerResponsePart.body(.byteBuffer(_responseBuffer))), promise: nil)
-                        }
-                    }
+                    requestHandler?.httpClient(self, didCatch: error)
+                    ?? delegate?.httpClient(self, didCatch: error)
                 }
-                catch { delegate?.httpClient(self, didCatch: error) }
+
+                // Content-length is cleared to prevent error in Swift-NIO when the length is not equal to 0 (missing body).
+                response.contentLength = nil
             }
 
-            // End
-            do {
-                channel.writeAndFlush(self.wrapOutboundOut(HTTPServerResponsePart.end(nil)), promise: nil)
+            channelWrite(response, bodyCallback, context: context, httpVersion: httpVersion)
+        }
 
-                self.withLock {
-                    self._activeRequestCount -= 1
-                    self.requestLimit = self.requestLimit > 0 ? self.requestLimit - 1 : 0
+
+        /// - Note: This method decreases `_activeRequestCount`.
+        ///
+        /// - Warning: Assuming this method is invoked on `.dispatchQueue`.
+        private func channelWrite(_ response: Response,
+                                  _ bodyCallback: KvHttpResponseProvider.BodyCallback?,
+                                  context: ChannelHandlerContext,
+                                  httpVersion: HTTPVersion
+        ) {
+            context.eventLoop.execute {
+                let channel = context.channel
+
+                let headers: HTTPHeaders = {
+                    var headers = HTTPHeaders()
+
+                    if let contentType = response.contentType {
+                        headers.add(name: "Content-Type", value: contentType.value)
+                    }
+                    if let contentLength = response.contentLength {
+                        headers.add(name: "Content-Length", value: String(contentLength))
+                    }
+                    if let value = response.entityTag {
+                        headers.add(name: "ETag", value: value.httpRepresentation)
+                    }
+                    if let modificationDate = response.modificationDate {
+                        headers.add(name: "Last-Modified", value: self.dateFormatterRFC9110.string(from: modificationDate))
+                    }
+                    if let location = response.location {
+                        headers.add(name: "Location", value: location.absoluteString)
+                    }
+
+                    response.customHeaderCallback?(&headers)
+
+                    return headers
+                }()
+
+                // Head
+                let head = HTTPResponseHead(version: httpVersion, status: response.status, headers: headers)
+
+                channel.write(self.wrapOutboundOut(HTTPServerResponsePart.head(head)), promise: nil)
+
+                // Body
+                if let bodyCallback = bodyCallback {
+                    do {
+                        try self.withLock {
+                            while true {
+                                self._responseBuffer.clear(minimumCapacity: Constants.responseBufferCapacity)
+
+                                let bytesRead = try self._responseBuffer.writeWithUnsafeMutableBytes(minimumWritableBytes: 0) { dest in
+                                    try bodyCallback(dest).get()
+                                }
+
+                                guard bytesRead > 0 else { break }
+
+                                channel.writeAndFlush(self.wrapOutboundOut(HTTPServerResponsePart.body(.byteBuffer(self._responseBuffer))), promise: nil)
+                            }
+                        }
+                    }
+                    catch { self.delegate?.httpClient(self, didCatch: error) }
                 }
 
-                let needsClose: Bool = self.withLock {
-                    // Connections are closed when there are no received request.
-                    guard self._activeRequestCount <= 0 else { return false }
+                // End
+                do {
+                    channel
+                        .writeAndFlush(self.wrapOutboundOut(HTTPServerResponsePart.end(nil)))
+                        .whenComplete { _ in
+                            let needsDisconnect: Bool = self.withLock {
+                                self._activeRequestCount -= 1
 
-                    return (!head.isKeepAlive
-                            || self.context == nil
-                            || self._isIdleTimerFired
-                            || self.requestLimit <= 0)
-                }
+                                return (response.options.contains(.needsDisconnect)
+                                        || !head.isKeepAlive
+                                        || self.channel?.isActive != true
+                                        || (self._activeRequestCount <= 0 && (self._isIdleTimerFired || self._requestLimit <= 0)))
+                            }
 
-                if needsClose {
-                    context.close(promise: nil)
+                            if needsDisconnect {
+                                self.disconnect(context)
+                            }
+                        }
                 }
             }
         }
@@ -1114,11 +1173,11 @@ open class KvHttpChannel {
         private func startIdleTimeoutTask() {
             withLock {
                 guard !_isIdleTimerFired,
-                      let context = context,
+                      let eventLoop = channel?.eventLoop,
                       let idleTimeInterval = httpChannel?.configuration.connection.idleTimeInterval
                 else { return }
 
-                _idleTimeoutTask = context.eventLoop.scheduleTask(in: .nanoseconds(.init(idleTimeInterval * 1e9))) { [weak self] in
+                _idleTimeoutTask = eventLoop.scheduleTask(in: .nanoseconds(.init(idleTimeInterval * 1e9))) { [weak self] in
                     self?.handleIdleTimeout()
                 }
             }
@@ -1147,30 +1206,214 @@ open class KvHttpChannel {
 
 
         func handlerAdded(context: ChannelHandlerContext) {
-            self.context = context
+            if withLock({ _activeRequestCount <= 0 }) {
+                startIdleTimeoutTask()
+            }
         }
 
 
-        func handlerRemoved(context: ChannelHandlerContext) {
-            assert(self.context == context)
-
-            self.context = nil
-        }
+        func handlerRemoved(context: ChannelHandlerContext) { }
 
 
         func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-            assert(self.context == context)
+            switch unwrapInboundIn(data) {
+            case .head(let head):
+                handleRequestHead(head, in: context)
 
-            process(request: unwrapInboundIn(data))
+            case .body(var byteBuffer):
+                handleRequestBodyBytes(&byteBuffer, in: context)
+
+            case .end(_):
+                handleRequestEnd(in: context)
+            }
         }
 
 
         func errorCaught(context: ChannelHandlerContext, error: Error) {
-            assert(self.context == context)
+            switch requestProcessingState {
+            case .idle:
+                delegate?.httpClient(self, didCatch: error)
 
-            delegate?.httpClient(self, didCatch: error)
+            case .processing(let requestContext):
+                requestContext.handler.httpClient(self, didCatch: error)
 
-            disconnect()
+            case .stopped:
+                // Swift-NIO emits some errors when server discards client. So these errors are suppressed in `.stopped` state.
+                switch error {
+                case HTTPParserError.invalidEOFState:
+                    return
+                case let error as NIOHTTP2Errors.StreamClosed where error.errorCode == .cancel:
+                    return
+                default:
+                    break
+                }
+
+                delegate?.httpClient(self, didCatch: error)
+            }
+
+            disconnect(context)
+        }
+
+
+        private func handleRequestHead(_ head: HTTPRequestHead, in context: ChannelHandlerContext) {
+            let httpVersion: HTTPVersion
+            do {
+                lock()
+                defer { unlock() }
+
+                switch _requestProcessingState {
+                case .idle:
+                    break   // OK
+                case .processing(_):
+                    KvDebug.pause("Warning: new request is received but actual request is not complete")
+                case .stopped:
+                    return  // Requests are ignored
+                }
+
+                guard _requestLimit > 0 else {
+                    // It is not threated as incident due to channel will close connection just after the last response.
+                    // So response on incident will not be sent.
+                    //
+                    // Also `_requestLimit` is not decresed in ``handleRequestEnd(in:)`` to minimize locking of the handler.
+                    _requestProcessingState = .stopped
+                    return
+                }
+
+                _requestLimit -= 1
+                _activeRequestCount += 1
+
+                httpVersion = _httpVersion
+            }
+
+            guard let requestHandler = delegate?.httpClient(self, requestHandlerFor: head)
+            else { return processIncident(.noRequestHandler, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method) }
+
+
+            func ProcessIncident(_ incident: RequestIncident) {
+                processIncident(incident, isResponseComplete: false, context: context, httpVersion: httpVersion, httpMethod: head.method) {
+                    $0.response(client: self, requestHandler: requestHandler)
+                }
+            }
+
+
+            var preconditions = KvHttpRequestPreconditions()
+
+            let bodyLengthLimit = requestHandler.bodyLengthLimit
+
+            for header in head.headers {
+                // TODO: Optimize selection by header name.
+                switch header.name.lowercased() {
+                case "content-length":
+                    guard let contentLength = UInt(header.value) else { return ProcessIncident(.invalidHeader("Invalid value of Content-Length header: \(header.value)")) }
+                    guard contentLength <= bodyLengthLimit else { return ProcessIncident(.byteLimitExceeded) }
+
+                case "if-match":
+                    preconditions.entityTag = .ifMatch(header.value)
+
+                case "if-modified-since":
+                    preconditions.modificationDate = .ifModifiedSince(header.value)
+
+                case "if-none-match":
+                    preconditions.entityTag = .ifNoneMatch(header.value)
+
+                case "if-unmodified-since":
+                    preconditions.modificationDate = .ifUnmodifiedSince(header.value)
+
+                default:
+                    break
+                }
+            }
+
+            requestProcessingState = .processing(.init(httpVersion: httpVersion,
+                                                       httpMethod: head.method,
+                                                       preconditions: preconditions,
+                                                       handler: requestHandler,
+                                                       bodyLengthLimit: bodyLengthLimit))
+        }
+
+
+        private func handleRequestBodyBytes(_ byteBuffer: inout ByteBuffer, in context: ChannelHandlerContext) {
+            switch requestProcessingState {
+            case .processing(var requestContext):
+                guard requestContext.bodyLengthLimit >= byteBuffer.readableBytes
+                else { return processIncident(.byteLimitExceeded, isResponseComplete: false, in: context, requestContext) }
+
+                let bytesRead: UInt
+                do {
+                    bytesRead = try numericCast(byteBuffer.readWithUnsafeReadableBytes { pointer in
+                        try requestContext.handler.httpClient(self, didReceiveBodyBytes: pointer)
+                        return pointer.count
+                    })
+                }
+                catch { return processIncident(.requestProcessingError(error), isResponseComplete: false, in: context, requestContext) }
+
+                assert(requestContext.bodyLengthLimit >= bytesRead)
+
+                requestContext.bodyLengthLimit -= bytesRead
+
+                requestProcessingState = .processing(requestContext)
+
+            case .stopped:
+                return  // Requests are ignored
+
+            case .idle:
+                return KvDebug.pause("Warning: request body is received while new request is being waited")
+            }
+        }
+
+
+        private func handleRequestEnd(in context: ChannelHandlerContext) {
+            switch requestProcessingState {
+            case .processing(let requestContext):
+                dispatchQueue.async {
+                    let response: Response?
+                    do { response = try requestContext.handler.httpClientDidReceiveEnd(self) }
+                    catch { return self.processIncident(.requestProcessingError(error), isResponseComplete: true, in: context, requestContext) }
+
+                    guard let response = response else { return self.processIncident(.noResponse, isResponseComplete: true, in: context, requestContext) }
+
+                    self.channelWrite(response, in: context, requestContext)
+                }
+
+                requestProcessingState = .idle
+
+            case .stopped:
+                return  // Requests are ignored
+
+            case .idle:
+                return KvDebug.pause("Warning: end of request is received while new request is being waited")
+            }
+        }
+
+
+        // MARK: .RequestProcessingState
+
+        private enum RequestProcessingState {
+            /// Waiting for a request
+            case idle
+            /// Processing a request. Waiting for body bytes or the end.
+            case processing(RequestContext)
+            /// Requests are ignored. E.g. channel handler is in this state after an incident.
+            case stopped
+        }
+
+
+        // MARK: .RequestContext
+
+        /// It's used to hold a request related data and process it at once when needed.
+        private struct RequestContext {
+
+            let httpVersion: HTTPVersion
+            let httpMethod: HTTPMethod
+
+            let preconditions: KvHttpRequest.Preconditions
+
+            /// Handler of a request.
+            let handler: KvHttpRequestHandler
+
+            /// Maximum number of bytes current request handler can process Number of received bytes passed to current `.requestHandler`.
+            var bodyLengthLimit: UInt
+
         }
 
     }

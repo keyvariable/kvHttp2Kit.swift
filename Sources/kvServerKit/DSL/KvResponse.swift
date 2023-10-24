@@ -25,51 +25,55 @@
 
 /// A type that represents a response on server.
 ///
-/// This type can be used to create properties and custom types of serponses.
+/// This type can be used to create properties and custom types of responses.
 ///
 /// Below is an example of a current server time HTTP response type having *format* parameter:
 ///
-///     struct CurrentDateResponse : KvResponse {
-///         enum Format { case iso8601, rfc3339 }
+/// ```swift
+/// struct CurrentDateResponse : KvResponse {
+///     enum Format { case iso8601, rfc3339 }
 ///
-///         init(format: Format) {
-///             switch {
-///             case .iso8601:
-///                 formatter = ISO8601DateFormatter()
-///             case .rfc3339:
-///                 let rfc3339Formatter = DateFormatter()
-///                 rfc3339Formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
-///                 rfc3339Formatter.locale = Locale(identifier: "en_US_POSIX")
-///                 rfc3339Formatter.timeZone = TimeZone(secondsFromGMT: 0)
-///                 formatter = rfc3339Formatter
-///             }
-///         }
-///
-///         private let formatter: Formatter
-///
-///         var body: some KvResponse {
-///             KvHttpResponse.static { .string(formatter.string(for: Date()!) }
+///     init(format: Format) {
+///         switch {
+///         case .iso8601:
+///             formatter = ISO8601DateFormatter()
+///         case .rfc3339:
+///             let rfc3339Formatter = DateFormatter()
+///             rfc3339Formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
+///             rfc3339Formatter.locale = Locale(identifier: "en_US_POSIX")
+///             rfc3339Formatter.timeZone = TimeZone(secondsFromGMT: 0)
+///             formatter = rfc3339Formatter
 ///         }
 ///     }
+///
+///     private let formatter: Formatter
+///
+///     var body: some KvResponse {
+///         KvHttpResponse { .string { formatter.string(for: Date()! } }
+///     }
+/// }
+/// ```
 ///
 /// Then `CurrentDateResponse` can be used as any Swift type. For example:
 ///
-///     KvGroup("iso8601") {
-///         CurrentDateResponse(format: .iso8601)
-///     }
-///     KvGroup("rfc3339") {
-///         CurrentDateResponse(format: .rfc3339)
-///     }
+/// ```swift
+/// KvGroup("iso8601") {
+///     CurrentDateResponse(format: .iso8601)
+/// }
+/// KvGroup("rfc3339") {
+///     CurrentDateResponse(format: .rfc3339)
+/// }
+/// ```
 ///
-/// See ``KvHttpResponse``.
+/// - SeeAlso: ``KvHttpResponse``.
 public protocol KvResponse {
 
-    /// It's inferred from your implementation of the required property ``KvResponse/body-swift.property-9pflg``.
+    /// It's inferred from your implementation of the required property ``KvResponse/body-swift.property-7lcxm``.
     associatedtype Body : KvResponse
 
 
-    /// Represens the behaviour of response.
-    var body: Self.Body { get }
+    /// Represents the behavior of response.
+    var body: Body { get }
 
 }
 
@@ -85,28 +89,11 @@ extension KvResponse {
 
 
 
-// MARK: Accumulation
-
-extension KvResponse {
-
-    internal func insert<A : KvResponseAccumulator>(to accumulator: A) {
-        switch self {
-        case let response as any KvResponseInternalProtocol:
-            response.insert(to: accumulator)
-        default:
-            body.insert(to: accumulator)
-        }
-    }
-
-}
-
-
-
 // MARK: - KvResponseInternalProtocol
 
 protocol KvResponseInternalProtocol : KvResponse {
 
-    func insert<A : KvResponseAccumulator>(to accumulator: A)
+    func insert<A : KvHttpResponseAccumulator>(to accumulator: A)
 
 }
 
@@ -121,9 +108,9 @@ public protocol KvNeverResponseProtocol : KvResponse {
 }
 
 
-// This approach helps to prevent substituion of `KvNeverResponse` as `Body` in the Xcode's code completion for `body` properties
+// This approach helps to prevent substitution of `KvNeverResponse` as `Body` in the Xcode's code completion for `body` properties
 // when declaring structures conforming to `KvResponse`.
-// If body constaint were `Body == KvNeverResponse` then the code completion would always produce `var body: KvNeverResponse`.
+// If body constraint were `Body == KvNeverResponse` then the code completion would always produce `var body: KvNeverResponse`.
 extension KvResponse where Body : KvNeverResponseProtocol {
 
     public var body: Body { Body() }
