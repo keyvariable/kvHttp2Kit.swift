@@ -206,14 +206,9 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
         switch incident.defaultStatus {
         case .notFound:
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
             return try? .notFound
-                .file(resource: "404", extension: "html", subdirectory: "Resources", bundle: .module)
+                .file(resource: "404", extension: "html", bundle: .module)
                 .contentType(.text(.html))
-#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            // - NOTE: Currently there is a bug (fatalError) in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
-            return .notFound.string { "Status code: 404 (Not Found)" }
-#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
         default:
             return nil
         }

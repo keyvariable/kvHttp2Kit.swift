@@ -106,12 +106,12 @@ final class KvDirectoryTests : XCTestCase {
             XCTAssertEqual(Result(catching: { try ResolvedURL(for: url, indexNames: [ "index.html", "index" ]) }).mapError { $0 as! KvHttpResponseError }, expectation(url), "URL: \(url)")
         }
 
-        Assert(bundlePath: "Resources/sample.txt", expectation: { .success(.init(resolved: $0, isLocal: true)) })
-        Assert(bundlePath: "Resources/missing_file", expectation: { .failure(.fileDoesNotExist($0)) })
+        Assert(bundlePath: "sample.txt", expectation: { .success(.init(resolved: $0, isLocal: true)) })
+        Assert(bundlePath: "missing_file", expectation: { .failure(.fileDoesNotExist($0)) })
 
-        Assert(bundlePath: "Resources/html", expectation: { .success(.init(resolved: $0.appendingPathComponent("index.html"), isLocal: true)) })
-        Assert(bundlePath: "Resources/html/a", expectation: { .success(.init(resolved: $0.appendingPathComponent("index"), isLocal: true)) })
-        Assert(bundlePath: "Resources/html/a/b", expectation: { .failure(.unableToFindIndexFile(directoryURL: $0)) })
+        Assert(bundlePath: "html", expectation: { .success(.init(resolved: $0.appendingPathComponent("index.html"), isLocal: true)) })
+        Assert(bundlePath: "html/a", expectation: { .success(.init(resolved: $0.appendingPathComponent("index"), isLocal: true)) })
+        Assert(bundlePath: "html/a/b", expectation: { .failure(.unableToFindIndexFile(directoryURL: $0)) })
     }
 
 
@@ -119,7 +119,7 @@ final class KvDirectoryTests : XCTestCase {
     // MARK: - testSubpathResolver()
 
     func testSubpathResolver() {
-        let baseURL = Bundle.module.resourceURL!.appendingPathComponent("Resources/html")
+        let baseURL = Bundle.module.resourceURL!.appendingPathComponent("html")
 
         func Assert(subpath: KvUrlSubpath, blackList: [KvUrlSubpath]?, whiteList: [KvUrlSubpath]?, expected: String?) {
             let result = KvDirectory.resolvedSubpath(subpath, rootURL: baseURL, accessList: .init(black: blackList, white: whiteList))

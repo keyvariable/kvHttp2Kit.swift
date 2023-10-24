@@ -50,7 +50,10 @@ let package = Package(
 
         .testTarget(name: "kvServerKitTests",
                     dependencies: [ "kvServerKit" ],
-                    resources: [ .copy("Resources"), ],
+                    resources: [ .copy("Resources/html"),
+                                 .copy("Resources/html_status"),
+                                 .copy("Resources/https.pem"),
+                                 .copy("Resources/sample.txt") ],
                     swiftSettings: swiftSettings),
     ]
 )

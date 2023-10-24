@@ -37,9 +37,6 @@ import Foundation
 @main
 struct DeclarativeServer : KvServer {
 
-    private static let resourceDirectory = "Resources"
-
-
     // MARK: : KvServer
 
     var body: some KvResponseRootGroup {
@@ -65,11 +62,7 @@ struct DeclarativeServer : KvServer {
             /// Also directory declarations via URL provide automatic search of "Status" or "status" subdirectory
             /// to provide non-200 responses from files named "\(statusCode).html".
             /// See `KvDirectory` and `KvFiles` for details.
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-            Bundle.module.resourceURL!.appendingPathComponent("Resources/Frontend")
-#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
             Bundle.module.resourceURL!.appendingPathComponent("Frontend")
-#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
 
             /// Parameterized responses provide customizable processing of request content.
             /// For example the response below uses structured URL query handling.
@@ -268,15 +261,7 @@ struct DeclarativeServer : KvServer {
     /// - Warning: Don't use this certificate in your projects.
     private var ssl: KvHttpChannel.Configuration.SSL {
         get throws {
-            let fileName = "https"
-            let fileExtension = "pem"
-
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-            let pemPath = Bundle.module.url(forResource: fileName, withExtension: fileExtension, subdirectory: Self.resourceDirectory)!.path
-#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            // - NOTE: Currently there is a bug (fatalError) in open-source `Bundle.module.url(forResource:withExtension:subdirectory:)`.
-            let pemPath = Bundle.module.resourceURL!.appendingPathComponent("\(fileName).\(fileExtension)").path
-#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+            let pemPath = Bundle.module.url(forResource: "https", withExtension: "pem")!.path
 
             return try .init(pemPath: pemPath)
         }
@@ -396,7 +381,7 @@ struct DeclarativeServer : KvServer {
             /// - Note: Conditional statements are supported.
             ///
             /// - Tip: `KvForEach()` is used as example. The same result can be archived with shorter code: `KvGroup("images") { imageURLs }`.
-            if let urls = imageURLs {
+            if let urls = (Bundle.module.urls(forResourcesWithExtension: "png", subdirectory: nil) as [URL]?) {
                 KvGroup("images") {
                     /// `KvForEach()` is used to provide dynamic list of responses.
                     /// Also it can be used to provide responses for all cases of an enumeration.
@@ -411,17 +396,6 @@ struct DeclarativeServer : KvServer {
                     }
                 }
             }
-        }
-
-        private var imageURLs: [URL]? {
-            // - NOTE: Currently there is a bug in open-source `Bundle.module.urls(forResourcesWithExtension:subdirectory:)`.
-            //         So this response is implemented only on platforms listed below.
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-            return Bundle.module.urls(forResourcesWithExtension: "png", subdirectory: "Resources")
-#else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
-            return try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: "./Sources/DeclarativeServer/\(DeclarativeServer.resourceDirectory)/"), includingPropertiesForKeys: nil)
-                .filter { $0.pathExtension == "png" }
-#endif // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
         }
 
     }
