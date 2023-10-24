@@ -122,7 +122,8 @@ public struct KvFiles : KvResponse {
     /// - SeeAlso: ``KvFiles/init(resourcesWithExtension:subdirectory:bundle:)``
     @inlinable
     public init?(resource: String, withExtension extension: String? = nil, subdirectory: String? = nil, bundle: Bundle? = nil) {
-        guard let url = (bundle ?? .main).url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory) else { return nil }
+        // - Note: Explicit cast to URL? prevents error on Linux.
+        guard let url = ((bundle ?? .main).url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory) as URL?) else { return nil }
 
         self.init(at: url)
     }
@@ -135,7 +136,8 @@ public struct KvFiles : KvResponse {
     /// - SeeAlso: ``KvFiles/init(resource:withExtension:subdirectory:bundle:)``.
     @inlinable
     public init?(resourcesWithExtension extension: String?, subdirectory: String? = nil, bundle: Bundle? = nil) {
-        guard let urls = (bundle ?? .main).urls(forResourcesWithExtension: `extension`, subdirectory: subdirectory) else { return nil }
+        // - Note: Explicit cast to [URL]? prevents error on Linux.
+        guard let urls = ((bundle ?? .main).urls(forResourcesWithExtension: `extension`, subdirectory: subdirectory) as [URL]?) else { return nil }
 
         self.init(at: urls)
     }
