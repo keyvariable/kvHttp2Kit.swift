@@ -542,7 +542,7 @@ extension KvHttpResponseProvider {
     /// - body is content at *url*;
     /// - content length, entity tag and modification date are provided when the scheme is "file:" and the attributes are available.
     ///
-    /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
+    /// - Note: Entity tag is initialized as hexadecimal representation of precise modification date including fractional seconds.
     ///         This implementation prevents double access to file system and monitoring of changes at URL.
     ///
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
@@ -842,7 +842,7 @@ extension KvHttpResponseProvider {
     /// - body is content at *url*;
     /// - content length, entity tag and modification date are updated when the scheme is "file:" and the attributes are available.
     ///
-    /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
+    /// - Note: Entity tag is initialized as hexadecimal representation of precise modification date including fractional seconds.
     ///         This implementation prevents double access to file system and monitoring of changes at URL.
     ///
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
@@ -864,7 +864,7 @@ extension KvHttpResponseProvider {
 
             if let modificationDate = attributes[.modificationDate] as? Date {
                 $0.modificationDate = modificationDate
-                $0.entityTag = .base64(withBytesOf: modificationDate.timeIntervalSince1970)
+                $0.entityTag = .hex(withBytesOf: modificationDate.timeIntervalSince1970)
             }
             if let size = attributes[.size] as? UInt64 {
                 $0.contentLength = size
