@@ -329,31 +329,25 @@ public struct KvHttpResponseProvider {
         /// - SeeAlso: ``base64(_:options:)``.
         @inlinable
         public static func base64<T>(withBytesOf x: T, options: Options = [ ]) -> Self {
-            withUnsafeBytes(of: x) { buffer in
-                return .base64(.init(bytesNoCopy: .init(mutating: buffer.baseAddress!), count: buffer.count, deallocator: .none), options: options)
-            }
+            .init(safeValue: KvStringKit.base64(withBytesOf: x), options: options)
         }
 
 
         /// - Returns: An instance where value is a hexadecimal representation of bytes from *data*.
-        @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
         @inlinable
-        public static func hex<Bytes>(_ bytes: Bytes, options: Options = [ ]) -> Self
-        where Bytes : Collection, Bytes.Element == UInt8
+        public static func hex<D>(_ data: D, options: Options = [ ]) -> Self
+        where D : DataProtocol
         {
-            let digits: [UInt8] = [ 0x30/*0*/, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x61/*a*/, 0x62, 0x63, 0x64, 0x65, 0x66 ]
-            let count = 2 * bytes.count
+            .init(safeValue: KvBase16.encodeAsString(data), options: options)
+        }
 
-            return .init(
-                safeValue: String(unsafeUninitializedCapacity: count, initializingUTF8With: { buffer in
-                    bytes.enumerated().forEach { (offset, byte) in
-                        buffer[2 * offset    ] = digits[numericCast((byte >> 4) & 0x0F)]
-                        buffer[2 * offset + 1] = digits[numericCast( byte       & 0x0F)]
-                    }
-                    return count
-                }),
-                options: options
-            )
+
+        /// - Returns: An instance where value is a hexadecimal representation of bytes of *x*.
+        @inlinable
+        public static func hex<T>(withBytesOf x: T, options: Options = [ ]) -> Self {
+            withUnsafeBytes(of: x) {
+                .hex($0, options: options)
+            }
         }
 
 
