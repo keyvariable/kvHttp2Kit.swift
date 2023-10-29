@@ -200,7 +200,7 @@ struct DeclarativeServer : KvServer {
             /// Responses in the group above are provided for HTTP requests with POST method only.
             ///
             /// - Note: Responses are available for any HTTP method by default.
-            .httpMethods(.POST)
+            .httpMethods(.post)
             /// Length limit of HTTP request bodies for responses in the group above is increased to 256 KiB.
             /// This limit also can be declared in a request this way: `.requestBody(.data.bodyLengthLimit(65_536))`.
             /// Default limit is ``kvServerKit/KvHttpRequest/Constants/bodyLengthLimit``.
@@ -214,7 +214,7 @@ struct DeclarativeServer : KvServer {
                 /// The limited availability feature is supported in `KvResponseGroupBuilder` result builder.
                 /// This availability check is for `ISO8601DateFormatter`.
                 if #available(macOS 12.0, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
-                    KvGroup(httpMethods: .POST) {
+                    KvGroup(httpMethods: .post) {
                         /// Returns ISO 8601 representation of date components in JSON format.
                         KvHttpResponse.with
                             /// This modifier and the argument provide decoding of the request data as given decodable type.
@@ -227,7 +227,7 @@ struct DeclarativeServer : KvServer {
                             }
                     }
                 }
-                KvGroup(httpMethods: .GET) {
+                KvGroup(httpMethods: .get) {
                     /// Returns JSON representation of current date.
                     KvHttpResponse {
                         .json {
@@ -405,7 +405,7 @@ struct DeclarativeServer : KvServer {
     private struct EntityResponseGroup : KvResponseGroup {
 
         var body: some KvResponseGroup {
-            KvGroup(httpMethods: .GET) {
+            KvGroup(httpMethods: .get) {
                 KvHttpResponse.with
                     /// At first subpaths are filtered accepting single component subpaths.
                     ///

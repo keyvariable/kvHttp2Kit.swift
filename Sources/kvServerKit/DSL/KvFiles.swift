@@ -184,7 +184,7 @@ extension KvFiles : KvResponseInternalProtocol {
                 }
                 .content { input in try .file(at: input.subpath) }
         }
-        .httpMethods(.GET)
+        .httpMethods(.get)
 
         httpRepresentation.resolvedGroup.insertResponses(to: accumulator)
     }

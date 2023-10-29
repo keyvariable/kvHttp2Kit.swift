@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 import kvKit
 
 
@@ -972,8 +974,8 @@ extension KvHttpResponseDispatcher {
 
         static func secondaryKeys(for primaryKey: Key) -> [Key] {
             switch primaryKey {
-            case .HEAD:
-                return [ .GET ]
+            case .head:
+                return [ .get ]
 
             default:
                 return [ ]

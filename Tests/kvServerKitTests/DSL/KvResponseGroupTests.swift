@@ -27,6 +27,8 @@ import XCTest
 
 @testable import kvServerKit
 
+import kvHttpKit
+
 
 
 final class KvResponseGroupTests : XCTestCase {
@@ -91,7 +93,7 @@ final class KvResponseGroupTests : XCTestCase {
                     }
 
                     KvGroup("/a/b/d") {
-                        KvGroup(httpMethods: .POST) {
+                        KvGroup(httpMethods: .post) {
                             KvHttpResponse { .string { "POST /a/b/d" } }
                         }
                     }
@@ -116,7 +118,7 @@ final class KvResponseGroupTests : XCTestCase {
             }
 
             func Assert404(path: String, method: String? = nil) async throws {
-                try await TestKit.assertResponse(baseURL, method: method, path: path, statusCode: .notFound, contentType: .text(.plain)) { data, request, message in
+                try await TestKit.assertResponse(baseURL, method: method, path: path, status: .notFound, contentType: .text(.plain)) { data, request, message in
                     XCTAssertTrue(data.isEmpty, message())
                 }
             }
@@ -185,8 +187,8 @@ final class KvResponseGroupTests : XCTestCase {
                         KvGroup {
                             KvHttpResponse { .string { Self.greeting } }
                         }
-                        .httpMethods(.DELETE)
-                        .httpMethods(.GET, .PUT)
+                        .httpMethods(.delete)
+                        .httpMethods(.get, .put)
                         .path("/c/")
                         .path("d///e")
                     }
@@ -377,13 +379,13 @@ final class KvResponseGroupTests : XCTestCase {
         try await TestKit.withRunningServer(of: OverloadedQueryServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
             func Assert200(path: String, query: TestKit.Query?, expectedBody: String) async throws {
-                try await TestKit.assertResponse(baseURL, path: path, query: query, statusCode: .ok, expecting: expectedBody)
+                try await TestKit.assertResponse(baseURL, path: path, query: query, status: .ok, expecting: expectedBody)
             }
             func Assert400(path: String, query: TestKit.Query?) async throws {
-                try await TestKit.assertResponse(baseURL, path: path, query: query, statusCode: .badRequest, expecting: "")
+                try await TestKit.assertResponse(baseURL, path: path, query: query, status: .badRequest, expecting: "")
             }
             func Assert404(path: String, query: TestKit.Query?) async throws {
-                try await TestKit.assertResponse(baseURL, path: path, query: query, statusCode: .notFound, expecting: "")
+                try await TestKit.assertResponse(baseURL, path: path, query: query, status: .notFound, expecting: "")
             }
 
             func AssertVoid(path: String) async throws {
@@ -520,16 +522,16 @@ final class KvResponseGroupTests : XCTestCase {
                             KvGroup("c") {
                                 KvHttpResponse { .string { "/a/b/c" } }
                             }
-                            .httpMethods(.POST)
+                            .httpMethods(.post)
                         }
-                        .httpMethods(.POST, .PUT)
+                        .httpMethods(.post, .put)
 
                         KvGroup("d") {
                             KvHttpResponse { .string { "/a/d" } }
                         }
-                        .httpMethods(.PUT)
+                        .httpMethods(.put)
                     }
-                    .httpMethods(.GET, .POST)
+                    .httpMethods(.get, .post)
                 }
             }
 
@@ -542,19 +544,19 @@ final class KvResponseGroupTests : XCTestCase {
 
             try await TestKit.assertResponse(baseURL, method: "GET" , path: "a", expecting: "/a")
             try await TestKit.assertResponse(baseURL, method: "POST", path: "a", expecting: "/a")
-            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a", status: .notFound, expecting: "")
 
-            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/b", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/b", status: .notFound, expecting: "")
             try await TestKit.assertResponse(baseURL, method: "POST", path: "a/b", expecting: "/a/b")
-            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/b", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/b", status: .notFound, expecting: "")
 
-            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/b/c", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/b/c", status: .notFound, expecting: "")
             try await TestKit.assertResponse(baseURL, method: "POST", path: "a/b/c", expecting: "/a/b/c")
-            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/b/c", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/b/c", status: .notFound, expecting: "")
 
-            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/d", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, method: "POST", path: "a/d", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/d", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "GET" , path: "a/d", status: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "POST", path: "a/d", status: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "PUT" , path: "a/d", status: .notFound, expecting: "")
         }
     }
 
@@ -607,7 +609,7 @@ final class KvResponseGroupTests : XCTestCase {
                     components.user = user
                     baseURL = components.url!
                 }
-                try await TestKit.assertResponse(baseURL, path: path, statusCode: expecting != nil ? .ok : .notFound, expecting: expecting ?? "")
+                try await TestKit.assertResponse(baseURL, path: path, status: expecting != nil ? .ok : .notFound, expecting: expecting ?? "")
             }
 
             try await Assert(user: nil, path: nil, expecting: "/")
@@ -659,11 +661,11 @@ final class KvResponseGroupTests : XCTestCase {
                                     .requestBody(.data.bodyLengthLimit(Self.bodyLimit))
                                     .content { input in .string { "\(input.requestBody?.count ?? 0)" } }
                                     .onIncident { incident, _ in
-                                        guard incident.defaultStatus == .payloadTooLarge else { return nil }
-                                        return .payloadTooLarge.string { Self.payloadTooLargeString }
+                                        guard incident.defaultStatus == .contentTooLarge else { return nil }
+                                        return .contentTooLarge.string { Self.contentTooLargeString }
                                     }
                             }
-                            .httpMethods(.POST)
+                            .httpMethods(.post)
 
                             KvGroup("b") {
                                 greetingResponse
@@ -708,7 +710,7 @@ final class KvResponseGroupTests : XCTestCase {
             static let notFoundString1 = "/"
             static let notFoundString2 = "/a/"
             static let notFoundString3 = "/d/"
-            static let payloadTooLargeString = "Body limit is \(bodyLimit) bytes."
+            static let contentTooLargeString = "Body limit is \(bodyLimit) bytes."
 
         }
 
@@ -717,14 +719,14 @@ final class KvResponseGroupTests : XCTestCase {
             func Assert404(path: String, response: String) async throws {
                 try await TestKit.assertResponse(
                     baseURL, path: path,
-                    statusCode: .notFound, contentType: .text(.plain), expecting: response
+                    status: .notFound, contentType: .text(.plain), expecting: response
                 )
             }
 
             func Assert413(path: String, contentLength: UInt, response: String) async throws {
                 try await TestKit.assertResponse(
                     baseURL, method: "POST", path: path, query: .raw("count"), body: contentLength > 0 ? Data(count: numericCast(contentLength)) : nil,
-                    statusCode: .payloadTooLarge, contentType: .text(.plain), expecting: response
+                    status: .contentTooLarge, contentType: .text(.plain), expecting: response
                 )
             }
 
@@ -744,7 +746,7 @@ final class KvResponseGroupTests : XCTestCase {
             try await Assert404(path: "/x/a/x", response: IncidentServer.notFoundString1)
             try await Assert404(path: "/x/c/x", response: IncidentServer.notFoundString1)
 
-            try await Assert413(path: "/a", contentLength: IncidentServer.bodyLimit + 1, response: IncidentServer.payloadTooLargeString)
+            try await Assert413(path: "/a", contentLength: IncidentServer.bodyLimit + 1, response: IncidentServer.contentTooLargeString)
         }
     }
 
@@ -784,10 +786,10 @@ final class KvResponseGroupTests : XCTestCase {
             }
 
             func Assert(section: String, path: String, status: KvHttpStatus) async throws {
-                let url = TestKit.htmlStatusDirectoryURL.appendingPathComponent("\(status.code).html")
+                let url = TestKit.htmlStatusDirectoryURL.appendingPathComponent("\(status.rawValue).html")
                 let expected = try Data(contentsOf: url)
 
-                try await TestKit.assertResponse(baseURL, path: section + "/" + path, statusCode: status, contentType: nil, expecting: expected)
+                try await TestKit.assertResponse(baseURL, path: section + "/" + path, status: status, contentType: nil, expecting: expected)
             }
 
             try await Assert(section: "directory", path: "", expectedPath: "index.html")

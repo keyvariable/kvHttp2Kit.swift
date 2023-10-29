@@ -15,14 +15,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvHttpStatus.swift
-//  kvServerKit
+//  KvHttpKitTests.swift
+//  kvHttpKit
 //
-//  Created by Svyatoslav Popov on 16.10.2023.
+//  Created by Svyatoslav Popov on 28.10.2023.
 //
 
-import NIOHTTP1
+import XCTest
+
+@testable import kvHttpKit
 
 
 
-public typealias KvHttpStatus = HTTPResponseStatus
+final class KvHttpKitTests: XCTestCase {
+
+    // TODO: Implement
+
+}

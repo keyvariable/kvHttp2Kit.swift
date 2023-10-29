@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 
 
 /// A type representing directory response.
@@ -380,7 +382,7 @@ extension KvDirectory : KvResponseInternalProtocol {
         ].lazy.compactMap({ $0 }).joined())
 
         let httpStatusDirectoryURL = configuration.httpStatusDirectoryURL?.standardized
-        let httpStatusFileNameBlock = configuration.httpStatusFileNameBlock ?? { "\($0.code).html" }
+        let httpStatusFileNameBlock = configuration.httpStatusFileNameBlock ?? { "\($0.rawValue).html" }
 
         let accessList: AccessList = {
             var accessList = AccessList(black: configuration.blackList ?? Defaults.blackList,
@@ -402,7 +404,7 @@ extension KvDirectory : KvResponseInternalProtocol {
         }()
 
         let httpRepresentation =
-        KvGroup(httpMethods: .GET) {
+        KvGroup(httpMethods: .get) {
             KvHttpResponse.with
                 .subpathFlatMap { subpath -> KvFilterResult<ResolvedURL> in
                     guard let url = KvDirectory.resolvedSubpath(subpath, rootURL: rootURL, accessList: accessList)

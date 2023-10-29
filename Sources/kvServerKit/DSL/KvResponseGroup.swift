@@ -23,8 +23,9 @@
 
 import Foundation
 
+import kvHttpKit
+
 import kvKit
-import NIOHTTP1
 
 
 

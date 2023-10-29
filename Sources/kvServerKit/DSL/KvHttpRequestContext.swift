@@ -23,6 +23,9 @@
 
 import Foundation
 
+import kvHttpKit
+import kvHttpKit_NIOHTTP1
+
 
 
 /// It's used to identify responses in a dispatcher.
@@ -43,7 +46,7 @@ public class KvHttpRequestContext {
 
         guard let urlComponents = URLComponents(string: uri) else { return nil }
 
-        self.method = head.method
+        self.method = .init(from: head.method)
         self.urlComponents = urlComponents
     }
 

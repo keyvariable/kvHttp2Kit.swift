@@ -50,7 +50,7 @@ final class KvHttpServerTests : XCTestCase {
             // ##  404 at unexpected path
             try await KvServerTestKit.assertResponse(
                 baseURL, path: ImperativeHttpServer.Constants.NotFound.path,
-                statusCode: .notFound,
+                status: .notFound,
                 contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.NotFound.content, message: httpDescription
             )
 
@@ -98,7 +98,7 @@ final class KvHttpServerTests : XCTestCase {
             try await KvServerTestKit.assertResponse(
                 baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path,
                 body: .init(count: numericCast(ImperativeHttpServer.Constants.Echo.bodyLimit + 1)),
-                statusCode: .payloadTooLarge,
+                status: .contentTooLarge,
                 contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Echo.payloadTooLargeContent
             )
         })
@@ -156,14 +156,14 @@ final class KvHttpServerTests : XCTestCase {
                 try await KvServerTestKit.assertResponse(
                     baseURL, method: "HEAD", path: ImperativeHttpServer.Constants.Echo.path,
                     body: data,
-                    statusCode: .payloadTooLarge,
+                    status: .contentTooLarge,
                     contentType: .text(.plain), expecting: ""
                 )
 
                 try await KvServerTestKit.assertResponse(
                     baseURL, method: "POST", path: ImperativeHttpServer.Constants.Echo.path,
                     body: data,
-                    statusCode: .payloadTooLarge,
+                    status: .contentTooLarge,
                     contentType: .text(.plain), expecting: ImperativeHttpServer.Constants.Echo.payloadTooLargeContent
                 )
             }

@@ -26,7 +26,7 @@ import Foundation
 
 
 /// Errors related to processing of HTTP responses.
-public enum KvHttpResponseError : LocalizedError, Equatable {
+public enum KvHttpResponseError : LocalizedError {
 
     /// File at URL doesn't exist.
     case fileDoesNotExist(URL)
@@ -36,6 +36,9 @@ public enum KvHttpResponseError : LocalizedError, Equatable {
 
     /// Scheme of URL is "file:" but resource at URL is not a file.
     case isNotAFile(URL)
+
+    /// `InputStream.read` operation has returned negative *code*. Also`InputStream.streamError` is associated.
+    case streamRead(code: Int, error: Error?)
 
     /// Unable to create input stream for URL.
     case unableToCreateInputStream(URL)

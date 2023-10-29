@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 import NIOHTTP1
 
 
@@ -291,15 +293,15 @@ public struct KvHttpResponse : KvResponse {
     ///
     /// Previously declared value is replaced.
     ///
-    /// Below is an example where custom 413 (Payload Too Large) response is provided when request body exceeds limit:
+    /// Below is an example where custom 413 (Content Too Large) response is provided when request body exceeds limit:
     ///
     /// ```swift
     /// KvHttpResponse.with
     ///    .requestBody(.data.bodyLengthLimit(1024))
     ///    .content { input in .binary { input.requestBody ?? .init() } }
     ///    .onIncident { incident in
-    ///        guard incident.defaultStatus == .payloadTooLarge else { return nil }
-    ///        return .payloadTooLarge.string("Payload is too large. Limit is 1024 bytes.")
+    ///        guard incident.defaultStatus == .contentTooLarge else { return nil }
+    ///        return .contentTooLarge.string("Content is too large. Limit is 1024 bytes.")
     ///    }
     /// ```
     ///

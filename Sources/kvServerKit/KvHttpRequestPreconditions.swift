@@ -23,6 +23,10 @@
 
 import Foundation
 
+import kvHttpKit
+
+import NIOHTTP1
+
 
 
 struct KvHttpRequestPreconditions {
@@ -62,7 +66,7 @@ struct KvHttpRequestPreconditions {
 
     struct RequestContext {
 
-        let method: KvHttpMethod
+        let method: HTTPMethod
 
         let dateFormatterRFC9110: DateFormatter
 
@@ -173,7 +177,7 @@ struct KvHttpRequestPreconditions {
         /// - Returns: Boolean value or parse error. The boolean value indicates whether *rawValues* contains *element*.
         ///
         /// Implementation uses FSM pattern.
-        static func `is`(_ element: Response.EntityTag, in rawValues: String) -> Result<Bool, ParseError> {
+        static func `is`(_ element: KvHttpEntityTag, in rawValues: String) -> Result<Bool, ParseError> {
             let isWeak = element.options.contains(.weak)
             var valueIterator = element.value.makeIterator()
 

@@ -30,6 +30,8 @@ let package = Package(
 
     products: [
         .library(name: "kvServerKit", targets: [ "kvServerKit" ]),
+        .library(name: "kvHttpKit", targets: [ "kvHttpKit" ]),
+        .library(name: "kvHttpKit_NIOHTTP1", targets: [ "kvHttpKit_NIOHTTP1" ]),
     ],
 
     dependencies: [
@@ -41,7 +43,8 @@ let package = Package(
     
     targets: [
         .target(name: "kvServerKit",
-                dependencies: [ .product(name: "kvKit", package: "kvKit.swift"),
+                dependencies: [ "kvHttpKit_NIOHTTP1",
+                                .product(name: "kvKit", package: "kvKit.swift"),
                                 .product(name: "NIO", package: "swift-nio"),
                                 .product(name: "NIOHTTP1", package: "swift-nio"),
                                 .product(name: "NIOHTTP2", package: "swift-nio-http2"),
@@ -55,5 +58,20 @@ let package = Package(
                                  .copy("Resources/https.pem"),
                                  .copy("Resources/sample.txt") ],
                     swiftSettings: swiftSettings),
+
+        .target(name: "kvHttpKit",
+                dependencies: [ .product(name: "kvKit", package: "kvKit.swift") ],
+                swiftSettings: swiftSettings),
+
+        .target(name: "kvHttpKit_NIOHTTP1",
+                dependencies: [ "kvHttpKit",
+                                .product(name: "NIOHTTP1", package: "swift-nio") ],
+                swiftSettings: swiftSettings),
+
+        .testTarget(name: "kvHttpKitTests",
+                    dependencies: [ "kvHttpKit" ],
+                    swiftSettings: swiftSettings)
+
+
     ]
 )
