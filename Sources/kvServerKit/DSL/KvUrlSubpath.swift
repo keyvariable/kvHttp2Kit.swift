@@ -21,7 +21,7 @@
 //  Created by Svyatoslav Popov on 13.10.2023.
 //
 
-import Foundation
+import kvHttpKit
 
 
 
@@ -30,12 +30,7 @@ import Foundation
 /// Protocol the subpath representations conform to.
 public protocol KvUrlSubpathProtocol {
 
-    var components: ArraySlice<String> { get }
-
-    var joined: String { get }
-
-
-    init(safeComponents: ArraySlice<String>)
+    static func from(_ source: KvUrlPath.Slice) -> Self
 
 }
 
@@ -46,15 +41,17 @@ public protocol KvUrlSubpathProtocol {
 /// Special type representing subpath when it's unavailable.
 public struct KvUnavailableUrlSubpath : KvUrlSubpathProtocol {
 
-    @inlinable
-    public var components: ArraySlice<String> { [ ] }
-
-    @inlinable
-    public var joined: String { "" }
+    @usableFromInline
+    static let shared = KvUnavailableUrlSubpath()
 
 
+
     @inlinable
-    public init(safeComponents: ArraySlice<String>) { assert(components.isEmpty || (components.count == 1 && components[0] == "/")) }
+    public static func from(_ source: KvUrlPath.Slice) -> Self {
+        assert(source.isEmpty)
+
+        return shared
+    }
 
 }
 
@@ -62,138 +59,12 @@ public struct KvUnavailableUrlSubpath : KvUrlSubpathProtocol {
 
 // MARK: - KvUrlSubpath
 
-/// Representation of subpath in ``KvHttpResponse/ParameterizedResponse/Input`` of ``KvHttpResponse/ParameterizedResponse``.
-public struct KvUrlSubpath : KvUrlSubpathProtocol {
-
-    /// Sequence of path components.
-    public let components: ArraySlice<String>
+public typealias KvUrlSubpath = KvUrlPath.Slice
 
 
-    /// Splits any of *components* containing path separators. The resulting components are used to initialize an instance.
-    @inlinable
-    public init(with components: ArraySlice<String>) {
-        var iterator = components.enumerated().makeIterator()
-
-        while let (offset, component) = iterator.next() {
-            if let separatorIndex = component.firstIndex(of: "/") {
-                var safeComponents = Array(components.prefix(offset))
-
-                func Append<S : StringProtocol>(_ component: S) {
-                    safeComponents.append(contentsOf: component[separatorIndex...]
-                        .split(separator: "/", omittingEmptySubsequences: true)
-                        .lazy.map { String($0) })
-                }
-
-                safeComponents.append(.init(component.prefix(upTo: separatorIndex)))
-                Append(component[separatorIndex...])
-
-                while let (_, component) = iterator.next() {
-                    Append(component)
-                }
-
-                self.init(safeComponents: .init(safeComponents))
-                return
-            }
-        }
-
-        self.init(safeComponents: components)
-    }
-
-
-    /// Splits given *path* to path components and initializes an instance with the result.
-    @inlinable
-    public init(path: String) {
-        let components = path.split(separator: "/", omittingEmptySubsequences: true).map { String($0) }
-        self.init(safeComponents: ArraySlice(components))
-    }
-
-
-    /// - Warning: Provided components must not contain path separators and invalid characters.
-    @inlinable
-    public init(safeComponents: ArraySlice<String>) {
-        assert(safeComponents.allSatisfy { !$0.contains("/") })
-
-        self.components = safeComponents
-    }
-
-
-    // MARK: Operations
-
-    /// A boolean value indicating whether the receiver is empty.
-    @inlinable
-    public var isEmpty: Bool { components.isEmpty }
-
-    /// The receiver's *components* joined with standard path separator.
-    @inlinable
-    public var joined: String { components.joined(separator: "/") }
-
-
-    /// A copy where occurrences of "." and ".." special components are resolved.
-    ///
-    /// - Note: Empty subpath is the root. So standardized "a/../../b" is "b".
-    @inlinable
-    public var standardized: KvUrlSubpath {
-        let standardizedComponents = components.reduce(into: Array<String>(), { partialResult, component in
-            switch component {
-            case ".":
-                break
-            case "..":
-                guard !partialResult.isEmpty else { break }
-                partialResult.removeLast()
-            default:
-                partialResult.append(component)
-            }
-        })
-
-        return .init(with: .init(standardizedComponents))
-    }
-
-
-    /// - Returns: A boolean value indicating whether the receiver contains entire *prefix* subpath at the beginning.
-    @inlinable
-    public func starts(with prefix: KvUrlSubpath) -> Bool {
-        components.starts(with: prefix.components)
-    }
-
-
-    /// - Returns: A slice of the receiver containing up to given number of components.
-    @inlinable
-    public func prefix(_ count: Int) -> KvUrlSubpath {
-        .init(safeComponents: components.prefix(count))
-    }
-
-
-    /// - Returns: A slice of the receiver containing all but given number of components.
-    @inlinable
-    public func dropFirst(_ count: Int = 1) -> KvUrlSubpath {
-        .init(safeComponents: components.dropFirst(count))
-    }
-
-}
-
-
-// MARK: : Hashable
-
-extension KvUrlSubpath : Hashable { }
-
-
-// MARK: ExpressibleByStringLiteral
-
-extension KvUrlSubpath : ExpressibleByStringLiteral {
+extension KvUrlSubpath : KvUrlSubpathProtocol {
 
     @inlinable
-    public init(stringLiteral value: StringLiteralType) { self.init(path: value) }
-
-}
-
-
-// MARK: : ExpressibleByArrayLiteral
-
-extension KvUrlSubpath : ExpressibleByArrayLiteral {
-
-    @inlinable
-    public init(arrayLiteral elements: String...) {
-        self.init(with: elements[elements.indices])
-    }
+    public static func from(_ source: KvUrlPath.Slice) -> Self { source }
 
 }

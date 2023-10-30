@@ -27,7 +27,7 @@ import XCTest
 
 @testable import kvServerKit
 
-import NIOHTTP1
+import kvHttpKit
 
 
 
@@ -36,9 +36,10 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
     // MARK: - testEntityTagPreconditionParser()
 
     func testEntityTagPreconditionParser() async throws {
+        typealias ETag = KvHttpEntityTag
 
-        func Assert(value: String, options: KvHttpResponseProvider.EntityTag.Options = [ ], input: String, expected: Result<Bool, KvHttpRequestPreconditions.EntityTagParser.ParseError>) {
-            XCTAssertEqual(KvHttpRequestPreconditions.EntityTagParser.is(.init(safeValue: value, options: options), in: input),
+        func Assert(value: String, options: ETag.Options = [ ], input: String, expected: Result<Bool, KvHttpRequestPreconditions.EntityTagParser.ParseError>) {
+            XCTAssertEqual(KvHttpRequestPreconditions.EntityTagParser.is(ETag(value, options: options)!, in: input),
                            expected,
                            "value: \(value); options: \(options); input: \(input)")
         }
@@ -118,7 +119,7 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
     // MARK: - testETagPrecondition()
 
     func testETagPrecondition() async throws {
-        typealias ETag = KvHttpResponseProvider.EntityTag
+        typealias ETag = KvHttpEntityTag
 
         struct ETagServer : KvServer {
 
@@ -139,55 +140,55 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
         try await TestKit.withRunningServer(of: ETagServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
-            func Assert(path: String? = nil, header: (name: String, value: String)?, statusCode: KvHttpStatus, content: String)  async throws {
+            func Assert(path: String? = nil, header: (name: String, value: String)?, status: KvHttpStatus, content: String)  async throws {
                 try await TestKit.assertResponse(
                     baseURL, path: path,
                     onRequest: header.map { (name, value) in { $0.setValue(value, forHTTPHeaderField: name) } },
-                    statusCode: statusCode, expecting: content
+                    status: status, expecting: content
                 )
             }
 
             let etag = ETagServer.etag
 
-            try await Assert(header: nil, statusCode: .ok, content: "-")
+            try await Assert(header: nil, status: .ok, content: "-")
 
-            try await Assert(header: ("If-Match", ""), statusCode: .preconditionFailed, content: "")
-            try await Assert(header: ("If-Match", "*"), statusCode: .preconditionFailed, content: "")
-            try await Assert(header: ("If-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), statusCode: .preconditionFailed, content: "")
-            try await Assert(header: ("If-Match", "\"a\", *"), statusCode: .ok, content: "-")
+            try await Assert(header: ("If-Match", ""), status: .preconditionFailed, content: "")
+            try await Assert(header: ("If-Match", "*"), status: .preconditionFailed, content: "")
+            try await Assert(header: ("If-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), status: .preconditionFailed, content: "")
+            try await Assert(header: ("If-Match", "\"a\", *"), status: .ok, content: "-")
 
-            try await Assert(header: ("If-None-Match", ""), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-None-Match", "*"), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-None-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-None-Match", "\"a\", *"), statusCode: .ok, content: "-")
+            try await Assert(header: ("If-None-Match", ""), status: .ok, content: "-")
+            try await Assert(header: ("If-None-Match", "*"), status: .ok, content: "-")
+            try await Assert(header: ("If-None-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), status: .ok, content: "-")
+            try await Assert(header: ("If-None-Match", "\"a\", *"), status: .ok, content: "-")
 
-            try await Assert(path: "s", header: ("If-Match", ""), statusCode: .preconditionFailed, content: "")
-            try await Assert(path: "s", header: ("If-Match", "*"), statusCode: .ok, content: "s")
-            try await Assert(path: "s", header: ("If-Match", "\(etag.strong.httpRepresentation)"), statusCode: .ok, content: "s")
-            try await Assert(path: "s", header: ("If-Match", "\(ETag(safeValue: etag.strong.value, options: .weak).httpRepresentation)"), statusCode: .preconditionFailed, content: "")
-            try await Assert(path: "s", header: ("If-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), statusCode: .ok, content: "s")
-            try await Assert(path: "s", header: ("If-Match", "\"a\", *"), statusCode: .ok, content: "s")
+            try await Assert(path: "s", header: ("If-Match", ""), status: .preconditionFailed, content: "")
+            try await Assert(path: "s", header: ("If-Match", "*"), status: .ok, content: "s")
+            try await Assert(path: "s", header: ("If-Match", "\(etag.strong.httpRepresentation)"), status: .ok, content: "s")
+            try await Assert(path: "s", header: ("If-Match", "\(ETag(etag.strong.value, options: .weak)!.httpRepresentation)"), status: .preconditionFailed, content: "")
+            try await Assert(path: "s", header: ("If-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), status: .ok, content: "s")
+            try await Assert(path: "s", header: ("If-Match", "\"a\", *"), status: .ok, content: "s")
 
-            try await Assert(path: "s", header: ("If-None-Match", ""), statusCode: .ok, content: "s")
-            try await Assert(path: "s", header: ("If-None-Match", "*"), statusCode: .notModified, content: "")
-            try await Assert(path: "s", header: ("If-None-Match", "\(etag.strong.httpRepresentation)"), statusCode: .notModified, content: "")
-            try await Assert(path: "s", header: ("If-None-Match", "\(ETag(safeValue: etag.strong.value, options: .weak).httpRepresentation)"), statusCode: .ok, content: "s")
-            try await Assert(path: "s", header: ("If-None-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), statusCode: .notModified, content: "")
-            try await Assert(path: "s", header: ("If-None-Match", "\"a\", *"), statusCode: .ok, content: "s")
+            try await Assert(path: "s", header: ("If-None-Match", ""), status: .ok, content: "s")
+            try await Assert(path: "s", header: ("If-None-Match", "*"), status: .notModified, content: "")
+            try await Assert(path: "s", header: ("If-None-Match", "\(etag.strong.httpRepresentation)"), status: .notModified, content: "")
+            try await Assert(path: "s", header: ("If-None-Match", "\(ETag(etag.strong.value, options: .weak)!.httpRepresentation)"), status: .ok, content: "s")
+            try await Assert(path: "s", header: ("If-None-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), status: .notModified, content: "")
+            try await Assert(path: "s", header: ("If-None-Match", "\"a\", *"), status: .ok, content: "s")
 
-            try await Assert(path: "w", header: ("If-Match", ""), statusCode: .preconditionFailed, content: "")
-            try await Assert(path: "w", header: ("If-Match", "*"), statusCode: .preconditionFailed, content: "")
-            try await Assert(path: "w", header: ("If-Match", "\(etag.weak.httpRepresentation)"), statusCode: .preconditionFailed, content: "")
-            try await Assert(path: "w", header: ("If-Match", "\(ETag(safeValue: etag.weak.value).httpRepresentation)"), statusCode: .preconditionFailed, content: "")
-            try await Assert(path: "w", header: ("If-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), statusCode: .preconditionFailed, content: "")
-            try await Assert(path: "w", header: ("If-Match", "\"a\", *"), statusCode: .ok, content: "w")
+            try await Assert(path: "w", header: ("If-Match", ""), status: .preconditionFailed, content: "")
+            try await Assert(path: "w", header: ("If-Match", "*"), status: .preconditionFailed, content: "")
+            try await Assert(path: "w", header: ("If-Match", "\(etag.weak.httpRepresentation)"), status: .preconditionFailed, content: "")
+            try await Assert(path: "w", header: ("If-Match", "\(ETag(etag.weak.value)!.httpRepresentation)"), status: .preconditionFailed, content: "")
+            try await Assert(path: "w", header: ("If-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), status: .preconditionFailed, content: "")
+            try await Assert(path: "w", header: ("If-Match", "\"a\", *"), status: .ok, content: "w")
 
-            try await Assert(path: "w", header: ("If-None-Match", ""), statusCode: .ok, content: "w")
-            try await Assert(path: "w", header: ("If-None-Match", "*"), statusCode: .notModified, content: "")
-            try await Assert(path: "w", header: ("If-None-Match", "\(etag.weak.httpRepresentation)"), statusCode: .notModified, content: "")
-            try await Assert(path: "w", header: ("If-None-Match", "\(ETag(safeValue: etag.weak.value).httpRepresentation)"), statusCode: .ok, content: "w")
-            try await Assert(path: "w", header: ("If-None-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), statusCode: .notModified, content: "")
-            try await Assert(path: "w", header: ("If-None-Match", "\"a\", *"), statusCode: .ok, content: "w")
+            try await Assert(path: "w", header: ("If-None-Match", ""), status: .ok, content: "w")
+            try await Assert(path: "w", header: ("If-None-Match", "*"), status: .notModified, content: "")
+            try await Assert(path: "w", header: ("If-None-Match", "\(etag.weak.httpRepresentation)"), status: .notModified, content: "")
+            try await Assert(path: "w", header: ("If-None-Match", "\(ETag(etag.weak.value)!.httpRepresentation)"), status: .ok, content: "w")
+            try await Assert(path: "w", header: ("If-None-Match", "\(etag.strong.httpRepresentation), \(etag.weak.httpRepresentation)"), status: .notModified, content: "")
+            try await Assert(path: "w", header: ("If-None-Match", "\"a\", *"), status: .ok, content: "w")
         }
     }
 
@@ -217,11 +218,11 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
         try await TestKit.withRunningServer(of: ModificationDateServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
-            func Assert(path: String? = nil, header: (name: String, value: String)?, statusCode: KvHttpStatus, content: String)  async throws {
+            func Assert(path: String? = nil, header: (name: String, value: String)?, status: KvHttpStatus, content: String)  async throws {
                 try await TestKit.assertResponse(
                     baseURL, path: path,
                     onRequest: header.map { (name, value) in { $0.setValue(value, forHTTPHeaderField: name) } },
-                    statusCode: statusCode, expecting: content
+                    status: status, expecting: content
                 )
             }
 
@@ -230,33 +231,33 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
                         origin: formatter.string(from: ModificationDateServer.date),
                         future: formatter.string(from: ModificationDateServer.date.addingTimeInterval(1.0)))
 
-            try await Assert(header: ("If-Modified-Since", ""), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Modified-Since", date.past), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Modified-Since", date.origin), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Modified-Since", date.future), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Modified-Since", "  " + date.past + ","), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Modified-Since", date.past + "," + date.future), statusCode: .ok, content: "-")
+            try await Assert(header: ("If-Modified-Since", ""), status: .ok, content: "-")
+            try await Assert(header: ("If-Modified-Since", date.past), status: .ok, content: "-")
+            try await Assert(header: ("If-Modified-Since", date.origin), status: .ok, content: "-")
+            try await Assert(header: ("If-Modified-Since", date.future), status: .ok, content: "-")
+            try await Assert(header: ("If-Modified-Since", "  " + date.past + ","), status: .ok, content: "-")
+            try await Assert(header: ("If-Modified-Since", date.past + "," + date.future), status: .ok, content: "-")
 
-            try await Assert(header: ("If-Unmodified-Since", ""), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Unmodified-Since", date.past), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Unmodified-Since", date.origin), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Unmodified-Since", date.future), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Unmodified-Since", "  " + date.past + ","), statusCode: .ok, content: "-")
-            try await Assert(header: ("If-Unmodified-Since", date.past + "," + date.future), statusCode: .ok, content: "-")
+            try await Assert(header: ("If-Unmodified-Since", ""), status: .ok, content: "-")
+            try await Assert(header: ("If-Unmodified-Since", date.past), status: .ok, content: "-")
+            try await Assert(header: ("If-Unmodified-Since", date.origin), status: .ok, content: "-")
+            try await Assert(header: ("If-Unmodified-Since", date.future), status: .ok, content: "-")
+            try await Assert(header: ("If-Unmodified-Since", "  " + date.past + ","), status: .ok, content: "-")
+            try await Assert(header: ("If-Unmodified-Since", date.past + "," + date.future), status: .ok, content: "-")
 
-            try await Assert(path: "d", header: ("If-Modified-Since", ""), statusCode: .ok, content: "d")
-            try await Assert(path: "d", header: ("If-Modified-Since", date.past), statusCode: .ok, content: "d")
-            try await Assert(path: "d", header: ("If-Modified-Since", date.origin), statusCode: .notModified, content: "")
-            try await Assert(path: "d", header: ("If-Modified-Since", date.future), statusCode: .notModified, content: "")
-            try await Assert(path: "d", header: ("If-Modified-Since", "  " + date.past + ","), statusCode: .ok, content: "d")
-            try await Assert(path: "d", header: ("If-Modified-Since", date.past + "," + date.future), statusCode: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Modified-Since", ""), status: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Modified-Since", date.past), status: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Modified-Since", date.origin), status: .notModified, content: "")
+            try await Assert(path: "d", header: ("If-Modified-Since", date.future), status: .notModified, content: "")
+            try await Assert(path: "d", header: ("If-Modified-Since", "  " + date.past + ","), status: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Modified-Since", date.past + "," + date.future), status: .ok, content: "d")
 
-            try await Assert(path: "d", header: ("If-Unmodified-Since", ""), statusCode: .ok, content: "d")
-            try await Assert(path: "d", header: ("If-Unmodified-Since", date.past), statusCode: .preconditionFailed, content: "")
-            try await Assert(path: "d", header: ("If-Unmodified-Since", date.origin), statusCode: .ok, content: "d")
-            try await Assert(path: "d", header: ("If-Unmodified-Since", date.future), statusCode: .ok, content: "d")
-            try await Assert(path: "d", header: ("If-Unmodified-Since", "  " + date.past + ","), statusCode: .ok, content: "d")
-            try await Assert(path: "d", header: ("If-Unmodified-Since", date.past + "," + date.future), statusCode: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Unmodified-Since", ""), status: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Unmodified-Since", date.past), status: .preconditionFailed, content: "")
+            try await Assert(path: "d", header: ("If-Unmodified-Since", date.origin), status: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Unmodified-Since", date.future), status: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Unmodified-Since", "  " + date.past + ","), status: .ok, content: "d")
+            try await Assert(path: "d", header: ("If-Unmodified-Since", date.past + "," + date.future), status: .ok, content: "d")
         }
     }
 

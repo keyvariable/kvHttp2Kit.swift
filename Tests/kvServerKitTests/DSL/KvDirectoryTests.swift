@@ -27,6 +27,8 @@ import XCTest
 
 @testable import kvServerKit
 
+import kvHttpKit
+
 
 
 final class KvDirectoryTests : XCTestCase {
@@ -58,7 +60,7 @@ final class KvDirectoryTests : XCTestCase {
                     try await TestKit.assertResponse(baseURL, path: path, contentType: nil, expecting: expected)
 
                 case .none:
-                    try await TestKit.assertResponse(baseURL, path: path, statusCode: .notFound, expecting: "")
+                    try await TestKit.assertResponse(baseURL, path: path, status: .notFound, expecting: "")
                 }
             }
 
@@ -101,17 +103,32 @@ final class KvDirectoryTests : XCTestCase {
     func testUrlResolvation() {
         typealias ResolvedURL = KvDirectory.ResolvedURL
 
-        func Assert(bundlePath: String, expectation: (URL) -> Result<ResolvedURL, KvHttpResponseError>) {
+        func Assert(bundlePath: String,
+                    onSuccess: (ResolvedURL, URL) -> Void = { XCTFail("URL: \($1), result: \($0)") },
+                    onFailure: (Error, URL) -> Void = { XCTFail("URL: \($1), error: \($0)") }
+        ) {
             let url = Bundle.module.resourceURL!.appendingPathComponent(bundlePath)
-            XCTAssertEqual(Result(catching: { try ResolvedURL(for: url, indexNames: [ "index.html", "index" ]) }).mapError { $0 as! KvHttpResponseError }, expectation(url), "URL: \(url)")
+
+            do { onSuccess(try ResolvedURL(for: url, indexNames: [ "index.html", "index" ]), url) }
+            catch { onFailure(error, url) }
         }
 
-        Assert(bundlePath: "sample.txt", expectation: { .success(.init(resolved: $0, isLocal: true)) })
-        Assert(bundlePath: "missing_file", expectation: { .failure(.fileDoesNotExist($0)) })
+        func Assert(bundlePath: String, expecting: (URL) -> ResolvedURL) {
+            Assert(bundlePath: bundlePath, onSuccess: { XCTAssertEqual($0, expecting($1), "URL: \($1)") })
+        }
 
-        Assert(bundlePath: "html", expectation: { .success(.init(resolved: $0.appendingPathComponent("index.html"), isLocal: true)) })
-        Assert(bundlePath: "html/a", expectation: { .success(.init(resolved: $0.appendingPathComponent("index"), isLocal: true)) })
-        Assert(bundlePath: "html/a/b", expectation: { .failure(.unableToFindIndexFile(directoryURL: $0)) })
+        Assert(bundlePath: "sample.txt", expecting: { .init(resolved: $0, isLocal: true) })
+        Assert(bundlePath: "missing_file", onFailure: { error, url in
+            guard case KvHttpResponseError.fileDoesNotExist(url) = error
+            else { return XCTFail("URL: \(url), result \(error) is not equal to expected \(KvHttpResponseError.fileDoesNotExist(url))") }
+        })
+
+        Assert(bundlePath: "html", expecting: { .init(resolved: $0.appendingPathComponent("index.html"), isLocal: true) })
+        Assert(bundlePath: "html/a", expecting: { .init(resolved: $0.appendingPathComponent("index"), isLocal: true) })
+        Assert(bundlePath: "html/a/b", onFailure: { error, url in
+            guard case KvHttpResponseError.unableToFindIndexFile(directoryURL: url) = error
+            else { return XCTFail("URL: \(url), result \(error) is not equal to expected \(KvHttpResponseError.unableToFindIndexFile(directoryURL: url))") }
+        })
     }
 
 
@@ -221,7 +238,7 @@ final class KvDirectoryTests : XCTestCase {
                     let expectedData = try Data(contentsOf: TestKit.htmlDirectoryURL.appendingPathComponent(expected))
                     try await TestKit.assertResponse(baseURL, path: directory + "/" + path, contentType: nil, expecting: expectedData)
                 case .none:
-                    try await TestKit.assertResponse(baseURL, path: directory + "/" + path, statusCode: .notFound, expecting: "")
+                    try await TestKit.assertResponse(baseURL, path: directory + "/" + path, status: .notFound, expecting: "")
                 }
             }
 
@@ -263,11 +280,11 @@ final class KvDirectoryTests : XCTestCase {
         }
 
         try await TestKit.withRunningServer(of: TestServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
-            try await TestKit.assertResponse(baseURL, method: "GET"   , path: "uuid.txt", statusCode: .ok, contentType: nil, expecting: TestKit.data_uuid_txt)
-            try await TestKit.assertResponse(baseURL, method: "HEAD"  , path: "uuid.txt", statusCode: .ok, contentType: nil, expecting: Data())
-            try await TestKit.assertResponse(baseURL, method: "POST"  , path: "uuid.txt", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, method: "PUT"   , path: "uuid.txt", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, method: "DELETE", path: "uuid.txt", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "GET"   , path: "uuid.txt", status: .ok, contentType: nil, expecting: TestKit.data_uuid_txt)
+            try await TestKit.assertResponse(baseURL, method: "HEAD"  , path: "uuid.txt", status: .ok, contentType: nil, expecting: Data())
+            try await TestKit.assertResponse(baseURL, method: "POST"  , path: "uuid.txt", status: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "PUT"   , path: "uuid.txt", status: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, method: "DELETE", path: "uuid.txt", status: .notFound, expecting: "")
         }
     }
 
@@ -333,14 +350,14 @@ final class KvDirectoryTests : XCTestCase {
                 let statusFileName = customName ? "NotFound.html" : "404.html"
 
                 let expectedData = try Data(contentsOf: statusDirectoryURL.appendingPathComponent(statusFileName))
-                try await TestKit.assertResponse(baseURL, path: directory + "/.uuid.txt", statusCode: .notFound, contentType: nil, expecting: expectedData)
+                try await TestKit.assertResponse(baseURL, path: directory + "/.uuid.txt", status: .notFound, contentType: nil, expecting: expectedData)
             }
 
             func AssertDirectAccess(directory: String, customName: Bool = false) async throws {
                 let statusFileName = customName ? "NotFound.html" : "404.html"
 
                 let expectedData = try Data(contentsOf: TestKit.htmlStatusDirectoryURL.appendingPathComponent(statusFileName))
-                try await TestKit.assertResponse(baseURL, path: directory + "/status/uuid.txt", statusCode: .notFound, contentType: nil, expecting: expectedData)
+                try await TestKit.assertResponse(baseURL, path: directory + "/status/uuid.txt", status: .notFound, contentType: nil, expecting: expectedData)
             }
 
             try await Assert404(directory: "1")
@@ -401,12 +418,12 @@ final class KvDirectoryTests : XCTestCase {
             }
 
             func Assert(path: String, status: KvHttpStatus) async throws {
-                let expecteData = try Data(contentsOf: TestKit.htmlStatusDirectoryURL.appendingPathComponent("\(status.code).html"))
-                try await TestKit.assertResponse(baseURL, path: path, statusCode: status, contentType: nil, expecting: expecteData)
+                let expecteData = try Data(contentsOf: TestKit.htmlStatusDirectoryURL.appendingPathComponent("\(status.rawValue).html"))
+                try await TestKit.assertResponse(baseURL, path: path, status: status, contentType: nil, expecting: expecteData)
             }
 
             func Assert(path: String, status: KvHttpStatus, expected: String) async throws {
-                try await TestKit.assertResponse(baseURL, path: path, statusCode: status, contentType: nil, expecting: expected)
+                try await TestKit.assertResponse(baseURL, path: path, status: status, contentType: nil, expecting: expected)
             }
 
             func Assert(path: String, query: TestKit.Query? = nil, expecting: UUID) async throws {
@@ -477,7 +494,7 @@ final class KvDirectoryTests : XCTestCase {
             try await Assert(directory: "3", expected: "uuid.txt")
             try await Assert(directory: "4", expected: "uuid.txt")
 
-            try await TestKit.assertResponse(baseURL, path: "5", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "5", status: .notFound, expecting: "")
         }
     }
 

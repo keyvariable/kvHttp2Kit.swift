@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 
 
 // MARK: - KvFile
@@ -150,12 +152,12 @@ public struct KvFiles : KvResponse {
     struct Configuration {
 
         @usableFromInline
-        var urls: [String : URL]
+        var urls: [KvUrlPath.Components.Element : URL]
 
 
         @usableFromInline
         init<URLs>(urls: URLs) where URLs : Sequence, URLs.Element == URL {
-            self.urls = .init(urls.lazy.map { ($0.lastPathComponent, $0) }, uniquingKeysWith: { lhs, rhs in rhs })
+            self.urls = .init(urls.lazy.map { (Substring($0.lastPathComponent), $0) }, uniquingKeysWith: { lhs, rhs in rhs })
         }
 
     }
@@ -184,7 +186,7 @@ extension KvFiles : KvResponseInternalProtocol {
                 }
                 .content { input in try .file(at: input.subpath) }
         }
-        .httpMethods(.GET)
+        .httpMethods(.get)
 
         httpRepresentation.resolvedGroup.insertResponses(to: accumulator)
     }

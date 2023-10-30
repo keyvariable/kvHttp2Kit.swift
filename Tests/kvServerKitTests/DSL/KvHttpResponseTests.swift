@@ -27,6 +27,8 @@ import XCTest
 
 @testable import kvServerKit
 
+import kvHttpKit
+
 
 
 final class KvHttpResponseTests : XCTestCase {
@@ -41,7 +43,7 @@ final class KvHttpResponseTests : XCTestCase {
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvGroup(httpMethods: .POST) {
+                    KvGroup(httpMethods: .post) {
                         KvGroup("echo") {
                             KvHttpResponse.with
                                 .requestBody(.data)
@@ -92,7 +94,7 @@ final class KvHttpResponseTests : XCTestCase {
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
                     if #available(macOS 12.0, *) {
-                        KvGroup(httpMethods: .POST) {
+                        KvGroup(httpMethods: .post) {
                             KvHttpResponse.with
                                 .requestBody(.json(of: DateComponents.self))
                                 .content {
@@ -101,7 +103,7 @@ final class KvHttpResponseTests : XCTestCase {
                                 }
                         }
                     }
-                    KvGroup(httpMethods: .GET) {
+                    KvGroup(httpMethods: .get) {
                         KvHttpResponse {
                             .json { echoDateComponents }
                         }
@@ -158,8 +160,8 @@ final class KvHttpResponseTests : XCTestCase {
             try await TestKit.assertResponse(baseURL, path: "boolean", query: "value=false", expecting: "false")
 
             try await TestKit.assertResponse(baseURL, path: "void", query: "value", expecting: "()")
-            try await TestKit.assertResponse(baseURL, path: "void", query: nil, statusCode: .notFound)
-            try await TestKit.assertResponse(baseURL, path: "void", query: "value=a", statusCode: .notFound)
+            try await TestKit.assertResponse(baseURL, path: "void", query: nil, status: .notFound)
+            try await TestKit.assertResponse(baseURL, path: "void", query: "value=a", status: .notFound)
         }
     }
 
@@ -179,7 +181,7 @@ final class KvHttpResponseTests : XCTestCase {
 
             var body: some KvResponseRootGroup {
                 NetworkGroup(with: configuration) {
-                    KvGroup(httpMethods: .POST) {
+                    KvGroup(httpMethods: .post) {
                         KvGroup("no_body") {
                             KvHttpResponse { .string { "0" } }
                         }
@@ -237,12 +239,12 @@ final class KvHttpResponseTests : XCTestCase {
         try await TestKit.withRunningServer(of: BodyLimitServer.self, context: { TestKit.baseURL(for: $0.configuration) }) { baseURL in
 
             func Assert(path: String, contentLength: UInt, expectedLimit: UInt) async throws {
-                let (statusCode, content): (KvHttpStatus, String)
-                = contentLength <= expectedLimit ? (.ok, "\(contentLength)") : (.payloadTooLarge, "")
+                let (status, content): (KvHttpStatus, String) = contentLength <= expectedLimit
+                ? (.ok, "\(contentLength)") : (.contentTooLarge, "")
 
                 try await TestKit.assertResponse(
                     baseURL, method: "POST", path: path, query: nil, body: contentLength > 0 ? Data(count: numericCast(contentLength)) : nil,
-                    statusCode: statusCode, contentType: .text(.plain), expecting: content
+                    status: status, contentType: .text(.plain), expecting: content
                 )
             }
 
@@ -323,10 +325,10 @@ final class KvHttpResponseTests : XCTestCase {
             try await TestKit.assertResponse(baseURL, path: "a/b", expecting: "-a-b")
             try await TestKit.assertResponse(baseURL, path: "a/b/", expecting: "-a-b")
 
-            try await TestKit.assertResponse(baseURL, path: "a/c", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, path: "a/c/", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, path: "b", statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, path: "b/", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "a/c", status: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "a/c/", status: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "b", status: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "b/", status: .notFound, expecting: "")
 
             try await TestKit.assertResponse(baseURL, path: "c", expecting: "/")
             try await TestKit.assertResponse(baseURL, path: "c/", expecting: "/")
@@ -394,12 +396,12 @@ final class KvHttpResponseTests : XCTestCase {
             }
 
             // Global 404.
-            try await TestKit.assertResponse(baseURL, statusCode: .notFound, expecting: "")
-            try await TestKit.assertResponse(baseURL, path: "profile", statusCode: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, status: .notFound, expecting: "")
+            try await TestKit.assertResponse(baseURL, path: "profile", status: .notFound, expecting: "")
             // Local 404.
-            try await TestKit.assertResponse(baseURL, path: "profiles/top_rated", statusCode: .notFound, expecting: "-")
-            try await TestKit.assertResponse(baseURL, path: "profiles/0", statusCode: .notFound, expecting: "-")
-            try await TestKit.assertResponse(baseURL, path: "profiles/\(SubpathFilterServer.profiles.keys.first!)/summary", statusCode: .notFound, expecting: "-")
+            try await TestKit.assertResponse(baseURL, path: "profiles/top_rated", status: .notFound, expecting: "-")
+            try await TestKit.assertResponse(baseURL, path: "profiles/0", status: .notFound, expecting: "-")
+            try await TestKit.assertResponse(baseURL, path: "profiles/\(SubpathFilterServer.profiles.keys.first!)/summary", status: .notFound, expecting: "-")
         }
     }
 

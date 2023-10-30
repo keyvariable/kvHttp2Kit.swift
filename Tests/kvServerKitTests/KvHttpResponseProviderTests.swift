@@ -104,7 +104,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
                     }
 
                 case false:
-                    try await TestKit.assertResponse(baseURL, query: query, statusCode: .notFound, contentType: .text(.plain)) { data, request, message in
+                    try await TestKit.assertResponse(baseURL, query: query, status: .notFound, contentType: .text(.plain)) { data, request, message in
                         XCTAssertTrue(data.isEmpty, "Non-empty data. " + message())
                     }
                 }
@@ -208,7 +208,7 @@ final class KvHttpResponseProviderTests : XCTestCase {
                     let data = try Data(contentsOf: url)
                     try await TestKit.assertResponse(baseURL, path: path, contentType: nil, expecting: data)
                 case .none:
-                    try await TestKit.assertResponse(baseURL, path: path, statusCode: .internalServerError, expecting: FileServer.errorMessage)
+                    try await TestKit.assertResponse(baseURL, path: path, status: .internalServerError, expecting: FileServer.errorMessage)
                 }
             }
 

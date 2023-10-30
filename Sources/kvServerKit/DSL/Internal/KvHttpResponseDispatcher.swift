@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 import kvKit
 
 
@@ -386,12 +388,7 @@ extension KvHttpResponseDispatcher {
             }
 
 
-            var pathComponents: [String] {
-                guard let path = group?.path else { return [ ] }
-
-                // TODO: Avoid redundant parsing.
-                return URL(fileURLWithPath: path.starts(with: "/") ? path : ("/" + path)).pathComponents
-            }
+            var path: KvUrlPath { group?.path ?? .empty }
 
         }
 
@@ -634,16 +631,12 @@ extension KvHttpResponseDispatcher {
         private class Paths : HierarchyContainer<Responses, PathNode> {
 
             func insert(_ response: KvHttpResponseImplementationProtocol, for configuration: DispatchConfiguration) {
-                let keys = PathNode.safePathComponens(configuration.pathComponents)
-
-                child(for: keys).insert(response)
+                child(for: configuration.path.components).insert(response)
             }
 
 
             func insert(_ attributes: Attributes, for configuration: DispatchConfiguration) {
-                let keys = PathNode.safePathComponens(configuration.pathComponents)
-
-                child(for: keys).insert(attributes)
+                child(for: configuration.path.components).insert(attributes)
             }
 
 
@@ -651,16 +644,6 @@ extension KvHttpResponseDispatcher {
             where Keys : Collection, Keys.Element == Key
             {
                 child(for: keys, fabric: Child.init(pathLevel:))
-            }
-
-
-            // MARK: Auxiliaries
-
-            private static func pathComponents(from configuration: KvResponseGroupConfiguration.Dispatching) -> [String] {
-                let path = configuration.path
-
-                // TODO: Avoid redundant parsing.
-                return URL(fileURLWithPath: path.starts(with: "/") ? path : ("/" + path)).pathComponents
             }
 
         }
@@ -972,8 +955,8 @@ extension KvHttpResponseDispatcher {
 
         static func secondaryKeys(for primaryKey: Key) -> [Key] {
             switch primaryKey {
-            case .HEAD:
-                return [ .GET ]
+            case .head:
+                return [ .get ]
 
             default:
                 return [ ]
@@ -1019,7 +1002,7 @@ extension KvHttpResponseDispatcher {
     /// - Note: There is no placeholder paths.
     fileprivate class PathNode : HierarchyNode {
 
-        typealias Key = String
+        typealias Key = KvUrlPath.Components.Element
         typealias Subnode = ResponseNode
 
 
@@ -1036,7 +1019,7 @@ extension KvHttpResponseDispatcher {
 
         // MARK: : HierarchyNode
 
-        static func keys(from requestContext: KvHttpRequestContext) -> ArraySlice<Key> {
+        static func keys(from requestContext: KvHttpRequestContext) -> [Key] {
             requestContext.path.components
         }
 
@@ -1071,16 +1054,6 @@ extension KvHttpResponseDispatcher {
             }
 
             node.subnode?.accumulateRequestProcessors(for: requestContext, into: accumulator)
-        }
-
-
-        // MARK: Auxiliaries
-
-        // TODO: Delete when DispatchConfiguration's pathComponents will be refactored to KvUrlSubpath.
-        static func safePathComponens<S>(_ components: S) -> LazyFilterSequence<S>
-        where S : Sequence, S.Element == String
-        {
-            components.lazy.filter { $0 != "/" }
         }
 
     }

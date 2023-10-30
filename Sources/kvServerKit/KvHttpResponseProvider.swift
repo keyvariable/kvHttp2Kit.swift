@@ -23,7 +23,8 @@
 
 import Foundation
 
-import kvKit
+import kvHttpKit
+
 import NIOHTTP1
 
 
@@ -93,7 +94,7 @@ public struct KvHttpResponseProvider {
 
     /// Value for `ETag` response header.
     @usableFromInline
-    var entityTag: EntityTag?
+    var entityTag: KvHttpEntityTag?
     /// Value for `Last-Modified` response header.
     @usableFromInline
     var modificationDate: Date?
@@ -113,7 +114,7 @@ public struct KvHttpResponseProvider {
          customHeaderCallback: HeaderCallback? = nil,
          contentType: ContentType? = nil,
          contentLength: UInt64? = nil,
-         entityTag: EntityTag? = nil,
+         entityTag: KvHttpEntityTag? = nil,
          modificationDate: Date? = nil,
          location: URL? = nil,
          options: Options = [ ],
@@ -282,114 +283,6 @@ public struct KvHttpResponseProvider {
     }
 
 
-    // MARK: .EntityTag
-
-    /// Representation of HTTP entity tags.
-    public struct EntityTag {
-
-        /// Value of entity tag.
-        public let value: String
-        /// Options of entity tag. E.g. weak state.
-        public let options: Options
-
-
-        @usableFromInline
-        init(safeValue: String, options: Options = [ ]) {
-            self.value = safeValue
-            self.options = options
-        }
-
-
-        /// Initializes entity tag from a raw string.
-        ///
-        /// - Warning: It's recommended to avoid this initializer due to performance penalty. Initializer validates passed *value*. Use fabrics.
-        @inlinable
-        public init?(_ value: String, options: Options = [ ]) {
-            guard value.allSatisfy({ $0 != "\"" && $0 != "\0" }) else { return nil }
-
-            self.init(safeValue: value, options: options)
-        }
-
-
-        // MARK: Fabrics
-
-        /// - Returns: An instance where value is the result of `data.base64EncodedString()`.
-        ///
-        /// - SeeAlso: ``base64(withBytesOf:options:)``.
-        @inlinable
-        public static func base64(_ data: Data, options: Options = [ ]) -> Self {
-            .init(safeValue: data.base64EncodedString(), options: options)
-        }
-
-
-        /// - Returns: An instance where value is a Base64 representation of bytes of *x*.
-        ///
-        /// - Note: `Data.base64EncodedString()` method with default encoding options is used.
-        ///
-        /// - SeeAlso: ``base64(_:options:)``.
-        @inlinable
-        public static func base64<T>(withBytesOf x: T, options: Options = [ ]) -> Self {
-            withUnsafeBytes(of: x) { buffer in
-                return .base64(.init(bytesNoCopy: .init(mutating: buffer.baseAddress!), count: buffer.count, deallocator: .none), options: options)
-            }
-        }
-
-
-        /// - Returns: An instance where value is a hexadecimal representation of bytes from *data*.
-        @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
-        @inlinable
-        public static func hex<Bytes>(_ bytes: Bytes, options: Options = [ ]) -> Self
-        where Bytes : Collection, Bytes.Element == UInt8
-        {
-            let digits: [UInt8] = [ 0x30/*0*/, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x61/*a*/, 0x62, 0x63, 0x64, 0x65, 0x66 ]
-            let count = 2 * bytes.count
-
-            return .init(
-                safeValue: String(unsafeUninitializedCapacity: count, initializingUTF8With: { buffer in
-                    bytes.enumerated().forEach { (offset, byte) in
-                        buffer[2 * offset    ] = digits[numericCast((byte >> 4) & 0x0F)]
-                        buffer[2 * offset + 1] = digits[numericCast( byte       & 0x0F)]
-                    }
-                    return count
-                }),
-                options: options
-            )
-        }
-
-
-        /// - Returns: An instance where value is a standard string representation of given UUID.
-        @inlinable
-        public static func uuid(_ value: UUID, options: Options = [ ]) -> Self {
-            .init(safeValue: value.uuidString, options: options)
-        }
-
-
-        // MARK: .Options
-
-        /// Options of entity tags. E.g. weak state.
-        public struct Options : OptionSet {
-
-            /// Weak state option constant.
-            public static let weak: Self = .init(rawValue: 1 << 0)
-
-
-            // MARK: : OptionSet
-
-            public let rawValue: UInt
-
-            @inlinable public init(rawValue: UInt) { self.rawValue = rawValue }
-        }
-
-
-        // MARK: Operations
-
-        /// HTTP representation of the receiver.
-        var httpRepresentation: String {
-            !options.contains(.weak) ? "\"\(value)\"" : "W/\"\(value)\""
-        }
-    }
-
-
     // MARK: .Options
 
     /// Response options. E.g. disconnection flag.
@@ -436,7 +329,7 @@ public struct KvHttpResponseProvider {
         return { buffer in
             let bytesRead = stream.read(buffer.baseAddress!.assumingMemoryBound(to: UInt8.self), maxLength: buffer.count)
 
-            guard bytesRead >= 0 else { return .failure(KvError("Failed to read from response body stream: code = \(bytesRead), streamError = nil")) }
+            guard bytesRead >= 0 else { return .failure(KvHttpResponseError.streamRead(code: bytesRead, error: stream.streamError)) }
 
             return .success(bytesRead)
         }
@@ -548,7 +441,7 @@ extension KvHttpResponseProvider {
     /// - body is content at *url*;
     /// - content length, entity tag and modification date are provided when the scheme is "file:" and the attributes are available.
     ///
-    /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
+    /// - Note: Entity tag is initialized as hexadecimal representation of precise modification date including fractional seconds.
     ///         This implementation prevents double access to file system and monitoring of changes at URL.
     ///
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
@@ -603,129 +496,122 @@ extension KvHttpResponseProvider {
 
     // MARK: 2xx
 
-    /// - Returns: An instance where *status* is `.ok`.
+    /// - Returns: An instance where *status* is  `.ok` (`200 OK`).
     @inlinable public static var ok: Self { .init(status: .ok) }
-    /// - Returns: An instance where *status* is `.created`.
+    /// - Returns: An instance where *status* is `.created` (`201 Created`).
     @inlinable public static var created: Self { .init(status: .created) }
-    /// - Returns: An instance where *status* is `.accepted`.
+    /// - Returns: An instance where *status* is `.accepted` (`202 Accepted`).
     @inlinable public static var accepted: Self { .init(status: .accepted) }
-    /// - Returns: An instance where *status* is `.nonAuthoritativeInformation`.
+    /// - Returns: An instance where *status* is `.nonAuthoritativeInformation` (` 203 Non-Authoritative Information`).
     @inlinable public static var nonAuthoritativeInformation: Self { .init(status: .nonAuthoritativeInformation) }
-    /// - Returns: An instance where *status* is `.noContent`.
+    /// - Returns: An instance where *status* is `.noContent` (`204 No Content`).
     @inlinable public static var noContent: Self { .init(status: .noContent) }
-    /// - Returns: An instance where *status* is `.resetContent`.
+    /// - Returns: An instance where *status* is `.resetContent` (`205 Reset Content`).
     @inlinable public static var resetContent: Self { .init(status: .resetContent) }
-    /// - Returns: An instance where *status* is `.partialContent`.
+    /// - Returns: An instance where *status* is `.partialContent` (`206 Partial Content`).
     @inlinable public static var partialContent: Self { .init(status: .partialContent) }
-    /// - Returns: An instance where *status* is `.multiStatus`.
+    /// - Returns: An instance where *status* is `.multiStatus` (`207 Multi-Status`).
     @inlinable public static var multiStatus: Self { .init(status: .multiStatus) }
-    /// - Returns: An instance where *status* is `.alreadyReported`.
+    /// - Returns: An instance where *status* is `.alreadyReported` (`208 Already Reported`).
     @inlinable public static var alreadyReported: Self { .init(status: .alreadyReported) }
-    /// - Returns: An instance where *status* is `.imUsed`.
+    /// - Returns: An instance where *status* is `.imUsed` (`226 IM Used`).
     @inlinable public static var imUsed: Self { .init(status: .imUsed) }
 
     // MARK: 3xx
 
-    /// - Returns: An instance where *status* is `.multipleChoices`.
+    /// - Returns: An instance where *status* is `.multipleChoices` (`300 Multiple Choices`).
     @inlinable public static func multipleChoices(preferredLocation: URL? = nil) -> Self { .init(status: .multipleChoices, location: preferredLocation) }
-    /// - Returns: An instance where *status* is `.movedPermanently`.
+    /// - Returns: An instance where *status* is `.movedPermanently` (`301 Moved Permanently`).
     @inlinable public static func movedPermanently(location: URL?) -> Self { .init(status: .movedPermanently, location: location) }
-    /// - Returns: An instance where *status* is `.found`.
+    /// - Returns: An instance where *status* is `.found` (`302 Found`).
     @inlinable public static func found(location: URL?) -> Self { .init(status: .found, location: location) }
-    /// - Returns: An instance where *status* is `.seeOther`.
+    /// - Returns: An instance where *status* is `.seeOther` (`303 See Other`).
     @inlinable public static func seeOther(location: URL) -> Self { .init(status: .seeOther, location: location) }
-    /// - Returns: An instance where *status* is `.notModified`.
+    /// - Returns: An instance where *status* is `.notModified` (`304 Not Modified`).
     @inlinable public static var notModified: Self { .init(status: .notModified) }
-    /// - Returns: An instance where *status* is `.useProxy`.
-    @available(*, deprecated, message: "The 305 (Use Proxy) status code has been deprecated due to security concerns. See https://www.rfc-editor.org/rfc/rfc7231.html#appendix-B")
-    @inlinable public static var useProxy: Self { .init(status: .useProxy) }
-    /// - Returns: An instance where *status* is `.temporaryRedirect`.
+    /// - Returns: An instance where *status* is `.temporaryRedirect` (`307 Temporary Redirect`).
     @inlinable public static func temporaryRedirect(location: URL?) -> Self { .init(status: .temporaryRedirect, location: location) }
-    /// - Returns: An instance where *status* is `.permanentRedirect`.
+    /// - Returns: An instance where *status* is `.permanentRedirect` (`308 Permanent Redirect`).
     @inlinable public static func permanentRedirect(location: URL?) -> Self { .init(status: .permanentRedirect, location: location) }
 
     // MARK: 4xx
 
-    /// - Returns: An instance where *status* is `.badRequest`.
+    /// - Returns: An instance where *status* is `.badRequest` (`400 Bad Request`).
     @inlinable public static var badRequest: Self { .init(status: .badRequest) }
-    /// - Returns: An instance where *status* is `.unauthorized`.
+    /// - Returns: An instance where *status* is `.unauthorized` (`401 Unauthorized`).
     @inlinable public static var unauthorized: Self { .init(status: .unauthorized) }
-    /// - Returns: An instance where *status* is `.paymentRequired`.
+    /// - Returns: An instance where *status* is `.paymentRequired` (`402 Payment Required`).
     @inlinable public static var paymentRequired: Self { .init(status: .paymentRequired) }
-    /// - Returns: An instance where *status* is `.forbidden`.
+    /// - Returns: An instance where *status* is `.forbidden` (`403 Forbidden`).
     @inlinable public static var forbidden: Self { .init(status: .forbidden) }
-    /// - Returns: An instance where *status* is `.notFound`.
+    /// - Returns: An instance where *status* is `.notFound` (`404 Not Found`).
     @inlinable public static var notFound: Self { .init(status: .notFound) }
-    /// - Returns: An instance where *status* is `.methodNotAllowed`.
+    /// - Returns: An instance where *status* is `.methodNotAllowed` (`405 Method Not Allowed`).
     @inlinable public static var methodNotAllowed: Self { .init(status: .methodNotAllowed) }
-    /// - Returns: An instance where *status* is `.notAcceptable`.
+    /// - Returns: An instance where *status* is `.notAcceptable` (`406 Not Acceptable`).
     @inlinable public static var notAcceptable: Self { .init(status: .notAcceptable) }
-    /// - Returns: An instance where *status* is `.proxyAuthenticationRequired`.
+    /// - Returns: An instance where *status* is `.proxyAuthenticationRequired` (`407 Proxy Authentication Required`).
     @inlinable public static var proxyAuthenticationRequired: Self { .init(status: .proxyAuthenticationRequired) }
-    /// - Returns: An instance where *status* is `.requestTimeout`.
+    /// - Returns: An instance where *status* is `.requestTimeout` (`408 Request Timeout`).
     @inlinable public static var requestTimeout: Self { .init(status: .requestTimeout) }
-    /// - Returns: An instance where *status* is `.conflict`.
+    /// - Returns: An instance where *status* is `.conflict` (`409 Conflict`).
     @inlinable public static var conflict: Self { .init(status: .conflict) }
-    /// - Returns: An instance where *status* is `.gone`.
+    /// - Returns: An instance where *status* is `.gone` (`410 Gone`).
     @inlinable public static var gone: Self { .init(status: .gone) }
-    /// - Returns: An instance where *status* is `.lengthRequired`.
+    /// - Returns: An instance where *status* is `.lengthRequired` (`411 Length Required`).
     @inlinable public static var lengthRequired: Self { .init(status: .lengthRequired) }
-    /// - Returns: An instance where *status* is `.preconditionFailed`.
+    /// - Returns: An instance where *status* is `.preconditionFailed` (`412 Precondition Failed`).
     @inlinable public static var preconditionFailed: Self { .init(status: .preconditionFailed) }
-    /// - Returns: An instance where *status* is `.payloadTooLarge`.
-    @inlinable public static var payloadTooLarge: Self { .init(status: .payloadTooLarge) }
-    /// - Returns: An instance where *status* is `.uriTooLong`.
+    /// - Returns: An instance where *status* is `.contentTooLarge` (`413 Content Too Large`).
+    @inlinable public static var contentTooLarge: Self { .init(status: .contentTooLarge) }
+    /// - Returns: An instance where *status* is `.uriTooLong` (`414 URI Too Long`).
     @inlinable public static var uriTooLong: Self { .init(status: .uriTooLong) }
-    /// - Returns: An instance where *status* is `.unsupportedMediaType`.
+    /// - Returns: An instance where *status* is `.unsupportedMediaType` (`415 Unsupported Media Type`).
     @inlinable public static var unsupportedMediaType: Self { .init(status: .unsupportedMediaType) }
-    /// - Returns: An instance where *status* is `.rangeNotSatisfiable`.
+    /// - Returns: An instance where *status* is `.rangeNotSatisfiable` (`416 Range Not Satisfiable`).
     @inlinable public static var rangeNotSatisfiable: Self { .init(status: .rangeNotSatisfiable) }
-    /// - Returns: An instance where *status* is `.expectationFailed`.
+    /// - Returns: An instance where *status* is `.expectationFailed` (`417 Expectation Failed`).
     @inlinable public static var expectationFailed: Self { .init(status: .expectationFailed) }
-    /// - Returns: An instance where *status* is `.imATeapot`.
-    @inlinable public static var imATeapot: Self { .init(status: .imATeapot) }
-    /// - Returns: An instance where *status* is `.misdirectedRequest`.
+    /// - Returns: An instance where *status* is `.misdirectedRequest` (`421 Misdirected Request`).
     @inlinable public static var misdirectedRequest: Self { .init(status: .misdirectedRequest) }
-    /// - Returns: An instance where *status* is `.unprocessableEntity`.
-    @inlinable public static var unprocessableEntity: Self { .init(status: .unprocessableEntity) }
-    /// - Returns: An instance where *status* is `.locked`.
+    /// - Returns: An instance where *status* is `.unprocessableContent` (`422 Unprocessable Content`).
+    @inlinable public static var unprocessableContent: Self { .init(status: .unprocessableContent) }
+    /// - Returns: An instance where *status* is `.locked` (`423 Locked`).
     @inlinable public static var locked: Self { .init(status: .locked) }
-    /// - Returns: An instance where *status* is `.failedDependency`.
+    /// - Returns: An instance where *status* is `.failedDependency` (`424 Failed Dependency`).
     @inlinable public static var failedDependency: Self { .init(status: .failedDependency) }
-    /// - Returns: An instance where *status* is `.upgradeRequired`.
+    /// - Returns: An instance where *status* is `.upgradeRequired` (`426 Upgrade Required`).
     @inlinable public static var upgradeRequired: Self { .init(status: .upgradeRequired) }
-    /// - Returns: An instance where *status* is `.preconditionRequired`.
+    /// - Returns: An instance where *status* is `.preconditionRequired` (`428 Precondition Required`).
     @inlinable public static var preconditionRequired: Self { .init(status: .preconditionRequired) }
-    /// - Returns: An instance where *status* is `.tooManyRequests`.
+    /// - Returns: An instance where *status* is `.tooManyRequests` (`429 Too Many Requests`).
     @inlinable public static var tooManyRequests: Self { .init(status: .tooManyRequests) }
-    /// - Returns: An instance where *status* is `.requestHeaderFieldsTooLarge`.
+    /// - Returns: An instance where *status* is `.requestHeaderFieldsTooLarge` (`431 Request Header Fields Too Large`).
     @inlinable public static var requestHeaderFieldsTooLarge: Self { .init(status: .requestHeaderFieldsTooLarge) }
-    /// - Returns: An instance where *status* is `.unavailableForLegalReasons`.
+    /// - Returns: An instance where *status* is `.unavailableForLegalReasons` (`451 Unavailable For Legal Reasons`).
     @inlinable public static var unavailableForLegalReasons: Self { .init(status: .unavailableForLegalReasons) }
 
     // MARK: 5xx
 
-    /// - Returns: An instance where *status* is `.internalServerError`.
+    /// - Returns: An instance where *status* is `.internalServerError` (`500 Internal Server Error`).
     @inlinable public static var internalServerError: Self { .init(status: .internalServerError) }
-    /// - Returns: An instance where *status* is `.notImplemented`.
+    /// - Returns: An instance where *status* is `.notImplemented` (`501 Not Implemented`).
     @inlinable public static var notImplemented: Self { .init(status: .notImplemented) }
-    /// - Returns: An instance where *status* is `.badGateway`.
+    /// - Returns: An instance where *status* is `.badGateway` (`502 Bad Gateway`).
     @inlinable public static var badGateway: Self { .init(status: .badGateway) }
-    /// - Returns: An instance where *status* is `.serviceUnavailable`.
+    /// - Returns: An instance where *status* is `.serviceUnavailable` (`503 Service Unavailable`).
     @inlinable public static var serviceUnavailable: Self { .init(status: .serviceUnavailable) }
-    /// - Returns: An instance where *status* is `.gatewayTimeout`.
+    /// - Returns: An instance where *status* is `.gatewayTimeout` (`504 Gateway Timeout`).
     @inlinable public static var gatewayTimeout: Self { .init(status: .gatewayTimeout) }
-    /// - Returns: An instance where *status* is `.httpVersionNotSupported`.
+    /// - Returns: An instance where *status* is `.httpVersionNotSupported` (`505 HTTP Version Not Supported`).
     @inlinable public static var httpVersionNotSupported: Self { .init(status: .httpVersionNotSupported) }
-    /// - Returns: An instance where *status* is `.variantAlsoNegotiates`.
+    /// - Returns: An instance where *status* is `.variantAlsoNegotiates` (`506 Variant Also Negotiates`).
     @inlinable public static var variantAlsoNegotiates: Self { .init(status: .variantAlsoNegotiates) }
-    /// - Returns: An instance where *status* is `.insufficientStorage`.
+    /// - Returns: An instance where *status* is `.insufficientStorage` (`507 Insufficient Storage`).
     @inlinable public static var insufficientStorage: Self { .init(status: .insufficientStorage) }
-    /// - Returns: An instance where *status* is `.loopDetected`.
+    /// - Returns: An instance where *status* is `.loopDetected` (`508 Not Extended`).
     @inlinable public static var loopDetected: Self { .init(status: .loopDetected) }
-    /// - Returns: An instance where *status* is `.notExtended`.
-    @inlinable public static var notExtended: Self { .init(status: .notExtended) }
-    /// - Returns: An instance where *status* is `.networkAuthenticationRequired`.
+    /// - Returns: An instance where *status* is `.networkAuthenticationRequired` (`511 Network Authentication Required`).
     @inlinable public static var networkAuthenticationRequired: Self { .init(status: .networkAuthenticationRequired) }
 
 }
@@ -788,7 +674,7 @@ extension KvHttpResponseProvider {
     /// Provided value is used as value of `ETag` response header and to process `If-Match` and `If-None-Match` request headers.
     /// For example, response is automatically replaced with 304 (Not Modified) when request contains `If-None-Match` header with the matching value.
     @inlinable
-    public func entityTag(_ value: EntityTag) -> Self { modified { $0.entityTag = value } }
+    public func entityTag(_ value: KvHttpEntityTag) -> Self { modified { $0.entityTag = value } }
 
     /// - Returns: A copy where modification date is changed to given *value*.
     ///
@@ -848,7 +734,7 @@ extension KvHttpResponseProvider {
     /// - body is content at *url*;
     /// - content length, entity tag and modification date are updated when the scheme is "file:" and the attributes are available.
     ///
-    /// - Note: Entity tag is initialized as Base64 representation of precise modification date including fractional seconds.
+    /// - Note: Entity tag is initialized as hexadecimal representation of precise modification date including fractional seconds.
     ///         This implementation prevents double access to file system and monitoring of changes at URL.
     ///
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
@@ -870,7 +756,7 @@ extension KvHttpResponseProvider {
 
             if let modificationDate = attributes[.modificationDate] as? Date {
                 $0.modificationDate = modificationDate
-                $0.entityTag = .base64(withBytesOf: modificationDate.timeIntervalSince1970)
+                $0.entityTag = .hex(withBytesOf: modificationDate.timeIntervalSince1970)
             }
             if let size = attributes[.size] as? UInt64 {
                 $0.contentLength = size
@@ -928,141 +814,6 @@ extension KvHttpResponseProvider {
             $0.contentType = $0.contentType ?? .text(.plain)
         }
     }
-
-}
-
-
-
-// MARK: Dedicated Status Modifiers
-
-extension KvHttpResponseProvider {
-
-    // MARK: 2xx
-
-    /// - Returns: A copy where *status* is changed to`.ok`.
-    @inlinable public var ok: Self { modified { $0.status = .ok } }
-    /// - Returns: A copy where *status* is changed to`.created`.
-    @inlinable public var created: Self { modified { $0.status = .created } }
-    /// - Returns: A copy where *status* is changed to`.accepted`.
-    @inlinable public var accepted: Self { modified { $0.status = .accepted } }
-    /// - Returns: A copy where *status* is changed to`.nonAuthoritativeInformation`.
-    @inlinable public var nonAuthoritativeInformation: Self { modified { $0.status = .nonAuthoritativeInformation } }
-    /// - Returns: A copy where *status* is changed to`.noContent`.
-    @inlinable public var noContent: Self { modified { $0.status = .noContent } }
-    /// - Returns: A copy where *status* is changed to`.resetContent`.
-    @inlinable public var resetContent: Self { modified { $0.status = .resetContent } }
-    /// - Returns: A copy where *status* is changed to`.partialContent`.
-    @inlinable public var partialContent: Self { modified { $0.status = .partialContent } }
-    /// - Returns: A copy where *status* is changed to`.multiStatus`.
-    @inlinable public var multiStatus: Self { modified { $0.status = .multiStatus } }
-    /// - Returns: A copy where *status* is changed to`.alreadyReported`.
-    @inlinable public var alreadyReported: Self { modified { $0.status = .alreadyReported } }
-    /// - Returns: A copy where *status* is changed to`.imUsed`.
-    @inlinable public var imUsed: Self { modified { $0.status = .imUsed } }
-
-    // MARK: 3xx
-
-    /// - Returns: A copy where *status* is changed to`.multipleChoices`.
-    @inlinable public var multipleChoices: Self { modified { $0.status = .multipleChoices } }
-    /// - Returns: A copy where *status* is changed to`.movedPermanently`.
-    @inlinable public var movedPermanently: Self { modified { $0.status = .movedPermanently } }
-    /// - Returns: A copy where *status* is changed to`.found`.
-    @inlinable public var found: Self { modified { $0.status = .found } }
-    /// - Returns: A copy where *status* is changed to`.seeOther`.
-    @inlinable public var seeOther: Self { modified { $0.status = .seeOther } }
-    /// - Returns: A copy where *status* is changed to`.notModified`.
-    @inlinable public var notModified: Self { modified { $0.status = .notModified } }
-    /// - Returns: A copy where *status* is changed to`.useProxy`.
-    @available(*, deprecated, message: "The 305 (Use Proxy) status code has been deprecated due to security concerns. See https://www.rfc-editor.org/rfc/rfc7231.html#appendix-B")
-    @inlinable public var useProxy: Self { modified { $0.status = .useProxy } }
-    /// - Returns: A copy where *status* is changed to`.temporaryRedirect`.
-    @inlinable public var temporaryRedirect: Self { modified { $0.status = .temporaryRedirect } }
-    /// - Returns: A copy where *status* is changed to`.permanentRedirect`.
-    @inlinable public var permanentRedirect: Self { modified { $0.status = .permanentRedirect } }
-
-    // MARK: 4xx
-
-    /// - Returns: A copy where *status* is changed to`.badRequest`.
-    @inlinable public var badRequest: Self { modified { $0.status = .badRequest } }
-    /// - Returns: A copy where *status* is changed to`.unauthorized`.
-    @inlinable public var unauthorized: Self { modified { $0.status = .unauthorized } }
-    /// - Returns: A copy where *status* is changed to`.paymentRequired`.
-    @inlinable public var paymentRequired: Self { modified { $0.status = .paymentRequired } }
-    /// - Returns: A copy where *status* is changed to`.forbidden`.
-    @inlinable public var forbidden: Self { modified { $0.status = .forbidden } }
-    /// - Returns: A copy where *status* is changed to`.notFound`.
-    @inlinable public var notFound: Self { modified { $0.status = .notFound } }
-    /// - Returns: A copy where *status* is changed to`.methodNotAllowed`.
-    @inlinable public var methodNotAllowed: Self { modified { $0.status = .methodNotAllowed } }
-    /// - Returns: A copy where *status* is changed to`.notAcceptable`.
-    @inlinable public var notAcceptable: Self { modified { $0.status = .notAcceptable } }
-    /// - Returns: A copy where *status* is changed to`.proxyAuthenticationRequired`.
-    @inlinable public var proxyAuthenticationRequired: Self { modified { $0.status = .proxyAuthenticationRequired } }
-    /// - Returns: A copy where *status* is changed to`.requestTimeout`.
-    @inlinable public var requestTimeout: Self { modified { $0.status = .requestTimeout } }
-    /// - Returns: A copy where *status* is changed to`.conflict`.
-    @inlinable public var conflict: Self { modified { $0.status = .conflict } }
-    /// - Returns: A copy where *status* is changed to`.gone`.
-    @inlinable public var gone: Self { modified { $0.status = .gone } }
-    /// - Returns: A copy where *status* is changed to`.lengthRequired`.
-    @inlinable public var lengthRequired: Self { modified { $0.status = .lengthRequired } }
-    /// - Returns: A copy where *status* is changed to`.preconditionFailed`.
-    @inlinable public var preconditionFailed: Self { modified { $0.status = .preconditionFailed } }
-    /// - Returns: A copy where *status* is changed to`.payloadTooLarge`.
-    @inlinable public var payloadTooLarge: Self { modified { $0.status = .payloadTooLarge } }
-    /// - Returns: A copy where *status* is changed to`.uriTooLong`.
-    @inlinable public var uriTooLong: Self { modified { $0.status = .uriTooLong } }
-    /// - Returns: A copy where *status* is changed to`.unsupportedMediaType`.
-    @inlinable public var unsupportedMediaType: Self { modified { $0.status = .unsupportedMediaType } }
-    /// - Returns: A copy where *status* is changed to`.rangeNotSatisfiable`.
-    @inlinable public var rangeNotSatisfiable: Self { modified { $0.status = .rangeNotSatisfiable } }
-    /// - Returns: A copy where *status* is changed to`.expectationFailed`.
-    @inlinable public var expectationFailed: Self { modified { $0.status = .expectationFailed } }
-    /// - Returns: A copy where *status* is changed to`.imATeapot`.
-    @inlinable public var imATeapot: Self { modified { $0.status = .imATeapot } }
-    /// - Returns: A copy where *status* is changed to`.misdirectedRequest`.
-    @inlinable public var misdirectedRequest: Self { modified { $0.status = .misdirectedRequest } }
-    /// - Returns: A copy where *status* is changed to`.unprocessableEntity`.
-    @inlinable public var unprocessableEntity: Self { modified { $0.status = .unprocessableEntity } }
-    /// - Returns: A copy where *status* is changed to`.locked`.
-    @inlinable public var locked: Self { modified { $0.status = .locked } }
-    /// - Returns: A copy where *status* is changed to`.failedDependency`.
-    @inlinable public var failedDependency: Self { modified { $0.status = .failedDependency } }
-    /// - Returns: A copy where *status* is changed to`.upgradeRequired`.
-    @inlinable public var upgradeRequired: Self { modified { $0.status = .upgradeRequired } }
-    /// - Returns: A copy where *status* is changed to`.preconditionRequired`.
-    @inlinable public var preconditionRequired: Self { modified { $0.status = .preconditionRequired } }
-    /// - Returns: A copy where *status* is changed to`.tooManyRequests`.
-    @inlinable public var tooManyRequests: Self { modified { $0.status = .tooManyRequests } }
-    /// - Returns: A copy where *status* is changed to`.requestHeaderFieldsTooLarge`.
-    @inlinable public var requestHeaderFieldsTooLarge: Self { modified { $0.status = .requestHeaderFieldsTooLarge } }
-    /// - Returns: A copy where *status* is changed to`.unavailableForLegalReasons`.
-    @inlinable public var unavailableForLegalReasons: Self { modified { $0.status = .unavailableForLegalReasons } }
-
-    // MARK: 5xx
-
-    /// - Returns: A copy where *status* is changed to`.internalServerError`.
-    @inlinable public var internalServerError: Self { modified { $0.status = .internalServerError } }
-    /// - Returns: A copy where *status* is changed to`.notImplemented`.
-    @inlinable public var notImplemented: Self { modified { $0.status = .notImplemented } }
-    /// - Returns: A copy where *status* is changed to`.badGateway`.
-    @inlinable public var badGateway: Self { modified { $0.status = .badGateway } }
-    /// - Returns: A copy where *status* is changed to`.serviceUnavailable`.
-    @inlinable public var serviceUnavailable: Self { modified { $0.status = .serviceUnavailable } }
-    /// - Returns: A copy where *status* is changed to`.gatewayTimeout`.
-    @inlinable public var gatewayTimeout: Self { modified { $0.status = .gatewayTimeout } }
-    /// - Returns: A copy where *status* is changed to`.httpVersionNotSupported`.
-    @inlinable public var httpVersionNotSupported: Self { modified { $0.status = .httpVersionNotSupported } }
-    /// - Returns: A copy where *status* is changed to`.variantAlsoNegotiates`.
-    @inlinable public var variantAlsoNegotiates: Self { modified { $0.status = .variantAlsoNegotiates } }
-    /// - Returns: A copy where *status* is changed to`.insufficientStorage`.
-    @inlinable public var insufficientStorage: Self { modified { $0.status = .insufficientStorage } }
-    /// - Returns: A copy where *status* is changed to`.loopDetected`.
-    @inlinable public var loopDetected: Self { modified { $0.status = .loopDetected } }
-    /// - Returns: A copy where *status* is changed to`.notExtended`.
-    @inlinable public var notExtended: Self { modified { $0.status = .notExtended } }
-    /// - Returns: A copy where *status* is changed to`.networkAuthenticationRequired`.
-    @inlinable public var networkAuthenticationRequired: Self { modified { $0.status = .networkAuthenticationRequired } }
 
 }
 

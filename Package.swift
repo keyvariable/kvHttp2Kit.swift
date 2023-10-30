@@ -30,18 +30,21 @@ let package = Package(
 
     products: [
         .library(name: "kvServerKit", targets: [ "kvServerKit" ]),
+        .library(name: "kvHttpKit", targets: [ "kvHttpKit" ]),
+        .library(name: "kvHttpKit_NIOHTTP1", targets: [ "kvHttpKit_NIOHTTP1" ]),
     ],
 
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.13.0"),
         .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.24.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
-        .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.2.0"),
+        .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.7.0"),
     ],
     
     targets: [
         .target(name: "kvServerKit",
-                dependencies: [ .product(name: "kvKit", package: "kvKit.swift"),
+                dependencies: [ "kvHttpKit_NIOHTTP1",
+                                .product(name: "kvKit", package: "kvKit.swift"),
                                 .product(name: "NIO", package: "swift-nio"),
                                 .product(name: "NIOHTTP1", package: "swift-nio"),
                                 .product(name: "NIOHTTP2", package: "swift-nio-http2"),
@@ -55,5 +58,20 @@ let package = Package(
                                  .copy("Resources/https.pem"),
                                  .copy("Resources/sample.txt") ],
                     swiftSettings: swiftSettings),
+
+        .target(name: "kvHttpKit",
+                dependencies: [ .product(name: "kvKit", package: "kvKit.swift") ],
+                swiftSettings: swiftSettings),
+
+        .target(name: "kvHttpKit_NIOHTTP1",
+                dependencies: [ "kvHttpKit",
+                                .product(name: "NIOHTTP1", package: "swift-nio") ],
+                swiftSettings: swiftSettings),
+
+        .testTarget(name: "kvHttpKitTests",
+                    dependencies: [ "kvHttpKit" ],
+                    swiftSettings: swiftSettings)
+
+
     ]
 )

@@ -23,6 +23,9 @@
 
 import Foundation
 
+import kvHttpKit
+import kvHttpKit_NIOHTTP1
+
 import kvKit
 import NIO
 import NIOHTTP1
@@ -758,7 +761,7 @@ open class KvHttpChannel {
     public enum RequestIncident : KvHttpIncident {
 
         /// This incident is emitted when a request exceeds provided or default limit for a body.
-        /// By default `.payloadTooLarge` (413) status is returned.
+        /// By default `.contentTooLarge` (413) status is returned.
         ///
         /// - SeeAlso: ``KvHttpRequestHandler/bodyLengthLimit``, ``KvResponseGroup/httpBodyLengthLimit(_:)``,
         ///            ``KvHttpRequestRequiredBody/bodyLengthLimit(_:)``.
@@ -782,7 +785,7 @@ open class KvHttpChannel {
         public var defaultStatus: KvHttpStatus {
             switch self {
             case .byteLimitExceeded:
-                return .payloadTooLarge
+                return .contentTooLarge
             case .invalidHeader:
                 return .badRequest
             case .noResponse:
@@ -1123,7 +1126,7 @@ open class KvHttpChannel {
                 }()
 
                 // Head
-                let head = HTTPResponseHead(version: httpVersion, status: response.status, headers: headers)
+                let head = HTTPResponseHead(version: httpVersion, status: response.status.nioStatus, headers: headers)
 
                 channel.write(self.wrapOutboundOut(HTTPServerResponsePart.head(head)), promise: nil)
 

@@ -27,6 +27,8 @@ import XCTest
 
 @testable import kvServerKit
 
+import kvHttpKit
+
 
 
 class KvServerTestKit {
@@ -147,7 +149,7 @@ class KvServerTestKit {
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
-        statusCode: KvHttpStatus = .ok,
+        status: KvHttpStatus = .ok,
         contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
         message: @escaping @autoclosure () -> String = "",
         bodyBlock: ((Data, URLRequest, () -> String) throws -> Void)? = nil
@@ -188,7 +190,7 @@ class KvServerTestKit {
             guard let httpResponse = response as? HTTPURLResponse
             else { return XCTFail([ "Unexpected type of response: \(type(of: response))", message() ].lazy.filter({ !$0.isEmpty }).joined(separator: ". ")) }
 
-            XCTAssertEqual(httpResponse.statusCode, numericCast(statusCode.code), message())
+            XCTAssertEqual(httpResponse.statusCode, numericCast(status.rawValue), message())
             if let contentType = contentType {
                 XCTAssertEqual(httpResponse.mimeType, contentType.components.mimeType, message())
             }
@@ -202,12 +204,12 @@ class KvServerTestKit {
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
-        statusCode: KvHttpStatus = .ok,
+        status: KvHttpStatus = .ok,
         contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
         expecting expected: String,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, status: status, contentType: contentType, message: message()) { data, request, message in
             let result = String(data: data, encoding: .utf8)
             XCTAssertEqual(result, expected, message())
         }
@@ -218,12 +220,12 @@ class KvServerTestKit {
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
-        statusCode: KvHttpStatus = .ok,
+        status: KvHttpStatus = .ok,
         contentType: KvHttpResponseProvider.ContentType? = .application(.octetStream),
         expecting expected: Data,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, status: status, contentType: contentType, message: message()) { data, request, message in
             XCTAssertEqual(data, expected, message())
         }
     }
@@ -233,12 +235,12 @@ class KvServerTestKit {
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
-        statusCode: KvHttpStatus = .ok,
+        status: KvHttpStatus = .ok,
         contentType: KvHttpResponseProvider.ContentType? = .application(.json),
         expecting expected: T,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
-        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, statusCode: statusCode, contentType: contentType, message: message()) { data, request, message in
+        try await assertResponse(urlSession: urlSession, baseURL, method: method, path: path, query: query, body: body, onRequest: onRequest, status: status, contentType: contentType, message: message()) { data, request, message in
             let result = try JSONDecoder().decode(T.self, from: data)
             XCTAssertEqual(result, expected, message())
         }

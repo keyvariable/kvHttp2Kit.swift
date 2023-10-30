@@ -23,6 +23,9 @@
 
 import Foundation
 
+import kvHttpKit
+import kvHttpKit_NIOHTTP1
+
 
 
 /// It's used to identify responses in a dispatcher.
@@ -32,8 +35,9 @@ public class KvHttpRequestContext {
     public let urlComponents: URLComponents
 
     /// Decomposed path.
+    /// 
     /// - Note: *URLComponents* contains only composed path.
-    public private(set) lazy var path: KvUrlSubpath = .init(path: urlComponents.path)
+    public private(set) lazy var path: KvUrlPath = .init(path: urlComponents.path)
 
 
     init?(_ client: KvHttpChannel.Client, _ head: KvHttpServer.RequestHead) {
@@ -43,7 +47,7 @@ public class KvHttpRequestContext {
 
         guard let urlComponents = URLComponents(string: uri) else { return nil }
 
-        self.method = head.method
+        self.method = .init(from: head.method)
         self.urlComponents = urlComponents
     }
 

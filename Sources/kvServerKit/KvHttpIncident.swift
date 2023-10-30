@@ -21,6 +21,10 @@
 //  Created by Svyatoslav Popov on 30.09.2023.
 //
 
+import kvHttpKit
+
+
+
 /// A protocol for HTTP incidents. Incidents are errors those are reported to clients.
 public protocol KvHttpIncident {
 

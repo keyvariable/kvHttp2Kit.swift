@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 import NIOHTTP1
 
 
@@ -291,15 +293,15 @@ public struct KvHttpResponse : KvResponse {
     ///
     /// Previously declared value is replaced.
     ///
-    /// Below is an example where custom 413 (Payload Too Large) response is provided when request body exceeds limit:
+    /// Below is an example where custom 413 (Content Too Large) response is provided when request body exceeds limit:
     ///
     /// ```swift
     /// KvHttpResponse.with
     ///    .requestBody(.data.bodyLengthLimit(1024))
     ///    .content { input in .binary { input.requestBody ?? .init() } }
     ///    .onIncident { incident in
-    ///        guard incident.defaultStatus == .payloadTooLarge else { return nil }
-    ///        return .payloadTooLarge.string("Payload is too large. Limit is 1024 bytes.")
+    ///        guard incident.defaultStatus == .contentTooLarge else { return nil }
+    ///        return .contentTooLarge.string("Content is too large. Limit is 1024 bytes.")
     ///    }
     /// ```
     ///
@@ -1179,16 +1181,16 @@ extension KvHttpResponse.ParameterizedResponse where Subpath == KvUnavailableUrl
     /// }
     /// ```
     ///
-    /// Use ``subpathFlatMap(_:)-1b07o`` or ``subpathFilter(_:)-7fq07`` modifiers to provide additional filtering by subpath.
+    /// Use ``subpathFlatMap(_:)-6xc4y`` or ``subpathFilter(_:)-3tjji`` modifiers to provide additional filtering by subpath.
     @inlinable
     public var subpath: HandlingSubpath<KvUrlSubpath> {
         subpathFlatMap { .accepted($0) }
     }
 
 
-    /// Analog of ``subpathFlatMap(_:)-1b07o`` modifier returning a boolean value.
+    /// Analog of ``subpathFlatMap(_:)-6xc4y`` modifier returning a boolean value.
     ///
-    /// - SeeAlso: ``subpath``, ``subpathFlatMap(_:)-1b07o``.
+    /// - SeeAlso: ``subpath``, ``subpathFlatMap(_:)-6xc4y``.
     @inlinable
     public func subpathFilter(_ predicate: @escaping (KvUrlSubpath) -> Bool) -> HandlingSubpath<KvUrlSubpath> {
         subpathFlatMap { predicate($0) ? .accepted($0) : .rejected }
@@ -1218,7 +1220,7 @@ extension KvHttpResponse.ParameterizedResponse where Subpath == KvUnavailableUrl
     /// }
     /// ```
     ///
-    /// - SeeAlso: ``subpath``, ``subpathFilter(_:)-7fq07``.
+    /// - SeeAlso: ``subpath``, ``subpathFilter(_:)-3tjji``.
     @inlinable
     public func subpathFlatMap<SubpathMapValue>(_ predicate: @escaping (KvUrlSubpath) -> KvFilterResult<SubpathMapValue>) -> HandlingSubpath<SubpathMapValue> {
         map { .init(
@@ -1237,14 +1239,14 @@ extension KvHttpResponse.ParameterizedResponse where Subpath == KvUrlSubpath {
     public typealias MappedSubpath<T> = KvHttpResponse.ParameterizedResponse<QueryItemGroup, RequestHeaders, RequestBodyValue, KvUrlSubpath, T>
 
 
-    /// Adds additional subpath filter. See ``subpathFilter(_:)-1ytdy`` for details.
+    /// Adds additional subpath filter. See ``subpathFilter(_:)-9ey8x`` for details.
     @inlinable
     public func subpathFilter(_ predicate: @escaping (SubpathValue) -> Bool) -> Self {
         subpathFlatMap { predicate($0) ? .accepted($0) : .rejected }
     }
 
 
-    /// Adds additional subpath filter. See ``subpathFlatMap(_:)-638zc`` for details.
+    /// Adds additional subpath filter. See ``subpathFlatMap(_:)-7xend`` for details.
     @inlinable
     public func subpathFlatMap<SubpathMapValue>(_ predicate: @escaping (SubpathValue) -> KvFilterResult<SubpathMapValue>) -> MappedSubpath<SubpathMapValue> {
         map { configuration in .init(

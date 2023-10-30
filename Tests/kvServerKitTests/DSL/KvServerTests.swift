@@ -47,7 +47,7 @@ final class KvServerTests : XCTestCase {
                     KvGroup("b") {
                         KvHttpResponse { .string({ "b" }).contentLength(1) }
                     }
-                    .httpMethods(.GET)
+                    .httpMethods(.get)
                 }
             }
 
