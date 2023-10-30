@@ -38,7 +38,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.13.0"),
         .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.24.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
-        .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.7.0-a.1"),
+        .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.7.0"),
     ],
     
     targets: [
