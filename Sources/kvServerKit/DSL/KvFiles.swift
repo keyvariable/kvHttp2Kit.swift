@@ -162,6 +162,12 @@ public struct KvFiles : KvResponse {
 
     }
 
+
+
+    // MARK: : KvResponse
+
+    public var body: KvNeverResponse { Body() }
+
 }
 
 

@@ -363,7 +363,7 @@ public struct KvDirectory : KvResponse {
 
     // MARK: : KvResponse
 
-    public typealias Body = KvNeverResponse
+    public var body: KvNeverResponse { Body() }
 
 }
 

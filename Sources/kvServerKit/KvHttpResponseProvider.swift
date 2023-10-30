@@ -386,7 +386,7 @@ public struct KvHttpResponseProvider {
 extension KvHttpResponseProvider {
 
     /// - Returns:  An instance where body is provided via *provider*, *status* is `.ok`.
-    ///             See``BodyCallbackProvider`` for details.
+    ///             See ``BodyCallbackProvider`` for details.
     ///
     /// - Important: *Provider* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
@@ -396,7 +396,7 @@ extension KvHttpResponseProvider {
 
 
     /// - Returns:  An instance where body is provided via *callback*, *status* is `.ok`.
-    ///             See``BodyCallback`` for details.
+    ///             See ``BodyCallback`` for details.
     ///
     /// - Important: *Callback* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
@@ -622,7 +622,7 @@ extension KvHttpResponseProvider {
 
 extension KvHttpResponseProvider {
 
-    /// - Returns: A copy where body is provided via *provider*. See``BodyCallbackProvider`` for details.
+    /// - Returns: A copy where body is provided via *provider*. See ``BodyCallbackProvider`` for details.
     ///
     /// - Note: `contentType`, `contentLength` and other properties are not changed.
     ///
@@ -633,7 +633,7 @@ extension KvHttpResponseProvider {
     } }
 
 
-    /// - Returns: A copy where body is provided via *callback*. See``BodyCallback`` for details.
+    /// - Returns: A copy where body is provided via *callback*. See ``BodyCallback`` for details.
     ///
     /// - Note: `contentType`, `contentLength` and other properties are not changed.
     ///

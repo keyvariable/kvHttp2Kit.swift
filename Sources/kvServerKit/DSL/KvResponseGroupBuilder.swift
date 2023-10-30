@@ -187,7 +187,7 @@ public struct KvResponseGroupBuilder {
         // MARK: : KvResponseGroupInternalProtocol
 
         func insertResponses<A : KvHttpResponseAccumulator>(to accumulator: A) {
-            (wrapped as! any KvResponseInternalProtocol).insert(to: accumulator)
+            wrapped.resolvedResponse.insert(to: accumulator)
         }
 
     }
