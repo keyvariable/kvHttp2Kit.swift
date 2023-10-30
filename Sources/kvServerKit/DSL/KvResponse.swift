@@ -85,6 +85,11 @@ extension KvResponse {
 
     public typealias QueryResult = KvUrlQueryParseResult
 
+
+    internal var resolvedResponse: any KvResponseInternalProtocol {
+        (self as? any KvResponseInternalProtocol) ?? body.resolvedResponse
+    }
+
 }
 
 
