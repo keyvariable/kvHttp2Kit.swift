@@ -120,14 +120,14 @@ See [*ImperativeServer*](./Samples/Sources/ImperativeServer) target in [*Samples
 ## Supported Platforms
 
 The same as [SwiftNIO](https://github.com/apple/swift-nio).
-Package is built and the unit-tests are passed on macOS and Linux (Ubuntu 22.04).
+Package has been built and the unit-tests have passed on macOS and Linux (Ubuntu 22.04).
 
 
 ## Getting Started
 
 #### Package Dependencies:
 ```swift
-.package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.4.1")
+.package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.5.0")
 ```
 #### Target Dependencies:
 ```swift
