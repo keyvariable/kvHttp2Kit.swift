@@ -130,7 +130,7 @@ where Addresses : Sequence, Addresses.Element == KvNetworkEndpoint.Address, Port
 
 /// - Returns: A response group with HTTP method filter containing given elements.
 ///
-/// See ``KvResponseGroup/httpMethods(_:)-6fbma`` for details.
+/// See ``KvResponseGroup/httpMethods(_:)-7bfx0`` for details.
 @inlinable
 public func KvGroup<Methods, Content : KvResponseGroup>(
     httpMethods: Methods,
@@ -144,7 +144,7 @@ where Methods : Sequence, Methods.Element == KvHttpMethod
 
 /// - Returns: A response group with HTTP method filter containing given elements.
 ///
-/// See ``KvResponseGroup/httpMethods(_:)-6fbma`` for details.
+/// See ``KvResponseGroup/httpMethods(_:)-7bfx0`` for details.
 @inlinable
 public func KvGroup<Content : KvResponseGroup>(
     httpMethods: KvHttpMethod...,

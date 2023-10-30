@@ -123,7 +123,7 @@ extension KvResponseGroup {
 
     /// Adds given values into HTTP method filter.
     ///
-    /// The result is the same as ``KvResponseGroup/httpMethods(_:)-6fbma``. See it's documentation for details.
+    /// The result is the same as ``KvResponseGroup/httpMethods(_:)-7bfx0``. See it's documentation for details.
     @inlinable
     public func httpMethods<Methods>(_ httpMethods: Methods) -> some KvResponseGroup
     where Methods : Sequence, Methods.Element == KvHttpMethod
@@ -149,7 +149,7 @@ extension KvResponseGroup {
     ///     .httpMethods(.GET, .PUT, .DELETE)
     /// ```
     ///
-    /// - SeeAlso: ``KvGroup(httpMethods:content:)-29gzp``.
+    /// - SeeAlso: ``KvGroup(httpMethods:content:)-1367g``.
     @inlinable
     public func httpMethods(_ httpMethods: KvHttpMethod...) -> some KvResponseGroup {
         self.httpMethods(httpMethods)
