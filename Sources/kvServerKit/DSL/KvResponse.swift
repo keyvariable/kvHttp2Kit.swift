@@ -99,41 +99,17 @@ protocol KvResponseInternalProtocol : KvResponse {
 
 
 
-// MARK: - KvNeverResponseProtocol
-
-public protocol KvNeverResponseProtocol : KvResponse {
-
-    init()
-
-}
-
-
-// This approach helps to prevent substitution of `KvNeverResponse` as `Body` in the Xcode's code completion for `body` properties
-// when declaring structures conforming to `KvResponse`.
-// If body constraint were `Body == KvNeverResponse` then the code completion would always produce `var body: KvNeverResponse`.
-extension KvResponse where Body : KvNeverResponseProtocol {
-
-    public var body: Body { Body() }
-
-}
-
-
-
 // MARK: - KvNeverResponse
 
 /// Special type for implementations of ``KvResponse`` providing no body.
-public struct KvNeverResponse : KvNeverResponseProtocol {
+public struct KvNeverResponse : KvResponse {
 
     public typealias Body = KvNeverResponse
 
 
     public init() { fatalError("KvNeverResponse must never be instantiated") }
 
-}
 
-
-extension KvResponse where Body == KvNeverResponse {
-
-    public var body: KvNeverResponse { KvNeverResponse() }
+    public var body: Body { Body() }
 
 }
