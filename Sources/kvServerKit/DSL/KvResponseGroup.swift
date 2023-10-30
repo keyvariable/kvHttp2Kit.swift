@@ -234,7 +234,7 @@ extension KvResponseGroup {
     public func path(_ pathComponent: String) -> some KvResponseGroup {
         modified {
             $0.dispatching?.appendPathComponent(pathComponent)
-            ?? ($0.dispatching = .init(path: pathComponent))
+            ?? ($0.dispatching = .init(path: KvUrlPath(path: pathComponent)))
         }
     }
 
@@ -374,17 +374,17 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
         /// - SeeAlso: ``appendPathComponent(_:)``.
         @usableFromInline
-        private(set) var path: String
+        private(set) var path: KvUrlPath
 
 
         @usableFromInline
         init(httpMethods: CascadableSet<KvHttpMethod>? = nil,
              users: CascadableSet<String>? = nil,
-             path: String = ""
+             path: KvUrlPath = .empty
         ) {
             self.httpMethods = httpMethods
             self.users = users
-            self.path = Self.normalizedPath(path)
+            self.path = path
         }
 
 
@@ -451,19 +451,6 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
 
         // MARK: Operations
 
-        /// - Returns: Non-empty value where missing leading URL path separator is added or empty string.
-        @inline(__always)
-        @usableFromInline
-        static func normalizedPath(_ value: String) -> String {
-            switch value.first {
-            case "/", .none:
-                return value
-            default:
-                return "/" + value
-            }
-        }
-
-
         @inline(__always)
         @usableFromInline
         mutating func insert<HttpMethods>(httpMethods: HttpMethods)
@@ -487,7 +474,7 @@ struct KvResponseGroupConfiguration : KvDefaultOverlayCascadable, KvDefaultAccum
         @inline(__always)
         @usableFromInline
         mutating func appendPathComponent(_ pathComponent: String) {
-            path += Self.normalizedPath(pathComponent)
+            path += .init(path: pathComponent)
         }
 
     }

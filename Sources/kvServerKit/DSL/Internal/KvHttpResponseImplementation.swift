@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 
 
 // MARK: KvHttpResponseContext
@@ -130,7 +132,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
     func makeProcessor(in responseContext: ResponseContext) -> KvHttpRequestProcessorProtocol? {
         // TODO: Avoid subpath processing when `Subpath == KvUnavailableUrlSubpath`
         let subpathValue: SubpathValue
-        switch subpathFilter(.init(safeComponents: responseContext.subpath.components)) {
+        switch subpathFilter(.from(responseContext.subpath)) {
         case .accepted(let value):
             subpathValue = value
         case .rejected:

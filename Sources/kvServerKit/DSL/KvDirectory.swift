@@ -126,7 +126,7 @@ public struct KvDirectory : KvResponse {
     ///
     /// - SeeAlso: ``whiteList(_:)-43l0i``.
     @inlinable
-    public func blackList(_ paths: String...) -> Self { blackList(paths.lazy.map(KvUrlSubpath.init(path:))) }
+    public func blackList(_ paths: String...) -> Self { blackList(paths.lazy.map(KvUrlPath.init(path:))) }
 
     /// This modifier appends directory's black list.
     ///
@@ -134,14 +134,14 @@ public struct KvDirectory : KvResponse {
     @inlinable
     public func blackList<S>(_ paths: S) -> Self
     where S : Sequence, S.Element == String
-    { blackList(paths.lazy.map(KvUrlSubpath.init(stringLiteral:))) }
+    { blackList(paths.lazy.map(KvUrlPath.init(stringLiteral:))) }
 
     /// This modifier appends directory's black list.
     ///
     /// See ``blackList(_:)-5xwjb`` for details.
     @inlinable
-    public func blackList(_ paths: KvUrlSubpath...) -> Self { modified {
-        $0.insert(blackListItems: paths)
+    public func blackList(_ paths: KvUrlPath...) -> Self { modified {
+        $0.insert(blackListItems: paths.lazy.map(KvUrlSubpath.init(_:)))
     } }
 
     /// This modifier appends directory's black list.
@@ -149,9 +149,9 @@ public struct KvDirectory : KvResponse {
     /// See ``blackList(_:)-5xwjb`` for details.
     @inlinable
     public func blackList<S>(_ paths: S) -> Self
-    where S : Sequence, S.Element == KvUrlSubpath
+    where S : Sequence, S.Element == KvUrlPath
     { modified {
-        $0.insert(blackListItems: paths)
+        $0.insert(blackListItems: paths.lazy.map(KvUrlSubpath.init(_:)))
     } }
 
 
@@ -175,7 +175,7 @@ public struct KvDirectory : KvResponse {
     ///
     /// - SeeAlso: ``blackList(_:)-5xwjb``.
     @inlinable
-    public func whiteList(_ paths: String...) -> Self { whiteList(paths.lazy.map(KvUrlSubpath.init(path:))) }
+    public func whiteList(_ paths: String...) -> Self { whiteList(paths.lazy.map(KvUrlPath.init(path:))) }
 
     /// This modifier appends directory's white list.
     ///
@@ -183,14 +183,14 @@ public struct KvDirectory : KvResponse {
     @inlinable
     public func whiteList<S>(_ paths: S) -> Self
     where S : Sequence, S.Element == String
-    { whiteList(paths.lazy.map(KvUrlSubpath.init(stringLiteral:))) }
+    { whiteList(paths.lazy.map(KvUrlPath.init(stringLiteral:))) }
 
     /// This modifier appends directory's white list.
     ///
     /// See ``whiteList(_:)-6y9nd`` for details.
     @inlinable
-    public func whiteList(_ paths: KvUrlSubpath...) -> Self { modified {
-        $0.insert(whiteListItems: paths)
+    public func whiteList(_ paths: KvUrlPath...) -> Self { modified {
+        $0.insert(whiteListItems: paths.lazy.map(KvUrlSubpath.init(_:)))
     } }
 
     /// This modifier appends directory's white list.
@@ -198,9 +198,9 @@ public struct KvDirectory : KvResponse {
     /// See ``whiteList(_:)-6y9nd`` for details.
     @inlinable
     public func whiteList<S>(_ paths: S) -> Self
-    where S : Sequence, S.Element == KvUrlSubpath
+    where S : Sequence, S.Element == KvUrlPath
     { modified {
-        $0.insert(whiteListItems: paths)
+        $0.insert(whiteListItems: paths.lazy.map(KvUrlSubpath.init(_:)))
     } }
 
 
@@ -392,11 +392,11 @@ extension KvDirectory : KvResponseInternalProtocol {
             if let statusDirectoryURL = httpStatusDirectoryURL?.absoluteURL,
                statusDirectoryURL.scheme == rootURL.scheme
             {
-                let rootComponents = KvUrlSubpath(path: rootURL.path).standardized
-                let statusComponents = KvUrlSubpath(path: statusDirectoryURL.path).standardized
+                let rootComponents = KvUrlPath(path: rootURL.path).standardized
+                let statusComponents = KvUrlPath(path: statusDirectoryURL.path).standardized
 
                 if statusComponents.starts(with: rootComponents) {
-                    accessList.insertBlackSubpath(statusComponents.dropFirst(rootComponents.components.count))
+                    accessList.insertBlackSubpath(.init(statusComponents.dropFirst(rootComponents.components.count)))
                 }
             }
 
@@ -450,12 +450,14 @@ extension KvDirectory {
 
         var url = rootURL
 
-        permission.whitePrefix?.components.forEach { url.appendPathComponent($0) }
+        if let prefix = permission.whitePrefix {
+            url.appendPathComponent(prefix.joined)
+        }
 
         for component in permission.rest.components {
             guard component.first != "." else { return nil }
 
-            url.appendPathComponent(component)
+            url.appendPathComponent(.init(component))
         }
 
         return url
@@ -467,7 +469,7 @@ extension KvDirectory {
     /// - Note: It's internal due to unit-test requirements.
     struct AccessList {
 
-        typealias PathComponent = String
+        typealias PathComponent = KvUrlPath.Components.Element
 
 
         init<B, W>(black: B?, white: W?)

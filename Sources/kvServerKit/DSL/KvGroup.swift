@@ -269,5 +269,5 @@ public func KvGroup<Content : KvResponseGroup>(
     _ path: String,
     @KvResponseGroupBuilder content: @escaping () -> Content
 ) -> some KvResponseGroup {
-    KvModifiedResponseGroup(configuration: .init(dispatching: .init(path: path)), source: content)
+    KvModifiedResponseGroup(configuration: .init(dispatching: .init(path: KvUrlPath(path: path))), source: content)
 }
