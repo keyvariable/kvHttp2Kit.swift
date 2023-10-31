@@ -31,10 +31,6 @@ import NIOHTTP1
 
 struct KvHttpRequestPreconditions {
 
-    typealias Response = KvHttpResponseProvider
-
-
-
     var entityTag: EntityTag?
     var modificationDate: ModificationDate?
 
@@ -68,8 +64,6 @@ struct KvHttpRequestPreconditions {
 
         let method: HTTPMethod
 
-        let dateFormatterRFC9110: DateFormatter
-
 
         // MARK: Auxiliaries
 
@@ -89,14 +83,14 @@ struct KvHttpRequestPreconditions {
 
     // MARK: Operations
 
-    /// - Returns: `Nil` when normal response is OK or a replacement response (e.g. 304).
-    func process(for response: Response, in context: RequestContext) -> Response? {
+    /// - Returns: `Nil` when initial *response* meets preconditions or a replacement response (e.g. 304) otherwise.
+    func process(for response: KvHttpResponseContent, in context: RequestContext) -> KvHttpResponseContent? {
         processEntityTag(for: response, in: context)
         ?? processModificationDate(for: response, in: context)
     }
 
 
-    private func processEntityTag(for response: Response, in context: RequestContext) -> Response? {
+    private func processEntityTag(for response: KvHttpResponseContent, in context: RequestContext) -> KvHttpResponseContent? {
         switch entityTag {
         case .ifMatch(let rawValues):
             guard let element = response.entityTag,
@@ -137,7 +131,7 @@ struct KvHttpRequestPreconditions {
     }
 
 
-    private func processModificationDate(for response: Response, in context: RequestContext) -> Response? {
+    private func processModificationDate(for response: KvHttpResponseContent, in context: RequestContext) -> KvHttpResponseContent? {
         guard let date = response.modificationDate else { return nil /*Ignored*/ }
 
         switch modificationDate {
@@ -146,7 +140,7 @@ struct KvHttpRequestPreconditions {
 
             if case .ifNoneMatch(_) = entityTag { return nil /*Precondition ignored*/ }
 
-            guard let minimumDate = context.dateFormatterRFC9110.date(from: rawValue)
+            guard let minimumDate = KvRFC9110.DateFormatter.date(from: rawValue)
             else { return nil /* Incorrect dates must be ignored [RFC 9110, 13.1.3](https://www.rfc-editor.org/rfc/rfc9110#section-13.1.3). */ }
 
             guard date > minimumDate else { return .notModified }
@@ -154,7 +148,7 @@ struct KvHttpRequestPreconditions {
         case .ifUnmodifiedSince(let rawValue):
             if case .ifNoneMatch(_) = entityTag { return nil /*Precondition ignored*/ }
             
-            guard let maximumDate = context.dateFormatterRFC9110.date(from: rawValue)
+            guard let maximumDate = KvRFC9110.DateFormatter.date(from: rawValue)
             else { return nil /* Incorrect dates must be ignored [RFC 9110, 13.1.4](https://www.rfc-editor.org/rfc/rfc9110#section-13.1.4). */ }
 
             // - Note: Generally 2xx is allowed [RFC 9110, 13.1.4](https://www.rfc-editor.org/rfc/rfc9110#section-13.1.4).

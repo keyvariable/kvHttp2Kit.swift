@@ -27,7 +27,7 @@ import XCTest
 
 
 
-final class KvHttpKitTests: XCTestCase {
+final class KvHttpKitTests : XCTestCase {
 
     // MARK: - testStandardization()
 

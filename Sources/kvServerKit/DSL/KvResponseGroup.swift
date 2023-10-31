@@ -284,7 +284,7 @@ extension KvResponseGroup {
     ///
     /// - SeeAlso: ``onError(_:)``.
     @inlinable
-    public func onHttpIncident(_ block: @escaping (KvHttpIncident, KvHttpRequestContext) throws -> KvHttpResponseProvider?) -> some KvResponseGroup {
+    public func onHttpIncident(_ block: @escaping (KvHttpIncident, KvHttpRequestContext) throws -> KvHttpResponseContent?) -> some KvResponseGroup {
         modified {
             $0.clientCallbacks = .accumulate(.init(onHttpIncident: { try? block($0, $1) }), into: $0.clientCallbacks)
         }

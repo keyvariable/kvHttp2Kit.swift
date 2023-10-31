@@ -15,27 +15,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  KvHttpResponseProvider.swift
-//  kvServerKit
+//  KvHttpResponseContent.swift
+//  kvHttpKit
 //
 //  Created by Svyatoslav Popov on 30.05.2023.
 //
 
 import Foundation
 
-import kvHttpKit
-
-import NIOHTTP1
-
 
 
 // TODO: Apply consuming, borrowing, consume, copy keywords in Swift 5.9.
 
-/// Representation of HTTP responses.
-/// It's implemented in declarative way.
-/// It provides deferred access to body providers so, for example, the same declaration can be effectively used for both GET and HEAD methods.
-///
-/// Examples:
+/// Representation of HTTP response content.
+/// *KvHttpResponseContent* is designed to be configured with fabrics and modifiers. For example:
 ///
 /// ```swift
 /// // Plain text response.
@@ -57,9 +50,17 @@ import NIOHTTP1
 /// try .file(resource: "logo", extension: "png", subdirectory: "images", bundle: .module)
 ///     .contentType(.image(.png))
 /// ```
-public struct KvHttpResponseProvider {
+///
+/// *KvHttpResponseContent* provides deferred access to body providers so, for example, the same declaration can be effectively used for both GET and HEAD methods.
+///
+/// When a response is configured, use ``forEachHeader(_:)`` method to process headrer values and ``bodyCallbackProvider`` to process body bytes.
+public struct KvHttpResponseContent {
 
-    public typealias HeaderCallback = (inout HTTPHeaders) -> Void
+    /// A block invoked with header name and value.
+    public typealias HeaderCallback = (String, String) -> Void
+
+    /// A block calling provided callback with tuples of custom header names and values.
+    public typealias HeaderProvider = (HeaderCallback) -> Void
 
     /// Body callback is used to write body fragments to provided client's buffer.
     /// Body callback returns number of actually written bytes or an error as a standard *Result*.
@@ -68,13 +69,20 @@ public struct KvHttpResponseProvider {
     public typealias BodyCallbackProvider = () -> Result<BodyCallback, Error>
 
 
+    public typealias ContentError = KvHttpKitError.Response
+
+
     /// HTTP response status code.
+    @inlinable
+    public var status: KvHttpStatus {  _status }
     @usableFromInline
-    var status: KvHttpStatus
+    var _status: KvHttpStatus
 
     /// An optional callback providing custom headers.
+    @inlinable
+    public var customHeaderProvider: HeaderProvider? { _customHeaderProvider }
     @usableFromInline
-    var customHeaderCallback: HeaderCallback?
+    var _customHeaderProvider: HeaderProvider?
 
     /// This property is called just before response body is sent to a client.
     /// Also it can be ignored, for example when HTTP method is *HEAD*.
@@ -82,36 +90,50 @@ public struct KvHttpResponseProvider {
     /// `Nil` value means that response has no body.
     ///
     /// See ``BodyCallbackProvider`` and ``BodyCallback`` for details.
+    @inlinable
+    public var bodyCallbackProvider: BodyCallbackProvider? { _bodyCallbackProvider }
     @usableFromInline
-    var bodyCallbackProvider: BodyCallbackProvider?
+    var _bodyCallbackProvider: BodyCallbackProvider?
 
     /// Optional value for `Content-Type` HTTP header in response. If `nil` then the header is not provided in response.
+    @inlinable
+    public var contentType: KvHttpContentType? { _contentType }
     @usableFromInline
-    var contentType: KvHttpContentType?
+    var _contentType: KvHttpContentType?
     /// Optional value for `Content-Length` HTTP header in response. If `nil` then the header is not provided in response.
+    @inlinable
+    public var contentLength: UInt64? { _contentLength }
     @usableFromInline
-    var contentLength: UInt64?
+    var _contentLength: UInt64?
 
     /// Value for `ETag` response header.
+    @inlinable
+    public var entityTag: KvHttpEntityTag? { _entityTag }
     @usableFromInline
-    var entityTag: KvHttpEntityTag?
+    var _entityTag: KvHttpEntityTag?
     /// Value for `Last-Modified` response header.
+    @inlinable
+    public var modificationDate: Date? { _modificationDate }
     @usableFromInline
-    var modificationDate: Date?
+    var _modificationDate: Date?
 
     /// Value for `Location` response header.
+    @inlinable
+    public var location: URL? { _location }
     @usableFromInline
-    var location: URL?
+    var _location: URL?
 
     /// Response options. E.g. disconnection flag.
+    @inlinable
+    public var options: Options { _options }
     @usableFromInline
-    var options: Options
+    var _options: Options
 
 
     /// Memberwise initializer.
     @usableFromInline
     init(status: KvHttpStatus = .ok,
-         customHeaderCallback: HeaderCallback? = nil,
+         customHeaderProvider: HeaderProvider? = nil,
          contentType: KvHttpContentType? = nil,
          contentLength: UInt64? = nil,
          entityTag: KvHttpEntityTag? = nil,
@@ -120,15 +142,15 @@ public struct KvHttpResponseProvider {
          options: Options = [ ],
          bodyCallbackProvider: BodyCallbackProvider? = nil
     ) {
-        self.status = status
-        self.customHeaderCallback = customHeaderCallback
-        self.contentType = contentType
-        self.contentLength = contentLength
-        self.entityTag = entityTag
-        self.modificationDate = modificationDate
-        self.location = location
-        self.options = options
-        self.bodyCallbackProvider = bodyCallbackProvider
+        self._status = status
+        self._customHeaderProvider = customHeaderProvider
+        self._contentType = contentType
+        self._contentLength = contentLength
+        self._entityTag = entityTag
+        self._modificationDate = modificationDate
+        self._location = location
+        self._options = options
+        self._bodyCallbackProvider = bodyCallbackProvider
     }
 
 
@@ -178,7 +200,7 @@ public struct KvHttpResponseProvider {
         return { buffer in
             let bytesRead = stream.read(buffer.baseAddress!.assumingMemoryBound(to: UInt8.self), maxLength: buffer.count)
 
-            guard bytesRead >= 0 else { return .failure(KvHttpResponseError.streamRead(code: bytesRead, error: stream.streamError)) }
+            guard bytesRead >= 0 else { return .failure(ContentError.streamRead(code: bytesRead, error: stream.streamError)) }
 
             return .success(bytesRead)
         }
@@ -188,7 +210,7 @@ public struct KvHttpResponseProvider {
     @usableFromInline
     static func streamBodyCallbackProvider(_ url: URL) -> BodyCallbackProvider {
         return {
-            guard let stream = InputStream(url: url) else { return .failure(KvHttpResponseError.unableToCreateInputStream(url)) }
+            guard let stream = InputStream(url: url) else { return .failure(ContentError.unableToCreateInputStream(url)) }
             return .success(Self.streamBodyCallback(stream))
         }
     }
@@ -214,14 +236,14 @@ public struct KvHttpResponseProvider {
 
     @inline(__always)
     @usableFromInline
-    mutating func appendHeaderCallback(_ callback: @escaping HeaderCallback) {
-        switch customHeaderCallback {
+    mutating func appendHeaderProvider(_ provider: @escaping HeaderProvider) {
+        switch _customHeaderProvider {
         case .none:
-            self.customHeaderCallback = callback
-        case .some(let customHeaderCallback):
-            self.customHeaderCallback = { headers in
-                customHeaderCallback(&headers)
-                callback(&headers)
+            _customHeaderProvider = provider
+        case .some(let customHeaderProvider):
+            _customHeaderProvider = { callback in
+                customHeaderProvider(callback)
+                provider(callback)
             }
         }
     }
@@ -232,7 +254,7 @@ public struct KvHttpResponseProvider {
 
 // MARK: Fabrics
 
-extension KvHttpResponseProvider {
+extension KvHttpResponseContent {
 
     /// - Returns:  An instance where body is provided via *provider*, *status* is `.ok`.
     ///             See ``BodyCallbackProvider`` for details.
@@ -264,7 +286,7 @@ extension KvHttpResponseProvider {
 
 // MARK: Dedicated Body Fabrics
 
-extension KvHttpResponseProvider {
+extension KvHttpResponseContent {
 
     /// - Returns: An instance where body is taken from provided *bytes* callback, `contentType` is `.application(.octetStream)`, *status* is `.ok`.
     ///
@@ -296,15 +318,14 @@ extension KvHttpResponseProvider {
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public static func file(at url: URL) throws -> Self {
-        let resolvedURL = try KvDirectory.ResolvedURL(for: url)
+        let resolvedURL = try KvResolvedFileURL(for: url)
 
         return try Self().file(at: resolvedURL)
     }
 
 
-    @inline(__always)
-    @usableFromInline
-    static func file(at url: KvDirectory.ResolvedURL) throws -> Self { try Self().file(at: url) }
+    @inlinable
+    public static func file(at url: KvResolvedFileURL) throws -> Self { try Self().file(at: url) }
 
 
     /// Invokes ``file(at:)-swift.type.method`` fabric with URL of a resource file with given parameters.
@@ -316,7 +337,7 @@ extension KvHttpResponseProvider {
         let bundle = bundle ?? .main
 
         guard let url = bundle.url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory)
-        else { throw KvHttpResponseError.unableToFindBundleResource(name: resource, extension: `extension`, subdirectory: subdirectory, bundle: bundle) }
+        else { throw ContentError.unableToFindBundleResource(name: resource, extension: `extension`, subdirectory: subdirectory, bundle: bundle) }
 
         return try .file(at: url)
     }
@@ -341,7 +362,7 @@ extension KvHttpResponseProvider {
 
 // MARK: Dedicated Status Fabrics
 
-extension KvHttpResponseProvider {
+extension KvHttpResponseContent {
 
     // MARK: 2xx
 
@@ -469,7 +490,7 @@ extension KvHttpResponseProvider {
 
 // MARK: Modifiers
 
-extension KvHttpResponseProvider {
+extension KvHttpResponseContent {
 
     /// - Returns: A copy where body is provided via *provider*. See ``BodyCallbackProvider`` for details.
     ///
@@ -478,7 +499,7 @@ extension KvHttpResponseProvider {
     /// - Important: *Provider* block can be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func bodyCallbackProvider(_ provider: @escaping BodyCallbackProvider) -> Self { modified {
-        $0.bodyCallbackProvider = provider
+        $0._bodyCallbackProvider = provider
     } }
 
 
@@ -493,22 +514,22 @@ extension KvHttpResponseProvider {
 
     /// - Returns: A copy where *status* is changed to given value.
     @inlinable
-    public func status(_ status: KvHttpStatus) -> Self { modified { $0.status = status } }
+    public func status(_ status: KvHttpStatus) -> Self { modified { $0._status = status } }
 
 
-    /// - Returns:A copy where given block is appended to chain of callbacks to be invoked before HTTP headers are sent to client.
+    /// - Returns: A copy where given block is appended to the receiver's chain of header providers.
     @inlinable
-    public func headers(_ callback: @escaping HeaderCallback) -> Self { modified { $0.appendHeaderCallback(callback) } }
+    public func headers(_ provider: @escaping HeaderProvider) -> Self { modified { $0.appendHeaderProvider(provider) } }
 
 
     /// - Returns: A copy where `contentType` is changed to given *value*.
     @inlinable
-    public func contentType(_ value: KvHttpContentType) -> Self { modified { $0.contentType = value } }
+    public func contentType(_ value: KvHttpContentType) -> Self { modified { $0._contentType = value } }
 
 
     /// - Returns: A copy where `contentLength` is changed to given *value*.
     @inlinable
-    public func contentLength(_ value: UInt64) -> Self { modified { $0.contentLength = value } }
+    public func contentLength(_ value: UInt64) -> Self { modified { $0._contentLength = value } }
 
 
     /// Convenient method converting given *value* from any *BinaryInteger* value to *UInt64*.
@@ -523,7 +544,7 @@ extension KvHttpResponseProvider {
     /// Provided value is used as value of `ETag` response header and to process `If-Match` and `If-None-Match` request headers.
     /// For example, response is automatically replaced with 304 (Not Modified) when request contains `If-None-Match` header with the matching value.
     @inlinable
-    public func entityTag(_ value: KvHttpEntityTag) -> Self { modified { $0.entityTag = value } }
+    public func entityTag(_ value: KvHttpEntityTag) -> Self { modified { $0._entityTag = value } }
 
     /// - Returns: A copy where modification date is changed to given *value*.
     ///
@@ -532,12 +553,20 @@ extension KvHttpResponseProvider {
     /// Provided value is used as value of `Last-Modified` response header and to process `If-Modified-Since` and `If-Unmodified-Since` request headers.
     /// For example, response is automatically replaced with 304 (Not Modified) when request contains `If-Modified-Since` header with a later date.
     @inlinable
-    public func modificationDate(_ value: Date) -> Self { modified { $0.modificationDate = value } }
+    public func modificationDate(_ value: Date) -> Self { modified { $0._modificationDate = value } }
 
 
     /// - Returns: A copy where value of `Location` header is changed to given *value*.
     @inlinable
-    public func location(_ value: URL) -> Self { modified { $0.location = value } }
+    public func location(_ value: URL) -> Self { modified { $0._location = value } }
+
+
+    /// - Returns: A copy where body and content length are reset.
+    @inlinable
+    public var bodiless: Self { modified {
+        $0._bodyCallbackProvider = nil
+        $0._contentLength = nil
+    } }
 
 }
 
@@ -545,7 +574,7 @@ extension KvHttpResponseProvider {
 
 // MARK: Dedicated Body Modifiers
 
-extension KvHttpResponseProvider {
+extension KvHttpResponseContent {
 
     /// - Returns: A copy where body is taken from provided *bytes* callback, missing `contentType` is changed to `.application(.octetStream)`.
     ///
@@ -555,12 +584,12 @@ extension KvHttpResponseProvider {
     where D : DataProtocol, D.Index == Int
     {
         modified {
-            $0.bodyCallbackProvider = { Result {
+            $0._bodyCallbackProvider = { Result {
                 let data = try bytes()
 
                 return Self.dataBodyCallback(data)
             } }
-            $0.contentType = $0.contentType ?? .application(.octetStream)
+            $0._contentType = $0._contentType ?? .application(.octetStream)
         }
     }
 
@@ -571,8 +600,8 @@ extension KvHttpResponseProvider {
     @inlinable
     public func binary(_ stream: InputStream) -> Self {
         modified {
-            $0.bodyCallbackProvider = { .success(Self.streamBodyCallback(stream)) }
-            $0.contentType = $0.contentType ?? .application(.octetStream)
+            $0._bodyCallbackProvider = { .success(Self.streamBodyCallback(stream)) }
+            $0._contentType = $0._contentType ?? .application(.octetStream)
         }
     }
 
@@ -589,30 +618,29 @@ extension KvHttpResponseProvider {
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
     public func file(at url: URL) throws -> Self {
-        let resolvedURL = try KvDirectory.ResolvedURL(for: url)
+        let resolvedURL = try KvResolvedFileURL(for: url)
 
         return try self.file(at: resolvedURL)
     }
 
 
-    @inline(__always)
-    @usableFromInline
-    func file(at url: KvDirectory.ResolvedURL) throws -> Self { try modified {
+    @inlinable
+    public func file(at url: KvResolvedFileURL) throws -> Self { try modified {
         let (url, isLocal) = (url.value, url.isLocal)
 
         if isLocal {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
 
             if let modificationDate = attributes[.modificationDate] as? Date {
-                $0.modificationDate = modificationDate
-                $0.entityTag = .hex(withBytesOf: modificationDate.timeIntervalSince1970)
+                $0._modificationDate = modificationDate
+                $0._entityTag = .hex(withBytesOf: modificationDate.timeIntervalSince1970)
             }
             if let size = attributes[.size] as? UInt64 {
-                $0.contentLength = size
+                $0._contentLength = size
             }
         }
 
-        $0.bodyCallbackProvider = Self.streamBodyCallbackProvider(url)
+        $0._bodyCallbackProvider = Self.streamBodyCallbackProvider(url)
     } }
 
 
@@ -625,7 +653,7 @@ extension KvHttpResponseProvider {
         let bundle = bundle ?? .main
 
         guard let url = bundle.url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory)
-        else { throw KvHttpResponseError.unableToFindBundleResource(name: resource, extension: `extension`, subdirectory: subdirectory, bundle: bundle) }
+        else { throw ContentError.unableToFindBundleResource(name: resource, extension: `extension`, subdirectory: subdirectory, bundle: bundle) }
 
         return try self.file(at: url)
     }
@@ -637,13 +665,13 @@ extension KvHttpResponseProvider {
     @inlinable
     public func json<T : Encodable>(_ payload: @escaping () throws -> T) -> Self {
         modified {
-            $0.bodyCallbackProvider = { Result {
+            $0._bodyCallbackProvider = { Result {
                 let payload = try payload()
                 let data = try JSONEncoder().encode(payload)
 
                 return Self.dataBodyCallback(data)
             } }
-            $0.contentType = $0.contentType ?? .application(.json)
+            $0._contentType = $0._contentType ?? .application(.json)
         }
     }
 
@@ -654,13 +682,13 @@ extension KvHttpResponseProvider {
     @inlinable
     public func string<S: StringProtocol>(_ string: @escaping () throws -> S) -> Self {
         modified {
-            $0.bodyCallbackProvider = { Result {
+            $0._bodyCallbackProvider = { Result {
                 let string = try string()
                 let data = string.data(using: .utf8)!
 
                 return Self.dataBodyCallback(data)
             } }
-            $0.contentType = $0.contentType ?? .text(.plain)
+            $0._contentType = $0._contentType ?? .text(.plain)
         }
     }
 
@@ -670,11 +698,59 @@ extension KvHttpResponseProvider {
 
 // MARK: Dedicated Option Modifiers
 
-extension KvHttpResponseProvider {
+extension KvHttpResponseContent {
 
-    /// Sets or clears ``KvHttpResponseProvider/Options/needsDisconnect`` option.
-    @inlinable public func needsDisconnect(_ value: Bool = true) -> Self {
-        modified { value ? $0.options.formUnion(.needsDisconnect) : $0.options.subtract(.needsDisconnect) }
+    /// Sets or clears ``KvHttpResponseContent/Options/needsDisconnect`` option.
+    @inlinable
+    public func needsDisconnect(_ value: Bool = true) -> Self {
+        modified { value ? $0._options.formUnion(.needsDisconnect) : $0._options.subtract(.needsDisconnect) }
+    }
+
+}
+
+
+
+// MARK: Processing
+
+extension KvHttpResponseContent {
+
+    /// Invokes given *callback* with tuples of all the receriver's header names and values.
+    ///
+    /// - Note: All the headers are enumerated. So there is no need process the receiver's properties.
+    ///
+    /// - SeeAlso: ``reduce(into:_:)``.
+    @inlinable
+    public func forEachHeader(_ callback: HeaderCallback) {
+        if let contentType = _contentType {
+            callback("Content-Type", contentType.value)
+        }
+        if let contentLength = _contentLength {
+            callback("Content-Length", String(contentLength))
+        }
+        if let value = _entityTag {
+            callback("ETag", value.httpRepresentation)
+        }
+        if let modificationDate = _modificationDate {
+            callback("Last-Modified", KvRFC9110.DateFormatter.string(from: modificationDate))
+        }
+        if let location = _location {
+            callback("Location", location.absoluteString)
+        }
+
+        _customHeaderProvider?(callback)
+    }
+
+
+    /// - Returns: The result of the reduce operation on the receiver's headers.
+    @inlinable
+    public func reduceHeaders<T>(into accumulator: @autoclosure () -> T, _ updateAccumulatingResult: (inout T, (name: String, value: String)) -> Void) -> T {
+        var accumulator = accumulator()
+
+        forEachHeader { name, value in
+            updateAccumulatingResult(&accumulator, (name, value))
+        }
+
+        return accumulator
     }
 
 }

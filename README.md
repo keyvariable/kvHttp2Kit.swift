@@ -135,6 +135,7 @@ Package has been built and the unit-tests have passed on macOS and Linux (Ubuntu
 ```
 #### Import:
 ```swift
+import kvHttpKit
 import kvServerKit
 ```
 

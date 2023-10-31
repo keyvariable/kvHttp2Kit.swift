@@ -21,6 +21,10 @@
 //  Created by Svyatoslav Popov on 23.06.2023.
 //
 
+import kvHttpKit
+
+
+
 /// Processes request body fragments when they are received and collects the result until the body is completely processed.
 ///
 /// This handler is designated to process request bodies on the fly minimizing memory usage and improving performance of large body processing.
@@ -28,7 +32,7 @@
 /// See: ``init(bodyLengthLimit:initial:nextPartialResult:responseBlock:)``, ``init(bodyLengthLimit:into:updateAccumulatingResult:responseBlock:)``.
 open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = (PartialResult) throws -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (PartialResult) throws -> KvHttpResponseContent?
 
 
 
@@ -41,7 +45,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     let bodyCallback: (UnsafeRawBufferPointer) throws -> Void
 
     @usableFromInline
-    let responseBlock: () throws -> KvHttpResponseProvider?
+    let responseBlock: () throws -> KvHttpResponseContent?
 
 
 
@@ -109,7 +113,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseContent? {
         return try responseBlock()
     }
 
@@ -119,7 +123,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
         return nil
     }
 

@@ -23,6 +23,8 @@
 
 import kvKit
 
+import kvHttpKit
+
 
 
 class KvServerImplementation {
@@ -615,7 +617,7 @@ extension KvServerImplementation.HttpServer {
         }
 
 
-        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
+        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseContent? {
             // TODO: Pass to provided handler of channel incidents when implemented.
             return nil
         }

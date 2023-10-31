@@ -21,12 +21,16 @@
 //  Created by Svyatoslav Popov on 28.06.2023.
 //
 
+import kvHttpKit
+
+
+
 /// Ignores all the request body bytes.
 ///
 /// Note that the body limits are applied.
 public class KvHttpIgnoringBodyRequestHandler : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = () throws -> KvHttpResponseProvider?
+    public typealias ResponseBlock = () throws -> KvHttpResponseContent?
 
 
 
@@ -63,7 +67,7 @@ public class KvHttpIgnoringBodyRequestHandler : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    public func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+    public func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseContent? {
         return try responseBlock()
     }
 
@@ -73,7 +77,7 @@ public class KvHttpIgnoringBodyRequestHandler : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
         return nil
     }
 

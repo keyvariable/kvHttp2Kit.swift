@@ -200,7 +200,7 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
         struct ModificationDateServer : KvServer {
 
-            static let date = KvRFC9110.makeDateFormatter().date(from: "Thu, 12 Oct 2023 15:05:14 GMT")!
+            static let date = KvRFC9110.DateFormatter.date(from: "Thu, 12 Oct 2023 15:05:14 GMT")!
 
             let configuration = TestKit.secureHttpConfiguration()
 
@@ -226,10 +226,9 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
                 )
             }
 
-            let formatter = KvRFC9110.makeDateFormatter()
-            let date = (past: formatter.string(from: ModificationDateServer.date.addingTimeInterval(-1.0)),
-                        origin: formatter.string(from: ModificationDateServer.date),
-                        future: formatter.string(from: ModificationDateServer.date.addingTimeInterval(1.0)))
+            let date = (past: KvRFC9110.DateFormatter.string(from: ModificationDateServer.date.addingTimeInterval(-1.0)),
+                        origin: KvRFC9110.DateFormatter.string(from: ModificationDateServer.date),
+                        future: KvRFC9110.DateFormatter.string(from: ModificationDateServer.date.addingTimeInterval(1.0)))
 
             try await Assert(header: ("If-Modified-Since", ""), status: .ok, content: "-")
             try await Assert(header: ("If-Modified-Since", date.past), status: .ok, content: "-")

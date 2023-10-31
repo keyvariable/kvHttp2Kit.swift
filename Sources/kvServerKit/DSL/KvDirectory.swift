@@ -406,11 +406,11 @@ extension KvDirectory : KvResponseInternalProtocol {
         let httpRepresentation =
         KvGroup(httpMethods: .get) {
             KvHttpResponse.with
-                .subpathFlatMap { subpath -> KvFilterResult<ResolvedURL> in
+                .subpathFlatMap { subpath in
                     guard let url = KvDirectory.resolvedSubpath(subpath, rootURL: rootURL, accessList: accessList)
                     else { return .rejected }
 
-                    return (try? ResolvedURL(for: url, isLocal: isRootLocal, indexNames: indexFileNames)).map { .accepted($0) } ?? .rejected
+                    return (try? KvResolvedFileURL(for: url, isLocal: isRootLocal, indexNames: indexFileNames)).map { .accepted($0) } ?? .rejected
                 }
                 .content { input in try .file(at: input.subpath) }
         }
@@ -653,81 +653,6 @@ extension KvDirectory {
             case .container(let level), .white(let level):
                 level.withNode(for: prev, body)
             }
-        }
-
-    }
-
-}
-
-
-// MARK: .ResolvedURL
-
-extension KvDirectory {
-
-    @usableFromInline
-    struct ResolvedURL : Equatable {
-
-        @usableFromInline
-        let value: URL
-        @usableFromInline
-        let isLocal: Bool
-
-
-        @usableFromInline
-        init(resolved value: URL, isLocal: Bool) {
-            self.value = value
-            self.isLocal = isLocal
-        }
-
-
-        @usableFromInline
-        init(for url: URL) throws {
-            try self.init(for: url, indexNames: EmptyCollection<String>())
-        }
-
-
-        @usableFromInline
-        init<IndexNames>(for url: URL, isLocal: Bool? = nil, indexNames: IndexNames) throws
-        where IndexNames : Sequence, IndexNames.Element == String
-        {
-            let isLocal = isLocal ?? url.isFileURL
-
-            self.isLocal = isLocal
-            self.value = try {
-                guard isLocal else { return url }
-
-                var isDirectory: ObjCBool = false
-
-                guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { throw KvHttpResponseError.fileDoesNotExist(url) }
-                guard isDirectory.boolValue else { return url }
-
-                do {
-
-                    func MakeExistingIndexURL(_ indexName: String) -> URL? {
-                        let indexURL = url.appendingPathComponent(indexName)
-
-                        guard FileManager.default.fileExists(atPath: indexURL.path, isDirectory: &isDirectory),
-                              !isDirectory.boolValue
-                        else { return nil }
-
-                        return indexURL
-                    }
-
-
-                    var iterator = indexNames.makeIterator()
-
-                    do {
-                        guard let first = iterator.next() else { throw KvHttpResponseError.isNotAFile(url) }
-
-                        if let indexURL = MakeExistingIndexURL(first) { return indexURL }
-                    }
-                    while let next = iterator.next() {
-                        if let indexURL = MakeExistingIndexURL(next) { return indexURL }
-                    }
-
-                    throw KvHttpResponseError.unableToFindIndexFile(directoryURL: url)
-                }
-            }()
         }
 
     }

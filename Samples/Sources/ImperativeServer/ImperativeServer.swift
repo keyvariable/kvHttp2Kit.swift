@@ -21,6 +21,7 @@
 //  Created by Svyatoslav Popov on 06.09.2023.
 //
 
+import kvHttpKit
 import kvServerKit
 
 import Foundation
@@ -203,7 +204,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
     }
 
 
-    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseContent? {
         switch incident.defaultStatus {
         case .notFound:
             return try? .notFound
@@ -237,7 +238,7 @@ class ImperativeServer : KvHttpServerDelegate, KvHttpChannelDelegate, KvHttpClie
 
         // MARK: : KvHttpRequestHandler
 
-        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
             switch incident {
             case .byteLimitExceeded:
                 return .contentTooLarge.string { "Payload exceeds \(Constants.Echo.bodyLimit) byte limit." }

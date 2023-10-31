@@ -27,6 +27,8 @@ import XCTest
 
 @testable import kvServerKit
 
+import kvHttpKit
+
 
 
 final class KvHttpServerTests : XCTestCase {
@@ -391,7 +393,7 @@ extension KvHttpServerTests {
         }
 
 
-        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider? {
+        func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseContent? {
             return nil
         }
 
@@ -417,7 +419,7 @@ extension KvHttpServerTests {
 
             // MARK: : KvHttpRequestHandler
 
-            override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+            override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
                 switch incident {
                 case .byteLimitExceeded:
                     return .status(incident.defaultStatus)

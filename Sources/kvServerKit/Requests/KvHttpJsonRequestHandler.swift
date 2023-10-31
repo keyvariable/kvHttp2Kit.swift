@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 
 
 /// Passes body data to JSON decoder.
@@ -30,7 +32,7 @@ import Foundation
 /// - Note: Requests having no body are ignored and `nil` response are returned.
 open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = (T) throws -> KvHttpResponseProvider?
+    public typealias ResponseBlock = (T) throws -> KvHttpResponseContent?
 
 
 
@@ -72,7 +74,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseContent? {
         return try underlying.httpClientDidReceiveEnd(httpClient)
     }
 
@@ -82,7 +84,7 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
         return nil
     }
 

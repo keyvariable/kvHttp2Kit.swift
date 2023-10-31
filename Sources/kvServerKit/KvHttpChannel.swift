@@ -67,7 +67,7 @@ public protocol KvHttpClientDelegate : AnyObject {
     /// Also you can return custom responses depending on default status.
     ///
     /// - Note: Server will close connection to the client just after the response will be submitted.
-    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseProvider?
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.ClientIncident) -> KvHttpResponseContent?
 
     /// - Note: The client will be disconnected.
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error)
@@ -80,10 +80,6 @@ public protocol KvHttpClientDelegate : AnyObject {
 
 /// HTTP channels listens for connections and handling connected clients.
 open class KvHttpChannel {
-
-    public typealias Response = KvHttpResponseProvider
-
-
 
     public let configuration: Configuration
 
@@ -282,7 +278,7 @@ open class KvHttpChannel {
 
     public enum ChannelError : LocalizedError {
 
-        /// ``KvHttpResponseProvider/BodyCallbackProvider`` has returned an error for an incident. Empty body is sent in this case.
+        /// ``KvHttpResponseContent/BodyCallbackProvider`` has returned an error for an incident. Empty body is sent in this case.
         case incidentResponseBodyError(Error)
         /// Unable to perform a task due to reference to server is not valid. Probably channel is not bound to a server.
         case missingServer
@@ -743,7 +739,7 @@ open class KvHttpChannel {
 
         // MARK: Operations
 
-        fileprivate func response(client: KvHttpChannel.Client) -> KvHttpResponseProvider {
+        fileprivate func response(client: KvHttpChannel.Client) -> KvHttpResponseContent {
             client.delegate?.httpClient(client, didCatch: self) ?? .status(defaultStatus)
         }
 
@@ -800,7 +796,7 @@ open class KvHttpChannel {
 
         // MARK: Operations
 
-        fileprivate func response(client: KvHttpChannel.Client, requestHandler: KvHttpRequestHandler) -> KvHttpResponseProvider {
+        fileprivate func response(client: KvHttpChannel.Client, requestHandler: KvHttpRequestHandler) -> KvHttpResponseContent {
             requestHandler.httpClient(client, didCatch: self) ?? .status(defaultStatus)
         }
 
@@ -950,9 +946,6 @@ open class KvHttpChannel {
         }()
 
 
-        private let dateFormatterRFC9110 = KvRFC9110.makeDateFormatter()
-
-
         // MARK: .Constants
 
         private struct Constants {
@@ -995,7 +988,7 @@ open class KvHttpChannel {
                                         context: ChannelHandlerContext,
                                         httpVersion: HTTPVersion,
                                         httpMethod: HTTPMethod,
-                                        responseBlock: @escaping (I) -> KvHttpResponseProvider?
+                                        responseBlock: @escaping (I) -> KvHttpResponseContent?
         ) where I : KvHttpIncident {
             dispatchQueue.async {
                 self.channelWrite(incident,
@@ -1011,7 +1004,7 @@ open class KvHttpChannel {
 
         /// - Warning: This method must be used to access the body callback.
         @inline(__always)
-        private static func responseBodyCallback(_ response: KvHttpResponseProvider, _ httpMethod: HTTPMethod) -> Result<KvHttpResponseProvider.BodyCallback?, Error> {
+        private static func responseBodyCallback(_ response: KvHttpResponseContent, _ httpMethod: HTTPMethod) -> Result<KvHttpResponseContent.BodyCallback?, Error> {
             guard httpMethod != .HEAD,
                   response.status != .notModified
             else { return .success(nil) }
@@ -1021,16 +1014,15 @@ open class KvHttpChannel {
 
 
         /// - Returns: `Nil` or replacement response whether the preconditions are met.
-        private func processPreconditions(for response: Response, in requestContext: RequestContext) -> Response? {
+        private func processPreconditions(for response: KvHttpResponseContent, in requestContext: RequestContext) -> KvHttpResponseContent? {
             requestContext.preconditions.process(
                 for: response,
-                in: .init(method: requestContext.httpMethod,
-                          dateFormatterRFC9110: dateFormatterRFC9110)
+                in: .init(method: requestContext.httpMethod)
             )
         }
 
 
-        private func channelWrite(_ response: Response, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext) {
+        private func channelWrite(_ response: KvHttpResponseContent, in channelContext: ChannelHandlerContext, _ requestContext: RequestContext) {
             let response = processPreconditions(for: response, in: requestContext) ?? response
 
             switch InternalChannelHandler.responseBodyCallback(response, requestContext.httpMethod) {
@@ -1055,7 +1047,7 @@ open class KvHttpChannel {
                                      requestHandler: KvHttpRequestHandler?,
                                      httpVersion: HTTPVersion,
                                      httpMethod: HTTPMethod,
-                                     responseBlock: (I) -> KvHttpResponseProvider?)
+                                     responseBlock: (I) -> KvHttpResponseContent?)
         where I : KvHttpIncident
         {
             var response = responseBlock(incident) ?? .status(incident.defaultStatus)
@@ -1067,7 +1059,7 @@ open class KvHttpChannel {
             }
 
             // Assuming this method is invoked on `.dispatchQueue`.
-            let bodyCallback: KvHttpResponseProvider.BodyCallback?
+            let bodyCallback: KvHttpResponseContent.BodyCallback?
             switch InternalChannelHandler.responseBodyCallback(response, httpMethod) {
             case .success(let callback):
                 bodyCallback = callback
@@ -1083,7 +1075,7 @@ open class KvHttpChannel {
                 }
 
                 // Content-length is cleared to prevent error in Swift-NIO when the length is not equal to 0 (missing body).
-                response.contentLength = nil
+                response = response.bodiless
             }
 
             channelWrite(response, bodyCallback, context: context, httpVersion: httpVersion)
@@ -1093,37 +1085,17 @@ open class KvHttpChannel {
         /// - Note: This method decreases `_activeRequestCount`.
         ///
         /// - Warning: Assuming this method is invoked on `.dispatchQueue`.
-        private func channelWrite(_ response: Response,
-                                  _ bodyCallback: KvHttpResponseProvider.BodyCallback?,
+        private func channelWrite(_ response: KvHttpResponseContent,
+                                  _ bodyCallback: KvHttpResponseContent.BodyCallback?,
                                   context: ChannelHandlerContext,
                                   httpVersion: HTTPVersion
         ) {
             context.eventLoop.execute {
                 let channel = context.channel
 
-                let headers: HTTPHeaders = {
-                    var headers = HTTPHeaders()
-
-                    if let contentType = response.contentType {
-                        headers.add(name: "Content-Type", value: contentType.value)
-                    }
-                    if let contentLength = response.contentLength {
-                        headers.add(name: "Content-Length", value: String(contentLength))
-                    }
-                    if let value = response.entityTag {
-                        headers.add(name: "ETag", value: value.httpRepresentation)
-                    }
-                    if let modificationDate = response.modificationDate {
-                        headers.add(name: "Last-Modified", value: self.dateFormatterRFC9110.string(from: modificationDate))
-                    }
-                    if let location = response.location {
-                        headers.add(name: "Location", value: location.absoluteString)
-                    }
-
-                    response.customHeaderCallback?(&headers)
-
-                    return headers
-                }()
+                let headers: HTTPHeaders = response.reduceHeaders(into: HTTPHeaders()) { accumulator, header in
+                    accumulator.add(name: header.name, value: header.value)
+                }
 
                 // Head
                 let head = HTTPResponseHead(version: httpVersion, status: response.status.nioStatus, headers: headers)
@@ -1369,7 +1341,7 @@ open class KvHttpChannel {
             switch requestProcessingState {
             case .processing(let requestContext):
                 dispatchQueue.async {
-                    let response: Response?
+                    let response: KvHttpResponseContent?
                     do { response = try requestContext.handler.httpClientDidReceiveEnd(self) }
                     catch { return self.processIncident(.requestProcessingError(error), isResponseComplete: true, in: context, requestContext) }
 
