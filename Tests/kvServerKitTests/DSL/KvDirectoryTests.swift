@@ -506,9 +506,6 @@ final class KvDirectoryTests : XCTestCase {
 
     private typealias NetworkGroup = TestKit.NetworkGroup
 
-
-    private typealias ContentType = KvHttpResponseProvider.ContentType
-
 }
 
 

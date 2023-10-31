@@ -150,7 +150,7 @@ class KvServerTestKit {
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
         status: KvHttpStatus = .ok,
-        contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
+        contentType: KvHttpContentType? = .text(.plain),
         message: @escaping @autoclosure () -> String = "",
         bodyBlock: ((Data, URLRequest, () -> String) throws -> Void)? = nil
     ) async throws {
@@ -205,7 +205,7 @@ class KvServerTestKit {
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
         status: KvHttpStatus = .ok,
-        contentType: KvHttpResponseProvider.ContentType? = .text(.plain),
+        contentType: KvHttpContentType? = .text(.plain),
         expecting expected: String,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
@@ -221,7 +221,7 @@ class KvServerTestKit {
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
         status: KvHttpStatus = .ok,
-        contentType: KvHttpResponseProvider.ContentType? = .application(.octetStream),
+        contentType: KvHttpContentType? = .application(.octetStream),
         expecting expected: Data,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {
@@ -236,7 +236,7 @@ class KvServerTestKit {
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
         onRequest: ((inout URLRequest) -> Void)? = nil,
         status: KvHttpStatus = .ok,
-        contentType: KvHttpResponseProvider.ContentType? = .application(.json),
+        contentType: KvHttpContentType? = .application(.json),
         expecting expected: T,
         message: @escaping @autoclosure () -> String = ""
     ) async throws {

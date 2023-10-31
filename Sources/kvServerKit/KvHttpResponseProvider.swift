@@ -87,7 +87,7 @@ public struct KvHttpResponseProvider {
 
     /// Optional value for `Content-Type` HTTP header in response. If `nil` then the header is not provided in response.
     @usableFromInline
-    var contentType: ContentType?
+    var contentType: KvHttpContentType?
     /// Optional value for `Content-Length` HTTP header in response. If `nil` then the header is not provided in response.
     @usableFromInline
     var contentLength: UInt64?
@@ -112,7 +112,7 @@ public struct KvHttpResponseProvider {
     @usableFromInline
     init(status: KvHttpStatus = .ok,
          customHeaderCallback: HeaderCallback? = nil,
-         contentType: ContentType? = nil,
+         contentType: KvHttpContentType? = nil,
          contentLength: UInt64? = nil,
          entityTag: KvHttpEntityTag? = nil,
          modificationDate: Date? = nil,
@@ -129,157 +129,6 @@ public struct KvHttpResponseProvider {
         self.location = location
         self.options = options
         self.bodyCallbackProvider = bodyCallbackProvider
-    }
-
-
-    // MARK: .ContentType
-
-    /// Enumeration of some auxiliary content types and case for arbitrary values.
-    public enum ContentType {
-
-        case application(Application)
-
-        case image(Image)
-
-        /// Explicitly provided MIME-type and semicolon-separated options.
-        case raw(String, options: String?)
-
-        case text(Text)
-
-
-        // MARK: .Application
-
-        public enum Application {
-
-            case gzip
-            case javascript
-            case json
-            case octetStream
-            case pdf
-            case postscript
-            /// [TeX](https://wikipedia.org/wiki/TeX)
-            case tex
-            case xml
-            case xmlDTD
-            case zip
-
-
-            @inlinable
-            public var components: (mimeType: String, options: String?) {
-                switch self {
-                case .gzip:
-                    return ("application/gzip", options: nil)
-                case .javascript:
-                    return ("application/javascript", options: nil)
-                case .json:
-                    return ("application/json", options: nil)
-                case .octetStream:
-                    return ("application/octet-stream", options: nil)
-                case .pdf:
-                    return ("application/pdf", options: nil)
-                case .postscript:
-                    return ("application/postscript", options: nil)
-                case .tex:
-                    return ("application/x-tex", options: nil)
-                case .xml:
-                    return ("application/xml", options: nil)
-                case .xmlDTD:
-                    return ("application/xml-dtd", options: nil)
-                case .zip:
-                    return ("application/zip", options: nil)
-                }
-            }
-
-        }
-
-
-        // MARK: .Image
-
-        public enum Image {
-
-            case gif
-            case jpeg
-            case png
-            case svg_xml
-            case tiff
-            case webp
-
-
-            @inlinable
-            public var components: (mimeType: String, options: String?) {
-                switch self {
-                case .gif:
-                    return ("image/gif", options: nil)
-                case .jpeg:
-                    return ("image/jpeg", options: nil)
-                case .png:
-                    return ("image/png", options: nil)
-                case .svg_xml:
-                    return ("image/svg+xml", options: nil)
-                case .tiff:
-                    return ("image/tiff", options: nil)
-                case .webp:
-                    return ("image/webp", options: nil)
-                }
-            }
-
-        }
-
-
-        // MARK: .Text
-
-        public enum Text {
-
-            case css
-            case csv
-            case html
-            case markdown
-            case plain
-
-
-            @inlinable
-            public var components: (mimeType: String, options: String?) {
-                switch self {
-                case .css:
-                    return ("text/css", options: nil)
-                case .csv:
-                    return ("text/csv", options: nil)
-                case .html:
-                    return ("text/html", options: "charset=UTF-8")
-                case .markdown:
-                    return ("text/markdown", options: nil)
-                case .plain:
-                    return ("text/plain", options: "charset=UTF-8")
-                }
-            }
-
-        }
-
-
-        @inlinable
-        public var value: String {
-            switch components {
-            case (let mimeType, .none):
-                return mimeType
-            case (let mimeType, .some(let options)):
-                return "\(mimeType);\(options)"
-            }
-        }
-
-        @inlinable
-        public var components: (mimeType: String, options: String?) {
-            switch self {
-            case .application(let subtype):
-                return subtype.components
-            case .image(let subtype):
-                return subtype.components
-            case .text(let subtype):
-                return subtype.components
-            case let .raw(value, options):
-                return (value, options)
-            }
-        }
-
     }
 
 
@@ -654,7 +503,7 @@ extension KvHttpResponseProvider {
 
     /// - Returns: A copy where `contentType` is changed to given *value*.
     @inlinable
-    public func contentType(_ value: ContentType) -> Self { modified { $0.contentType = value } }
+    public func contentType(_ value: KvHttpContentType) -> Self { modified { $0.contentType = value } }
 
 
     /// - Returns: A copy where `contentLength` is changed to given *value*.
