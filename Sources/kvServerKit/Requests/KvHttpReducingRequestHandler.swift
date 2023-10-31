@@ -118,7 +118,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     }
 
 
-    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32d8h``.
     /// Override it to provide custom incident handling. 
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.

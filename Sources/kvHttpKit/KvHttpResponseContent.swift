@@ -328,8 +328,8 @@ extension KvHttpResponseContent {
     public static func file(at url: KvResolvedFileURL) throws -> Self { try Self().file(at: url) }
 
 
-    /// Invokes ``file(at:)-swift.type.method`` fabric with URL of a resource file with given parameters.
-    ///``KvHttpResponseError/unableToFindBundleResource(name:extension:subdirectory:bundle:)`` is thrown for missing resources.
+    /// Invokes ``file(at:)-12ly6`` fabric with URL of a resource file with given parameters.
+    /// ``KvHttpKitError/Response/unableToFindBundleResource(name:extension:subdirectory:bundle:)`` is thrown for missing resources.
     ///
     /// - Parameter bundle: If `nil` is passed then `Bundle.main` is used.
     @inlinable
@@ -366,122 +366,122 @@ extension KvHttpResponseContent {
 
     // MARK: 2xx
 
-    /// - Returns: An instance where *status* is  `.ok` (`200 OK`).
+    /// - Returns: An instance where *status* is  ``KvHttpStatus/ok``(`200 OK`).
     @inlinable public static var ok: Self { .init(status: .ok) }
-    /// - Returns: An instance where *status* is `.created` (`201 Created`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/created``(`201 Created`).
     @inlinable public static var created: Self { .init(status: .created) }
-    /// - Returns: An instance where *status* is `.accepted` (`202 Accepted`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/accepted``(`202 Accepted`).
     @inlinable public static var accepted: Self { .init(status: .accepted) }
-    /// - Returns: An instance where *status* is `.nonAuthoritativeInformation` (` 203 Non-Authoritative Information`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/nonAuthoritativeInformation``(` 203 Non-Authoritative Information`).
     @inlinable public static var nonAuthoritativeInformation: Self { .init(status: .nonAuthoritativeInformation) }
-    /// - Returns: An instance where *status* is `.noContent` (`204 No Content`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/noContent``(`204 No Content`).
     @inlinable public static var noContent: Self { .init(status: .noContent) }
-    /// - Returns: An instance where *status* is `.resetContent` (`205 Reset Content`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/resetContent``(`205 Reset Content`).
     @inlinable public static var resetContent: Self { .init(status: .resetContent) }
-    /// - Returns: An instance where *status* is `.partialContent` (`206 Partial Content`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/partialContent``(`206 Partial Content`).
     @inlinable public static var partialContent: Self { .init(status: .partialContent) }
-    /// - Returns: An instance where *status* is `.multiStatus` (`207 Multi-Status`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/multiStatus``(`207 Multi-Status`).
     @inlinable public static var multiStatus: Self { .init(status: .multiStatus) }
-    /// - Returns: An instance where *status* is `.alreadyReported` (`208 Already Reported`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/alreadyReported``(`208 Already Reported`).
     @inlinable public static var alreadyReported: Self { .init(status: .alreadyReported) }
-    /// - Returns: An instance where *status* is `.imUsed` (`226 IM Used`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/imUsed``(`226 IM Used`).
     @inlinable public static var imUsed: Self { .init(status: .imUsed) }
 
     // MARK: 3xx
 
-    /// - Returns: An instance where *status* is `.multipleChoices` (`300 Multiple Choices`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/multipleChoices``(`300 Multiple Choices`).
     @inlinable public static func multipleChoices(preferredLocation: URL? = nil) -> Self { .init(status: .multipleChoices, location: preferredLocation) }
-    /// - Returns: An instance where *status* is `.movedPermanently` (`301 Moved Permanently`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/movedPermanently``(`301 Moved Permanently`).
     @inlinable public static func movedPermanently(location: URL?) -> Self { .init(status: .movedPermanently, location: location) }
-    /// - Returns: An instance where *status* is `.found` (`302 Found`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/found``(`302 Found`).
     @inlinable public static func found(location: URL?) -> Self { .init(status: .found, location: location) }
-    /// - Returns: An instance where *status* is `.seeOther` (`303 See Other`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/seeOther``(`303 See Other`).
     @inlinable public static func seeOther(location: URL) -> Self { .init(status: .seeOther, location: location) }
-    /// - Returns: An instance where *status* is `.notModified` (`304 Not Modified`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/notModified``(`304 Not Modified`).
     @inlinable public static var notModified: Self { .init(status: .notModified) }
-    /// - Returns: An instance where *status* is `.temporaryRedirect` (`307 Temporary Redirect`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/temporaryRedirect``(`307 Temporary Redirect`).
     @inlinable public static func temporaryRedirect(location: URL?) -> Self { .init(status: .temporaryRedirect, location: location) }
-    /// - Returns: An instance where *status* is `.permanentRedirect` (`308 Permanent Redirect`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/permanentRedirect``(`308 Permanent Redirect`).
     @inlinable public static func permanentRedirect(location: URL?) -> Self { .init(status: .permanentRedirect, location: location) }
 
     // MARK: 4xx
 
-    /// - Returns: An instance where *status* is `.badRequest` (`400 Bad Request`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/badRequest``(`400 Bad Request`).
     @inlinable public static var badRequest: Self { .init(status: .badRequest) }
-    /// - Returns: An instance where *status* is `.unauthorized` (`401 Unauthorized`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/unauthorized``(`401 Unauthorized`).
     @inlinable public static var unauthorized: Self { .init(status: .unauthorized) }
-    /// - Returns: An instance where *status* is `.paymentRequired` (`402 Payment Required`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/paymentRequired``(`402 Payment Required`).
     @inlinable public static var paymentRequired: Self { .init(status: .paymentRequired) }
-    /// - Returns: An instance where *status* is `.forbidden` (`403 Forbidden`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/forbidden``(`403 Forbidden`).
     @inlinable public static var forbidden: Self { .init(status: .forbidden) }
-    /// - Returns: An instance where *status* is `.notFound` (`404 Not Found`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/notFound``(`404 Not Found`).
     @inlinable public static var notFound: Self { .init(status: .notFound) }
-    /// - Returns: An instance where *status* is `.methodNotAllowed` (`405 Method Not Allowed`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/methodNotAllowed``(`405 Method Not Allowed`).
     @inlinable public static var methodNotAllowed: Self { .init(status: .methodNotAllowed) }
-    /// - Returns: An instance where *status* is `.notAcceptable` (`406 Not Acceptable`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/notAcceptable``(`406 Not Acceptable`).
     @inlinable public static var notAcceptable: Self { .init(status: .notAcceptable) }
-    /// - Returns: An instance where *status* is `.proxyAuthenticationRequired` (`407 Proxy Authentication Required`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/proxyAuthenticationRequired``(`407 Proxy Authentication Required`).
     @inlinable public static var proxyAuthenticationRequired: Self { .init(status: .proxyAuthenticationRequired) }
-    /// - Returns: An instance where *status* is `.requestTimeout` (`408 Request Timeout`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/requestTimeout``(`408 Request Timeout`).
     @inlinable public static var requestTimeout: Self { .init(status: .requestTimeout) }
-    /// - Returns: An instance where *status* is `.conflict` (`409 Conflict`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/conflict``(`409 Conflict`).
     @inlinable public static var conflict: Self { .init(status: .conflict) }
-    /// - Returns: An instance where *status* is `.gone` (`410 Gone`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/gone``(`410 Gone`).
     @inlinable public static var gone: Self { .init(status: .gone) }
-    /// - Returns: An instance where *status* is `.lengthRequired` (`411 Length Required`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/lengthRequired``(`411 Length Required`).
     @inlinable public static var lengthRequired: Self { .init(status: .lengthRequired) }
-    /// - Returns: An instance where *status* is `.preconditionFailed` (`412 Precondition Failed`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/preconditionFailed``(`412 Precondition Failed`).
     @inlinable public static var preconditionFailed: Self { .init(status: .preconditionFailed) }
-    /// - Returns: An instance where *status* is `.contentTooLarge` (`413 Content Too Large`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/contentTooLarge``(`413 Content Too Large`).
     @inlinable public static var contentTooLarge: Self { .init(status: .contentTooLarge) }
-    /// - Returns: An instance where *status* is `.uriTooLong` (`414 URI Too Long`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/uriTooLong``(`414 URI Too Long`).
     @inlinable public static var uriTooLong: Self { .init(status: .uriTooLong) }
-    /// - Returns: An instance where *status* is `.unsupportedMediaType` (`415 Unsupported Media Type`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/unsupportedMediaType``(`415 Unsupported Media Type`).
     @inlinable public static var unsupportedMediaType: Self { .init(status: .unsupportedMediaType) }
-    /// - Returns: An instance where *status* is `.rangeNotSatisfiable` (`416 Range Not Satisfiable`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/rangeNotSatisfiable``(`416 Range Not Satisfiable`).
     @inlinable public static var rangeNotSatisfiable: Self { .init(status: .rangeNotSatisfiable) }
-    /// - Returns: An instance where *status* is `.expectationFailed` (`417 Expectation Failed`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/expectationFailed``(`417 Expectation Failed`).
     @inlinable public static var expectationFailed: Self { .init(status: .expectationFailed) }
-    /// - Returns: An instance where *status* is `.misdirectedRequest` (`421 Misdirected Request`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/misdirectedRequest``(`421 Misdirected Request`).
     @inlinable public static var misdirectedRequest: Self { .init(status: .misdirectedRequest) }
-    /// - Returns: An instance where *status* is `.unprocessableContent` (`422 Unprocessable Content`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/unprocessableContent``(`422 Unprocessable Content`).
     @inlinable public static var unprocessableContent: Self { .init(status: .unprocessableContent) }
-    /// - Returns: An instance where *status* is `.locked` (`423 Locked`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/locked``(`423 Locked`).
     @inlinable public static var locked: Self { .init(status: .locked) }
-    /// - Returns: An instance where *status* is `.failedDependency` (`424 Failed Dependency`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/failedDependency``(`424 Failed Dependency`).
     @inlinable public static var failedDependency: Self { .init(status: .failedDependency) }
-    /// - Returns: An instance where *status* is `.upgradeRequired` (`426 Upgrade Required`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/upgradeRequired``(`426 Upgrade Required`).
     @inlinable public static var upgradeRequired: Self { .init(status: .upgradeRequired) }
-    /// - Returns: An instance where *status* is `.preconditionRequired` (`428 Precondition Required`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/preconditionRequired``(`428 Precondition Required`).
     @inlinable public static var preconditionRequired: Self { .init(status: .preconditionRequired) }
-    /// - Returns: An instance where *status* is `.tooManyRequests` (`429 Too Many Requests`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/tooManyRequests``(`429 Too Many Requests`).
     @inlinable public static var tooManyRequests: Self { .init(status: .tooManyRequests) }
-    /// - Returns: An instance where *status* is `.requestHeaderFieldsTooLarge` (`431 Request Header Fields Too Large`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/requestHeaderFieldsTooLarge``(`431 Request Header Fields Too Large`).
     @inlinable public static var requestHeaderFieldsTooLarge: Self { .init(status: .requestHeaderFieldsTooLarge) }
-    /// - Returns: An instance where *status* is `.unavailableForLegalReasons` (`451 Unavailable For Legal Reasons`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/unavailableForLegalReasons``(`451 Unavailable For Legal Reasons`).
     @inlinable public static var unavailableForLegalReasons: Self { .init(status: .unavailableForLegalReasons) }
 
     // MARK: 5xx
 
-    /// - Returns: An instance where *status* is `.internalServerError` (`500 Internal Server Error`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/internalServerError``(`500 Internal Server Error`).
     @inlinable public static var internalServerError: Self { .init(status: .internalServerError) }
-    /// - Returns: An instance where *status* is `.notImplemented` (`501 Not Implemented`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/notImplemented``(`501 Not Implemented`).
     @inlinable public static var notImplemented: Self { .init(status: .notImplemented) }
-    /// - Returns: An instance where *status* is `.badGateway` (`502 Bad Gateway`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/badGateway``(`502 Bad Gateway`).
     @inlinable public static var badGateway: Self { .init(status: .badGateway) }
-    /// - Returns: An instance where *status* is `.serviceUnavailable` (`503 Service Unavailable`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/serviceUnavailable``(`503 Service Unavailable`).
     @inlinable public static var serviceUnavailable: Self { .init(status: .serviceUnavailable) }
-    /// - Returns: An instance where *status* is `.gatewayTimeout` (`504 Gateway Timeout`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/gatewayTimeout``(`504 Gateway Timeout`).
     @inlinable public static var gatewayTimeout: Self { .init(status: .gatewayTimeout) }
-    /// - Returns: An instance where *status* is `.httpVersionNotSupported` (`505 HTTP Version Not Supported`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/httpVersionNotSupported``(`505 HTTP Version Not Supported`).
     @inlinable public static var httpVersionNotSupported: Self { .init(status: .httpVersionNotSupported) }
-    /// - Returns: An instance where *status* is `.variantAlsoNegotiates` (`506 Variant Also Negotiates`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/variantAlsoNegotiates``(`506 Variant Also Negotiates`).
     @inlinable public static var variantAlsoNegotiates: Self { .init(status: .variantAlsoNegotiates) }
-    /// - Returns: An instance where *status* is `.insufficientStorage` (`507 Insufficient Storage`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/insufficientStorage``(`507 Insufficient Storage`).
     @inlinable public static var insufficientStorage: Self { .init(status: .insufficientStorage) }
-    /// - Returns: An instance where *status* is `.loopDetected` (`508 Not Extended`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/loopDetected``(`508 Not Extended`).
     @inlinable public static var loopDetected: Self { .init(status: .loopDetected) }
-    /// - Returns: An instance where *status* is `.networkAuthenticationRequired` (`511 Network Authentication Required`).
+    /// - Returns: An instance where *status* is ``KvHttpStatus/networkAuthenticationRequired``(`511 Network Authentication Required`).
     @inlinable public static var networkAuthenticationRequired: Self { .init(status: .networkAuthenticationRequired) }
 
 }
@@ -644,8 +644,8 @@ extension KvHttpResponseContent {
     } }
 
 
-    /// Invokes ``file(at:)-swift.method`` modifier with URL of a resource file with given parameters.
-    ///``KvHttpResponseError/unableToFindBundleResource(name:extension:subdirectory:bundle:)`` is thrown for missing resources.
+    /// Invokes ``file(at:)-4k2d`` modifier with URL of a resource file with given parameters.
+    /// ``KvHttpKitError/Response/unableToFindBundleResource(name:extension:subdirectory:bundle:)`` is thrown for missing resources.
     ///
     /// - Parameter bundle: If `nil` is passed then `Bundle.main` is used.
     @inlinable
@@ -718,7 +718,7 @@ extension KvHttpResponseContent {
     ///
     /// - Note: All the headers are enumerated. So there is no need process the receiver's properties.
     ///
-    /// - SeeAlso: ``reduce(into:_:)``.
+    /// - SeeAlso: ``reduceHeaders(into:_:)``.
     @inlinable
     public func forEachHeader(_ callback: HeaderCallback) {
         if let contentType = _contentType {

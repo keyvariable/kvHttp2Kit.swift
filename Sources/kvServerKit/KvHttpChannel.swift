@@ -278,7 +278,7 @@ open class KvHttpChannel {
 
     public enum ChannelError : LocalizedError {
 
-        /// ``KvHttpResponseContent/BodyCallbackProvider`` has returned an error for an incident. Empty body is sent in this case.
+        /// `KvHttpResponseContent.BodyCallbackProvider` has returned an error for an incident. Empty body is sent in this case.
         case incidentResponseBodyError(Error)
         /// Unable to perform a task due to reference to server is not valid. Probably channel is not bound to a server.
         case missingServer
@@ -717,7 +717,7 @@ open class KvHttpChannel {
     ///
     /// - Note: Server closes connections with clients after incidents.
     ///
-    /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
+    /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-lyif`` to override responses for incidents.
     public enum ClientIncident : KvHttpIncident {
 
         /// This incident is emitted when client's delegate returns no handler for a request.
@@ -753,7 +753,7 @@ open class KvHttpChannel {
     ///
     /// - Note: Server closes connections with clients after incidents.
     ///
-    /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-9mlo3`` to override responses for incidents.
+    /// See ``KvHttpClientDelegate/httpClient(_:didCatch:)-lyif`` to override responses for incidents.
     public enum RequestIncident : KvHttpIncident {
 
         /// This incident is emitted when a request exceeds provided or default limit for a body.
