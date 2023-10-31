@@ -206,7 +206,7 @@ public struct KvHttpResponse : KvResponse {
     ///     }
     ///     KvHttpResponse.with
     ///         .subpathFilter { $0.components.count == 1 }
-    ///         .subpathFlatMap { UInt($0.components.first!).map { .accepted($0) } ?? .rejected }
+    ///         .subpathFlatMap { .unwrapping(UInt($0.components.first!)) }
     ///         .content { input in .string { "Profile \(input.subpath)" } }
     /// }
     /// ```
@@ -1210,10 +1210,7 @@ extension KvHttpResponse.ParameterizedResponse where Subpath == KvUnavailableUrl
     ///     }
     ///     KvHttpResponse.with
     ///         .subpathFilter { $0.components.count == 1 }
-    ///         .subpathFlatMap {
-    ///             Int($0.components.first!).map { .accepted($0) }
-    ///             ?? .rejected
-    ///         }
+    ///         .subpathFlatMap { .unwrapping(Int($0.components.first!)) }
     ///         .content { input in
     ///             .string { "Profile \(input.subpath)" }
     ///         }

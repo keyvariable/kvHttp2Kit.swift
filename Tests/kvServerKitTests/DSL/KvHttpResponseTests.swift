@@ -369,10 +369,7 @@ final class KvHttpResponseTests : XCTestCase {
                         KvHttpResponse.with
                             .subpathFilter { $0.components.count == 1 }
                             .subpathFlatMap {
-                                UInt($0.components.first!)
-                                    .flatMap { Self.profiles[$0] }
-                                    .map { .accepted($0) }
-                                ?? .rejected
+                                .unwrapping(UInt($0.components.first!).flatMap { Self.profiles[$0] })
                             }
                             .content { input in .string { input.subpath.uuidString } }
                     }

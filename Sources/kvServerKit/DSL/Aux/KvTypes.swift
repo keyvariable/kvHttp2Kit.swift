@@ -30,6 +30,20 @@ public enum KvFilterResult<Accepted> {
     case rejected
 
 
+    // MARK: Fabrics
+
+    /// - Returns: Unwrapped *optional* accosiated with ``accepted(_:)-swift.enum.case`` or ``rejected-swift.enum.case`` otherwise.
+    @inlinable
+    public static func unwrapping(_ optional: Accepted?) -> Self {
+        switch optional {
+        case .some(let value):
+            return .accepted(value)
+        case .none:
+            return .rejected
+        }
+    }
+
+
     // MARK: Operations
 
     @inlinable
