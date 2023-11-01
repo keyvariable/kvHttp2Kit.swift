@@ -21,6 +21,10 @@
 //  Created by Svyatoslav Popov on 30.05.2023.
 //
 
+import kvHttpKit
+
+
+
 /// Protocol for request handlers. See provided common request handlers.
 public protocol KvHttpRequestHandler : AnyObject {
 
@@ -39,7 +43,7 @@ public protocol KvHttpRequestHandler : AnyObject {
     ///
     /// - Tip: `nil` response causes ``KvHttpChannel/RequestIncident/noResponse`` incident.
     /// - Tip: Thrown errors cause ``KvHttpChannel/RequestIncident/requestProcessingError(_:)`` incident.
-    func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider?
+    func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseContent?
 
     /// - Returns:  Optional custom response for an incident related to the request on a client.
     ///             If `nil` is returned then ``KvHttpIncident/defaultStatus`` is submitted to client.
@@ -50,7 +54,7 @@ public protocol KvHttpRequestHandler : AnyObject {
     /// - Note: Server will close connection to the client just after the response will be submitted.
     ///
     /// - Important: Provided response should provide a valid optional body. If error occurs then server omits body.
-    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider?
+    func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent?
 
     /// - Note: The client will continue to process requests.
     func httpClient(_ httpClient: KvHttpChannel.Client, didCatch error: Error)

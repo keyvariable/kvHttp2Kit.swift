@@ -30,7 +30,7 @@ import kvKit
 // MARK: - KvUrlPathProtocol
 
 /// A protocol for typea representing a path as collection of path components.
-public protocol KvUrlPathProtocol : Hashable, ExpressibleByStringLiteral, ExpressibleByArrayLiteral {
+public protocol KvUrlPathProtocol : Hashable, ExpressibleByStringLiteral, ExpressibleByStringInterpolation, ExpressibleByArrayLiteral {
 
     associatedtype Components : RandomAccessCollection where Components.Element == Substring
 

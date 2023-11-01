@@ -28,25 +28,7 @@ import Foundation
 /// Errors related to processing of HTTP responses.
 public enum KvHttpResponseError : LocalizedError {
 
-    /// File at URL doesn't exist.
-    case fileDoesNotExist(URL)
-
     /// Unable to compose target location for a redirection.
     case invalidRedirectionTarget(URLComponents)
-
-    /// Scheme of URL is "file:" but resource at URL is not a file.
-    case isNotAFile(URL)
-
-    /// `InputStream.read` operation has returned negative *code*. Also`InputStream.streamError` is associated.
-    case streamRead(code: Int, error: Error?)
-
-    /// Unable to create input stream for URL.
-    case unableToCreateInputStream(URL)
-
-    /// Unable to get URL of a resource in bundle.
-    case unableToFindBundleResource(name: String, extension: String?, subdirectory: String?, bundle: Bundle)
-
-    /// Unable to find index file in directory at *directoryURL*.
-    case unableToFindIndexFile(directoryURL: URL)
 
 }

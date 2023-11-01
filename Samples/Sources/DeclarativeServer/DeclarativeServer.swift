@@ -21,6 +21,7 @@
 //  Created by Svyatoslav Popov on 03.07.2023.
 //
 
+import kvHttpKit
 import kvServerKit
 
 import Foundation
@@ -416,12 +417,10 @@ struct DeclarativeServer : KvServer {
                     /// In this way response is accepted only for existing entities.
                     ///
                     /// This modifier also filters requests as `.subpathFilter` and allows to transform current value of subpath.
-                    .subpathFlatMap {
+                    .subpathFlatMap { .unwrapping(
                         Entity.ID($0.components.first!)
                             .flatMap { Self.sampleDB[$0] }
-                            .map { .accepted($0) }
-                        ?? .rejected
-                    }
+                    ) }
                     /// The resulting subpath processing result is in `input.subpath`.
                     .content { input in .json { input.subpath } }
 

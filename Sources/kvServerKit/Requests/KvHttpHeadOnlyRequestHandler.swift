@@ -21,10 +21,14 @@
 //  Created by Svyatoslav Popov on 31.05.2023.
 //
 
+import kvHttpKit
+
+
+
 /// Simple handler for requests having no body. It just sends response passed to the initializer.
 open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = () throws -> KvHttpResponseProvider?
+    public typealias ResponseBlock = () throws -> KvHttpResponseContent?
 
 
 
@@ -45,7 +49,7 @@ open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
     ///
     /// - Parameter response: Value to be sent to a client.
     @inlinable
-    public convenience init(response: KvHttpResponseProvider?) {
+    public convenience init(response: KvHttpResponseContent?) {
         self.init { response }
     }
 
@@ -65,17 +69,17 @@ open class KvHttpHeadOnlyRequestHandler : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseProvider? {
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseContent? {
         return try responseBlock()
     }
 
 
-    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32t5p``.
+    /// A trivial implementation of ``KvHttpRequestHandler/httpClient(_:didCatch:)-32d8h``.
     /// Override it to provide custom incident handling. 
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+    open func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
         return nil
     }
 

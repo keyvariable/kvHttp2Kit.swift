@@ -1,0 +1,1 @@
+It's a content of a text file in test target.

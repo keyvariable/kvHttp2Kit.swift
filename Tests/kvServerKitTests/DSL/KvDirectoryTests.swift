@@ -98,41 +98,6 @@ final class KvDirectoryTests : XCTestCase {
 
 
 
-    // MARK: - testUrlResolvation()
-
-    func testUrlResolvation() {
-        typealias ResolvedURL = KvDirectory.ResolvedURL
-
-        func Assert(bundlePath: String,
-                    onSuccess: (ResolvedURL, URL) -> Void = { XCTFail("URL: \($1), result: \($0)") },
-                    onFailure: (Error, URL) -> Void = { XCTFail("URL: \($1), error: \($0)") }
-        ) {
-            let url = Bundle.module.resourceURL!.appendingPathComponent(bundlePath)
-
-            do { onSuccess(try ResolvedURL(for: url, indexNames: [ "index.html", "index" ]), url) }
-            catch { onFailure(error, url) }
-        }
-
-        func Assert(bundlePath: String, expecting: (URL) -> ResolvedURL) {
-            Assert(bundlePath: bundlePath, onSuccess: { XCTAssertEqual($0, expecting($1), "URL: \($1)") })
-        }
-
-        Assert(bundlePath: "sample.txt", expecting: { .init(resolved: $0, isLocal: true) })
-        Assert(bundlePath: "missing_file", onFailure: { error, url in
-            guard case KvHttpResponseError.fileDoesNotExist(url) = error
-            else { return XCTFail("URL: \(url), result \(error) is not equal to expected \(KvHttpResponseError.fileDoesNotExist(url))") }
-        })
-
-        Assert(bundlePath: "html", expecting: { .init(resolved: $0.appendingPathComponent("index.html"), isLocal: true) })
-        Assert(bundlePath: "html/a", expecting: { .init(resolved: $0.appendingPathComponent("index"), isLocal: true) })
-        Assert(bundlePath: "html/a/b", onFailure: { error, url in
-            guard case KvHttpResponseError.unableToFindIndexFile(directoryURL: url) = error
-            else { return XCTFail("URL: \(url), result \(error) is not equal to expected \(KvHttpResponseError.unableToFindIndexFile(directoryURL: url))") }
-        })
-    }
-
-
-
     // MARK: - testSubpathResolver()
 
     func testSubpathResolver() {
@@ -505,9 +470,6 @@ final class KvDirectoryTests : XCTestCase {
     private typealias TestKit = KvServerTestKit
 
     private typealias NetworkGroup = TestKit.NetworkGroup
-
-
-    private typealias ContentType = KvHttpResponseProvider.ContentType
 
 }
 

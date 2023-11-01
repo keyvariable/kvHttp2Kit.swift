@@ -23,6 +23,8 @@
 
 import Foundation
 
+import kvHttpKit
+
 
 
 // MARK: - KvHttpRequestBody
@@ -42,7 +44,7 @@ protocol KvHttpRequestBodyInternal : KvHttpRequestBody {
 
     typealias Configuration = KvHttpRequestBodyConfiguration
 
-    typealias ResponseBlock = (Value) throws -> KvHttpResponseProvider
+    typealias ResponseBlock = (Value) throws -> KvHttpResponseContent
 
 
     func with(baseConfiguration: Configuration) -> Self
@@ -156,7 +158,7 @@ public struct KvHttpRequestProhibitedBody : KvHttpRequestBodyInternal {
 
         // MARK: : KvHttpRequestHandler
 
-        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
             clientCallbacks?.onHttpIncident?(incident, requestContext)
         }
 
@@ -392,7 +394,7 @@ public struct KvHttpRequestReducingBody<PartialResult> : KvHttpRequestRequiredBo
 
         // MARK: : KvHttpRequestHandler
 
-        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
             clientCallbacks?.onHttpIncident?(incident, requestContext)
         }
 
@@ -478,7 +480,7 @@ public struct KvHttpRequestDataBody : KvHttpRequestRequiredBodyInternal {
 
         // MARK: : KvHttpRequestHandler
 
-        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
             clientCallbacks?.onHttpIncident?(incident, requestContext)
         }
 
@@ -563,7 +565,7 @@ public struct KvHttpRequestJsonBody<Value : Decodable> : KvHttpRequestRequiredBo
 
         // MARK: : KvHttpRequestHandler
 
-        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseProvider? {
+        override func httpClient(_ httpClient: KvHttpChannel.Client, didCatch incident: KvHttpChannel.RequestIncident) -> KvHttpResponseContent? {
             clientCallbacks?.onHttpIncident?(incident, requestContext)
         }
 

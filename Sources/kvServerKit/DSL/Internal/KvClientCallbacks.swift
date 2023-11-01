@@ -21,6 +21,10 @@
 //  Created by Svyatoslav Popov on 22.10.2023.
 //
 
+import kvHttpKit
+
+
+
 /// Callbacks handling issues from ``KvHttpChannel/Client``.
 @usableFromInline
 struct KvClientCallbacks : KvCascadable, KvReplacingOverlayCascadable, KvDefaultAccumulationCascadable {
@@ -29,7 +33,7 @@ struct KvClientCallbacks : KvCascadable, KvReplacingOverlayCascadable, KvDefault
     typealias ErrorCallback = (Error, KvHttpRequestContext) -> Void
 
     @usableFromInline
-    typealias IncidentCallback = (KvHttpIncident, KvHttpRequestContext) -> KvHttpResponseProvider?
+    typealias IncidentCallback = (KvHttpIncident, KvHttpRequestContext) -> KvHttpResponseContent?
 
 
     /// Handles incidents.

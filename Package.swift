@@ -70,6 +70,8 @@ let package = Package(
 
         .testTarget(name: "kvHttpKitTests",
                     dependencies: [ "kvHttpKit" ],
+                    resources: [ .copy("Resources/html"),
+                                 .copy("Resources/sample.txt")],
                     swiftSettings: swiftSettings)
 
 

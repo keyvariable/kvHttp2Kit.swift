@@ -936,7 +936,7 @@ extension KvHttpResponseDispatcher {
             }
 
 
-            func onIncident(_ incident: KvHttpIncident, _ context: KvHttpRequestContext) -> KvHttpResponseProvider? { nil }
+            func onIncident(_ incident: KvHttpIncident, _ context: KvHttpRequestContext) -> KvHttpResponseContent? { nil }
 
         }
 
