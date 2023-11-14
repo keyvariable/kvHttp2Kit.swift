@@ -127,7 +127,7 @@ Package has been built and the unit-tests have passed on macOS and Linux (Ubuntu
 
 #### Package Dependencies:
 ```swift
-.package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.6.0")
+.package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.7.0")
 ```
 #### Target Dependencies:
 ```swift
