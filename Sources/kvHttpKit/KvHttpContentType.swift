@@ -22,7 +22,7 @@
 //
 
 /// Enumeration of some auxiliary content types and case for arbitrary values.
-public enum KvHttpContentType {
+public enum KvHttpContentType : Hashable {
 
     case application(Application)
     case image(Image)
@@ -34,7 +34,7 @@ public enum KvHttpContentType {
 
     // MARK: .Application
 
-    public enum Application {
+    public enum Application : Hashable {
 
         case gzip
         case javascript
@@ -80,7 +80,7 @@ public enum KvHttpContentType {
 
     // MARK: .Image
 
-    public enum Image {
+    public enum Image : Hashable {
 
         case gif
         case jpeg
@@ -113,7 +113,7 @@ public enum KvHttpContentType {
 
     // MARK: .Text
 
-    public enum Text {
+    public enum Text : Hashable {
 
         case css
         case csv
