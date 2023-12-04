@@ -211,7 +211,7 @@ public class KvServerToken {
     ///
     /// - Note: If the server has already stopped then last stop result is returned.
     @discardableResult
-    func waitUntilStopped() -> Result<Void, Error> {
+    public func waitUntilStopped() -> Result<Void, Error> {
         server.waitUntilStopped()
     }
 
