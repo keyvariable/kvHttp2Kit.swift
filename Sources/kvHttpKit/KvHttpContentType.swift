@@ -21,6 +21,10 @@
 //  Created by Svyatoslav Popov on 31.10.2023.
 //
 
+import Foundation
+
+
+
 /// Enumeration of some auxiliary content types and case for arbitrary values.
 public enum KvHttpContentType : Hashable {
 
@@ -206,5 +210,38 @@ public enum KvHttpContentType : Hashable {
     // MARK: .Components
 
     public typealias Components = (mimeType: String, options: String?)
+
+
+
+    // MARK: Inference
+
+    // TODO: Add inference by leading bytes (magic numbers) of files.
+    /// Infers some types by file extension of given URL.
+    ///
+    /// - SeeAlso: ``from(fileExtension:)``.
+    public static func from(_ url: URL) -> KvHttpContentType? {
+        from(fileExtension: url.pathExtension)
+    }
+
+
+    /// Infers some types by given file extension.
+    ///
+    /// - SeeAlso: ``from(_:)``.
+    public static func from(fileExtension: String) -> KvHttpContentType? {
+        switch fileExtension.lowercased() {
+        case "gif": .image(.gif)
+        case "jpg", "jpeg": .image(.jpeg)
+        case "otf": .font(.otf)
+        case "png": .image(.png)
+        case "svg", "svgz": .image(.svg_xml)
+        case "tcc": .font(.collection)
+        case "tiff": .image(.tiff)
+        case "ttf": .font(.ttf)
+        case "webp": .image(.webp)
+        case "woff": .font(.woff)
+        case "woff2": .font(.woff2)
+        default: nil
+        }
+    }
 
 }
