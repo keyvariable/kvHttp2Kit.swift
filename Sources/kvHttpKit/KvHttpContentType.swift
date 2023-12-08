@@ -25,6 +25,7 @@
 public enum KvHttpContentType : Hashable {
 
     case application(Application)
+    case font(Font)
     case image(Image)
     case text(Text)
 
@@ -72,6 +73,39 @@ public enum KvHttpContentType : Hashable {
                 return ("application/xml-dtd", options: nil)
             case .zip:
                 return ("application/zip", options: nil)
+            }
+        }
+
+    }
+
+
+    // MARK: .Font
+
+    public enum Font : Hashable {
+
+        case collection
+        case otf
+        case sfnt
+        case ttf
+        case woff
+        case woff2
+
+
+        @inlinable
+        public var components: Components {
+            switch self {
+            case .collection:
+                return ("font/collection", options: nil)
+            case .otf: 
+                return ("font/otf", options: nil)
+            case .sfnt: 
+                return ("font/sfnt", options: nil)
+            case .ttf: 
+                return ("font/ttf", options: nil)
+            case .woff: 
+                return ("font/woff", options: nil)
+            case .woff2: 
+                return ("font/woff2", options: nil)
             }
         }
 
@@ -156,6 +190,8 @@ public enum KvHttpContentType : Hashable {
         switch self {
         case .application(let subtype):
             return subtype.components
+        case .font(let font):
+            return font.components
         case .image(let subtype):
             return subtype.components
         case .text(let subtype):
