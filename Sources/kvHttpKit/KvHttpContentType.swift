@@ -42,6 +42,8 @@ public enum KvHttpContentType : Hashable {
     public enum Application : Hashable {
 
         case gzip
+        // TODO: Delete in 0.11.0.
+        @available(*, deprecated, message: "Use KvHttpContentType/Text/javascript")
         case javascript
         case json
         case octetStream
@@ -52,6 +54,7 @@ public enum KvHttpContentType : Hashable {
         case xml
         case xmlDTD
         case zip
+        case zlib
 
 
         @inlinable
@@ -77,6 +80,8 @@ public enum KvHttpContentType : Hashable {
                 return ("application/xml-dtd", options: nil)
             case .zip:
                 return ("application/zip", options: nil)
+            case .zlib:
+                return ("application/zlib", options: nil)
             }
         }
 
@@ -156,8 +161,10 @@ public enum KvHttpContentType : Hashable {
         case css
         case csv
         case html
+        case javascript
         case markdown
         case plain
+        case vCard
 
 
         @inlinable
@@ -169,10 +176,14 @@ public enum KvHttpContentType : Hashable {
                 return ("text/csv", options: nil)
             case .html:
                 return ("text/html", options: "charset=UTF-8")
+            case .javascript:
+                return ("text/javascript", options: nil)
             case .markdown:
                 return ("text/markdown", options: nil)
             case .plain:
                 return ("text/plain", options: "charset=UTF-8")
+            case .vCard:
+                return ("text/vcard", options: "charset=UTF-8")
             }
         }
 
@@ -229,17 +240,38 @@ public enum KvHttpContentType : Hashable {
     /// - SeeAlso: ``from(_:)``.
     public static func from(fileExtension: String) -> KvHttpContentType? {
         switch fileExtension.lowercased() {
+        case "css": .text(.css)
+        case "csv": .text(.csv)
+        case "dtd": .application(.xmlDTD)
         case "gif": .image(.gif)
-        case "jpg", "jpeg": .image(.jpeg)
+        case "gz": .application(.gzip)
+        case "htm": .text(.html)
+        case "html": .text(.html)
+        case "jpeg": .image(.jpeg)
+        case "jpg": .image(.jpeg)
+        case "js": .text(.javascript)
+        case "json": .application(.json)
+        case "mjs": .text(.javascript)
+        case "markdown": .text(.markdown)
+        case "md": .text(.markdown)
+        case "mod": .application(.xmlDTD)
         case "otf": .font(.otf)
+        case "pdf": .application(.pdf)
         case "png": .image(.png)
-        case "svg", "svgz": .image(.svg_xml)
         case "tcc": .font(.collection)
+        case "tex": .application(.tex)
         case "tiff": .image(.tiff)
         case "ttf": .font(.ttf)
+        case "txt": .text(.plain)
+        case "svg": .image(.svg_xml)
+        case "svgz": .image(.svg_xml)
+        case "vcard": .text(.vCard)
+        case "vcf": .text(.vCard)
         case "webp": .image(.webp)
         case "woff": .font(.woff)
         case "woff2": .font(.woff2)
+        case "xml": .application(.xml)
+        case "zip": .application(.zip)
         default: nil
         }
     }

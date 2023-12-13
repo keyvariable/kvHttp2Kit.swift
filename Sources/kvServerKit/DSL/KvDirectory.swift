@@ -59,6 +59,9 @@ import kvHttpKit
 /// - Note: If a directory response is declared via an URL directly,
 ///         then "Status" or "status" directory at the url is automatically selected as the HTTP status directory.
 ///
+/// By default content type of files in directory and status files is infered using all avilable methods.
+/// Use ``contentType(by:)`` modifier to select particular inference methods or disable the inference.
+///
 /// - SeeAlso: ``KvFiles``.
 public struct KvDirectory : KvResponse {
 
@@ -204,6 +207,15 @@ public struct KvDirectory : KvResponse {
     } }
 
 
+    /// This modifier changes the way content type of files in the directory and status files is infered.
+    ///
+    /// Default value is `.allMethods`.
+    @inlinable
+    public func contentType(by contentTypeInference: KvHttpResponseContent.ContentTypeInference) -> Self { modified {
+        $0.contentTypeInference = contentTypeInference
+    } }
+
+
     /// This modifier appends HTTP protocol-specific list of index file names.
     ///
     /// When a directory file system item is requested, protocol-specific and common lists of index file names are used to select a file in requested directory.
@@ -305,6 +317,9 @@ public struct KvDirectory : KvResponse {
         var whiteList: Set<KvUrlSubpath>?
 
         @usableFromInline
+        var contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+
+        @usableFromInline
         var httpIndexFileNames: [String]?
 
         @usableFromInline
@@ -376,6 +391,8 @@ extension KvDirectory : KvResponseInternalProtocol {
         let rootURL = configuration.rootURL.absoluteURL
         let isRootLocal = rootURL.isFileURL
 
+        let contentTypeInference = configuration.contentTypeInference
+
         let indexFileNames: [String] = Array([
             configuration.httpIndexFileNames ?? Defaults.httpIndexNames,
             configuration.indexFileNames ?? Defaults.indexNames
@@ -412,14 +429,16 @@ extension KvDirectory : KvResponseInternalProtocol {
 
                     return (try? KvResolvedFileURL(for: url, isLocal: isRootLocal, indexNames: indexFileNames)).map { .accepted($0) } ?? .rejected
                 }
-                .content { input in try .file(at: input.subpath) }
+                .content { input in try .file(at: input.subpath, contentTypeBy: contentTypeInference) }
         }
         .onHttpIncident { incident, _ in
             let status = incident.defaultStatus
 
             return httpStatusFileNameBlock(status)
                 .flatMap { fileName in httpStatusDirectoryURL?.appendingPathComponent(fileName) }
-                .flatMap { fileURL in try? .status(status).file(at: fileURL) }
+                .flatMap { fileURL in
+                    try? .status(status).file(at: fileURL, contentTypeBy: contentTypeInference)
+                }
         }
 
         httpRepresentation.resolvedGroup.insertResponses(to: accumulator)
