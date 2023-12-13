@@ -391,7 +391,8 @@ struct DeclarativeServer : KvServer {
                             KvHttpResponse {
                                 /// Use of `.file` fabric and modifier helps to reduce memory consumption and improve performance.
                                 /// Also consider `.binary`  fabric and modifier for input streams.
-                                try .file(at: url).contentType(.image(.png))
+                                /// - Note: `contentTypeBy` argument enables inference of content type.
+                                try .file(at: url, contentTypeBy: .allMethods)
                             }
                         }
                     }

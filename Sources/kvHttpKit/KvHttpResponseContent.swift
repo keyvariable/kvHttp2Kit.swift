@@ -49,6 +49,9 @@ import Foundation
 /// // PNG image from bundle.
 /// try .file(resource: "logo", extension: "png", subdirectory: "images", bundle: .module)
 ///     .contentType(.image(.png))
+///
+/// // A file with automatic content type.
+/// try .file(at: fileURL, contentTypeBy: .allMethods)
 /// ```
 ///
 /// *KvHttpResponseContent* provides deferred access to body providers so, for example, the same declaration can be effectively used for both GET and HEAD methods.
@@ -165,9 +168,31 @@ public struct KvHttpResponseContent {
 
         // MARK: : OptionSet
 
-        public var rawValue: UInt
+        public var rawValue: UInt8
 
-        @inlinable public init(rawValue: UInt) { self.rawValue = rawValue }
+        @inlinable public init(rawValue: UInt8) { self.rawValue = rawValue }
+    }
+
+
+    // MARK: .ContentTypeInference
+
+    /// The way content type if file responses is infered.
+    public struct ContentTypeInference : OptionSet {
+
+        /// Content type is infered by extension of file name.
+        public static let pathExtension = Self(rawValue: 1 << 0)
+
+
+        /// Content type is infered with all available methods.
+        public static let allMethods = Self(rawValue: ~0)
+
+
+        // MARK: : OptionSet
+
+        public var rawValue: UInt8
+
+        @inlinable public init(rawValue: UInt8) { self.rawValue = rawValue }
+
     }
 
 
@@ -306,6 +331,8 @@ extension KvHttpResponseContent {
     public static func binary(_ stream: InputStream) -> Self { Self().binary(stream) }
 
 
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
+    ///
     /// - Returns: An instance initialized with contents at given *url*.
     ///
     /// Contents of the resulting instance:
@@ -317,29 +344,41 @@ extension KvHttpResponseContent {
     ///
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public static func file(at url: URL) throws -> Self {
+    public static func file(at url: URL,
+                            contentTypeBy contentTypeInference: ContentTypeInference = [ ]
+    ) throws -> Self {
         let resolvedURL = try KvResolvedFileURL(for: url)
 
-        return try Self().file(at: resolvedURL)
+        return try Self().file(at: resolvedURL, contentTypeBy: contentTypeInference)
     }
 
 
     @inlinable
-    public static func file(at url: KvResolvedFileURL) throws -> Self { try Self().file(at: url) }
+    public static func file(at url: KvResolvedFileURL,
+                            contentTypeBy contentTypeInference: ContentTypeInference = [ ]
+    ) throws -> Self {
+        try Self().file(at: url, contentTypeBy: contentTypeInference)
+    }
 
 
-    /// Invokes ``file(at:)-12ly6`` fabric with URL of a resource file with given parameters.
+    /// Invokes ``file(at:contentTypeBy:)-8183z`` fabric with URL of a resource file with given parameters.
     /// ``KvHttpKitError/Response/unableToFindBundleResource(name:extension:subdirectory:bundle:)`` is thrown for missing resources.
     ///
     /// - Parameter bundle: If `nil` is passed then `Bundle.main` is used.
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
     @inlinable
-    public static func file(resource: String, extension: String? = nil, subdirectory: String? = nil, bundle: Bundle? = nil) throws -> Self {
+    public static func file(resource: String,
+                            extension: String? = nil,
+                            subdirectory: String? = nil,
+                            bundle: Bundle? = nil,
+                            contentTypeBy contentTypeInference: ContentTypeInference = [ ]
+    ) throws -> Self {
         let bundle = bundle ?? .main
 
         guard let url = bundle.url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory)
         else { throw ContentError.unableToFindBundleResource(name: resource, extension: `extension`, subdirectory: subdirectory, bundle: bundle) }
 
-        return try .file(at: url)
+        return try .file(at: url, contentTypeBy: contentTypeInference)
     }
 
 
@@ -606,6 +645,8 @@ extension KvHttpResponseContent {
     }
 
 
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
+    ///
     /// - Returns: A copy where contents are taken from file at given *url*.
     ///
     /// Following changes are applied:
@@ -617,15 +658,19 @@ extension KvHttpResponseContent {
     ///
     /// - Important: Contents of file may be ignored, for example when HTTP method is *HEAD*.
     @inlinable
-    public func file(at url: URL) throws -> Self {
+    public func file(at url: URL,
+                     contentTypeBy contentTypeInference: ContentTypeInference = [ ]
+    ) throws -> Self {
         let resolvedURL = try KvResolvedFileURL(for: url)
 
-        return try self.file(at: resolvedURL)
+        return try self.file(at: resolvedURL, contentTypeBy: contentTypeInference)
     }
 
 
     @inlinable
-    public func file(at url: KvResolvedFileURL) throws -> Self { try modified {
+    public func file(at url: KvResolvedFileURL,
+                     contentTypeBy contentTypeInference: ContentTypeInference = [ ]
+    ) throws -> Self { try modified {
         let (url, isLocal) = (url.value, url.isLocal)
 
         if isLocal {
@@ -641,21 +686,34 @@ extension KvHttpResponseContent {
         }
 
         $0._bodyCallbackProvider = Self.streamBodyCallbackProvider(url)
+
+        // Inference of content type.
+        if contentTypeInference.contains(.pathExtension) {
+            if let contentType = KvHttpContentType.from(fileExtension: url.pathExtension) {
+                $0._contentType = contentType
+            }
+        }
     } }
 
 
-    /// Invokes ``file(at:)-4k2d`` modifier with URL of a resource file with given parameters.
+    /// Invokes ``file(at:contentTypeBy:)-8lg5l`` modifier with URL of a resource file with given parameters.
     /// ``KvHttpKitError/Response/unableToFindBundleResource(name:extension:subdirectory:bundle:)`` is thrown for missing resources.
     ///
     /// - Parameter bundle: If `nil` is passed then `Bundle.main` is used.
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
     @inlinable
-    public func file(resource: String, extension: String? = nil, subdirectory: String? = nil, bundle: Bundle? = nil) throws -> Self {
+    public func file(resource: String,
+                     extension: String? = nil,
+                     subdirectory: String? = nil,
+                     bundle: Bundle? = nil,
+                     contentTypeBy contentTypeInference: ContentTypeInference = [ ]
+    ) throws -> Self {
         let bundle = bundle ?? .main
 
         guard let url = bundle.url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory)
         else { throw ContentError.unableToFindBundleResource(name: resource, extension: `extension`, subdirectory: subdirectory, bundle: bundle) }
 
-        return try self.file(at: url)
+        return try self.file(at: url, contentTypeBy: contentTypeInference)
     }
 
 
