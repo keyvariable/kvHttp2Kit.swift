@@ -6,7 +6,7 @@
 - imperative and declarative APIs;
 - multithreaded request processing;
 - validation of requests and various automatic customizable context-dependent responses, e.g. 400, 404, 413;
-- automatic Last-Modified and ETag headers for file responses;
+- automatic Content-Type, Last-Modified and ETag headers for file responses;
 - automatic 304 and 412 responses for preconditions on ETag and modification date;
 - automatic handling of HEAD method.
 
@@ -127,7 +127,7 @@ Package has been built and the unit-tests have passed on macOS and Linux (Ubuntu
 
 #### Package Dependencies:
 ```swift
-.package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.9.0")
+.package(url: "https://github.com/keyvariable/kvServerKit.swift.git", from: "0.10.0")
 ```
 #### Target Dependencies:
 ```swift
