@@ -29,26 +29,39 @@ import kvHttpKit
 
 // MARK: - KvFile
 
-/// Equivalent of `KvFiles(at: url)`.
+/// Equivalent of `KvFiles(at: url, contentTypeBy: contentTypeInference)`.
 ///
 /// - SeeAlso: ``KvFiles``.
 @inlinable
-public func KvFile(at url: URL) -> KvFiles { .init(at: url) }
+public func KvFile(at url: URL,
+                   contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+) -> KvFiles {
+    .init(at: url, contentTypeBy: contentTypeInference)
+}
 
 
-/// Equivalent of `KvFiles(atPaths: path)`.
+/// Equivalent of `KvFiles(atPaths: path, contentTypeBy: contentTypeInference)`.
 ///
 /// - SeeAlso: ``KvFiles``.
 @inlinable
-public func KvFile(atPath path: String) -> KvFiles? { .init(atPaths: path) }
+public func KvFile(atPath path: String,
+                   contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+) -> KvFiles? {
+    .init(atPaths: path, contentTypeBy: contentTypeInference)
+}
 
 
-/// Equivalent of `KvFiles(resource:extension:subdirectory:bundle:)`.
+/// Equivalent of `KvFiles(resource:extension:subdirectory:bundle:contentTypeBy:)`.
 ///
 /// - SeeAlso: ``KvFiles``.
 @inlinable
-public func KvFile(resource: String, withExtension extension: String? = nil, subdirectory: String? = nil, bundle: Bundle? = nil) -> KvFiles? {
-    .init(resource: resource, withExtension: `extension`, subdirectory: subdirectory)
+public func KvFile(resource: String,
+                   withExtension extension: String? = nil,
+                   subdirectory: String? = nil,
+                   bundle: Bundle? = nil,
+                   contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+) -> KvFiles? {
+    .init(resource: resource, withExtension: `extension`, subdirectory: subdirectory, bundle: bundle, contentTypeBy: contentTypeInference)
 }
 
 
@@ -79,7 +92,7 @@ public func KvFile(resource: String, withExtension extension: String? = nil, sub
 /// }
 /// ```
 ///
-/// - SeeAlso: ``KvFile(at:)``, ``KvDirectory``.
+/// - SeeAlso: ``KvFile(at:contentTypeBy:)``, ``KvDirectory``.
 public struct KvFiles : KvResponse {
 
     @usableFromInline
@@ -94,54 +107,86 @@ public struct KvFiles : KvResponse {
 
 
     /// Initializes a file response with contents at given URLs. See ``KvFiles`` for details.
+    ///
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
     @inlinable
-    public init(at urls: URL...) { self.init(at: urls) }
+    public init(at urls: URL...,
+                contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+    ) {
+        self.init(at: urls, contentTypeBy: contentTypeInference)
+    }
 
 
     /// Initializes a file response with contents at given URLs. See ``KvFiles`` for details.
+    ///
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
     @inlinable
-    public init<URLs>(at urls: URLs) where URLs : Sequence, URLs.Element == URL {
-        self.init(configuration: .init(urls: urls))
+    public init<URLs>(at urls: URLs,
+                      contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+    ) where URLs : Sequence, URLs.Element == URL {
+        self.init(configuration: .init(urls: urls, contentTypeInference: contentTypeInference))
     }
 
 
     /// Initializes a file response with contents at given paths. See ``KvFiles`` for details.
+    ///
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
     @inlinable
-    public init?(atPaths paths: String...) { self.init(atPaths: paths) }
+    public init?(atPaths paths: String...,
+                 contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+    ) {
+        self.init(atPaths: paths, contentTypeBy: contentTypeInference)
+    }
 
 
     /// Initializes a file response with contents at given paths. See ``KvFiles`` for details.
+    ///
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
     @inlinable
-    public init?<Paths>(atPaths paths: Paths) where Paths : Sequence, Paths.Element == String {
-        self.init(at: paths.lazy.map { URL(fileURLWithPath: $0, isDirectory: false) })
+    public init?<Paths>(atPaths paths: Paths,
+                        contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+    ) where Paths : Sequence, Paths.Element == String {
+        self.init(at: paths.lazy.map { URL(fileURLWithPath: $0, isDirectory: false) },
+                  contentTypeBy: contentTypeInference)
     }
 
 
     /// Initializes a file response with content of a resource in given bundle. See ``KvFiles`` for details.
     ///
     /// - Parameter bundle: If `nil` is passed then `Bundle.main` is used.
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
     ///
-    /// - SeeAlso: ``KvFiles/init(resourcesWithExtension:subdirectory:bundle:)``
+    /// - SeeAlso: ``KvFiles/init(resourcesWithExtension:subdirectory:bundle:contentTypeBy:)``
     @inlinable
-    public init?(resource: String, withExtension extension: String? = nil, subdirectory: String? = nil, bundle: Bundle? = nil) {
+    public init?(resource: String,
+                 withExtension extension: String? = nil,
+                 subdirectory: String? = nil,
+                 bundle: Bundle? = nil,
+                 contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+    ) {
         // - Note: Explicit cast to URL? prevents error on Linux.
         guard let url = ((bundle ?? .main).url(forResource: resource, withExtension: `extension`, subdirectory: subdirectory) as URL?) else { return nil }
 
-        self.init(at: url)
+        self.init(at: url, contentTypeBy: contentTypeInference)
     }
 
 
     /// Initializes a file response with resources in given bundle. See ``KvFiles`` for details.
     ///
     /// - Parameter bundle: If `nil` is passed then `Bundle.main` is used.
+    /// - Parameter contentTypeInference: The way content type is infered. Pass empty value to disable the inference.
     ///
-    /// - SeeAlso: ``KvFiles/init(resource:withExtension:subdirectory:bundle:)``.
+    /// - SeeAlso: ``KvFiles/init(resource:withExtension:subdirectory:bundle:contentTypeBy:)``.
     @inlinable
-    public init?(resourcesWithExtension extension: String?, subdirectory: String? = nil, bundle: Bundle? = nil) {
+    public init?(resourcesWithExtension extension: String?, 
+                 subdirectory: String? = nil,
+                 bundle: Bundle? = nil,
+                 contentTypeBy contentTypeInference: KvHttpResponseContent.ContentTypeInference = .allMethods
+    ) {
         // - Note: Explicit cast to [URL]? prevents error on Linux.
         guard let urls = ((bundle ?? .main).urls(forResourcesWithExtension: `extension`, subdirectory: subdirectory) as [URL]?) else { return nil }
 
-        self.init(at: urls)
+        self.init(at: urls, contentTypeBy: contentTypeInference)
     }
 
 
@@ -154,10 +199,16 @@ public struct KvFiles : KvResponse {
         @usableFromInline
         var urls: [KvUrlPath.Components.Element : URL]
 
+        @usableFromInline
+        var contentTypeInference: KvHttpResponseContent.ContentTypeInference
+
 
         @usableFromInline
-        init<URLs>(urls: URLs) where URLs : Sequence, URLs.Element == URL {
+        init<URLs>(urls: URLs,
+                   contentTypeInference: KvHttpResponseContent.ContentTypeInference
+        ) where URLs : Sequence, URLs.Element == URL {
             self.urls = .init(urls.lazy.map { (Substring($0.lastPathComponent), $0) }, uniquingKeysWith: { lhs, rhs in rhs })
+            self.contentTypeInference = contentTypeInference
         }
 
     }
@@ -177,6 +228,7 @@ extension KvFiles : KvResponseInternalProtocol {
 
     func insert<A>(to accumulator: A) where A : KvHttpResponseAccumulator {
         let urls = configuration.urls
+        let contentTypeInference = configuration.contentTypeInference
 
         guard !urls.isEmpty else { return }
 
@@ -190,7 +242,7 @@ extension KvFiles : KvResponseInternalProtocol {
 
                     return .accepted(url)
                 }
-                .content { input in try .file(at: input.subpath) }
+                .content { input in try .file(at: input.subpath, contentTypeBy: contentTypeInference) }
         }
         .httpMethods(.get)
 
