@@ -46,6 +46,7 @@ public enum KvHttpContentType : Hashable {
         @available(*, deprecated, message: "Use KvHttpContentType/Text/javascript")
         case javascript
         case json
+        case manifest_json
         case octetStream
         case pdf
         case postscript
@@ -66,6 +67,8 @@ public enum KvHttpContentType : Hashable {
                 return ("application/javascript", options: nil)
             case .json:
                 return ("application/json", options: nil)
+            case .manifest_json:
+                return ("application/manifest+json", options: nil)
             case .octetStream:
                 return ("application/octet-stream", options: nil)
             case .pdf:
@@ -267,6 +270,7 @@ public enum KvHttpContentType : Hashable {
         case "svgz": .image(.svg_xml)
         case "vcard": .text(.vCard)
         case "vcf": .text(.vCard)
+        case "webmanifest": .application(.manifest_json)
         case "webp": .image(.webp)
         case "woff": .font(.woff)
         case "woff2": .font(.woff2)
