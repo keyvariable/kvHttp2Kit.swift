@@ -239,6 +239,7 @@ class KvRawUrlQueryParser<Value> : KvEntireUrlQueryParser, KvUrlQueryParseResult
 }
 
 
+
 // MARK: - KvUrlQueryParser
 
 class KvUrlQueryParser<Value> : KvSerialUrlQueryParser, KvUrlQueryParseResultProvider {
@@ -453,9 +454,6 @@ public struct KvUrlQueryValueContainer<Value> {
 
     /// - Note: `Nil` means missing required value.
     fileprivate typealias ValueBlock = () -> KvUrlQueryParseResult<Value>?
-
-    /// It's invoked with name of URL query item and the item's value parser.
-    fileprivate typealias ParserCallback = (String, KvUrlQueryValueParserInternalProtocol) -> Void
 
 
     fileprivate let valueBlock: ValueBlock
