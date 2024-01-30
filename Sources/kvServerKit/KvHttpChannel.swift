@@ -95,7 +95,7 @@ open class KvHttpChannel {
 
 
     @inlinable
-    public init(with configuration: Configuration) {
+    public required init(with configuration: Configuration) {
         self.configuration = configuration
     }
 
