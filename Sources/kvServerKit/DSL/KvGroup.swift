@@ -56,7 +56,7 @@ public func KvGroup<Content : KvResponseGroup>(
 /// Below is an example where the contents are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
 ///
 /// ```swift
-/// KvGroup(httpEndpoints: Host.current().addresses.lazy.map { (.init($0, on: 8080), .v2(ssl: ssl)) }) {
+/// KvGroup(httpEndpoints: KvNetworkEndpoint.systemEndpoints(on: 8080).lazy.map { ($0, .v2(ssl: ssl)) }) {
 ///     Contents()
 /// }
 /// ```
@@ -84,7 +84,7 @@ where HttpEndpoints : Sequence, HttpEndpoints.Element == (KvNetworkEndpoint, KvR
 /// Below is an example where the contents are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
 ///
 /// ```swift
-/// KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses.lazy.map { .init($0, on: 8080) }) {
+/// KvGroup(http: .v2(ssl: ssl), at: KvNetworkEndpoint.systemEndpoints(on: 8080)) {
 ///     Contents()
 /// }
 /// ```
@@ -107,7 +107,7 @@ where Endpoints : Sequence, Endpoints.Element == KvNetworkEndpoint
 /// Below is an example where the contents are available at all the current machine's IP addresses on port 8080 via secure HTTP/2.0:
 ///
 /// ```swift
-/// KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
+/// KvGroup(http: .v2(ssl: ssl), at: KvNetworkEndpoint.systemAddresses, on: [ 8080 ]) {
 ///     Contents()
 /// }
 /// ```

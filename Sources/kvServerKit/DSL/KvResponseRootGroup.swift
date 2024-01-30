@@ -105,7 +105,7 @@ extension KvResponseRootGroup {
     ///
     /// ```swift
     /// responseGroup
-    ///     .http(Host.current().addresses.lazy.map { (.init($0, on: 8080), .v2(ssl: ssl)) })
+    ///     .http(KvNetworkEndpoint.systemEndpoints(on: 8080).lazy.map { ($0, .v2(ssl: ssl)) })
     /// ```
     ///
     /// - Note: By default HTTP responses are available at IPv6 local machine address `::1`, on port 80, via insecure HTTP/1.1.
@@ -128,7 +128,7 @@ extension KvResponseRootGroup {
     ///
     /// ```swift
     /// responseGroup
-    ///     .http(.v2(ssl: ssl), at: Host.current().addresses.lazy.map { .init($0, on: 8080) })
+    ///     .http(.v2(ssl: ssl), at: KvNetworkEndpoint.systemEndpoints(on: 8080))
     /// ```
     ///
     /// - SeeAlso: ``KvHttpConfiguration``, ``KvGroup(http:at:content:)``.
@@ -146,7 +146,7 @@ extension KvResponseRootGroup {
     ///
     /// ```swift
     /// responseGroup
-    ///     .http(.v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ])
+    ///     .http(.v2(ssl: ssl), at: KvNetworkEndpoint.systemAddresses, on: [ 8080 ])
     /// ```
     ///
     /// - SeeAlso: ``KvHttpConfiguration``, ``KvGroup(http:at:on:content:)``.

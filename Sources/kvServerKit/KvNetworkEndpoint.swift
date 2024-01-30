@@ -21,6 +21,10 @@
 //  Created by Svyatoslav Popov on 14.07.2023.
 //
 
+import Foundation
+
+
+
 /// Information required to establish network connection to the server.
 ///
 /// It holds network address and port. Address can be a string representation of an IP address or the host name.
@@ -47,6 +51,49 @@ public struct KvNetworkEndpoint : Hashable {
     public init(_ address: Address, on port: Port) {
         self.address = address
         self.port = port
+    }
+
+
+
+    // MARK: Fabrics
+
+    /// - Returns: An endpont where address is `"localhost"`.
+    ///
+    /// - SeeAlso: ``loopback(on:)``.
+    @inlinable
+    public static func localhost(on port: Port) -> KvNetworkEndpoint { .init("localhost", on: port) }
+
+
+    /// - Returns: An endpoint where address is a loopback IPv6 address `::1`.
+    ///
+    /// - SeeAlso: ``localhost(on:)``, ``loopbackIPv4(on:)``.
+    @inlinable
+    public static func loopback(on port: Port) -> KvNetworkEndpoint { .init("::1", on: port) }
+
+
+    /// - Returns: An endpoint where address is a loopback IPv4 address `127.0.0.1`.
+    ///
+    /// - SeeAlso: ``loopback(on:)``.
+    @inlinable
+    public static func loopbackIPv4(on port: Port) -> KvNetworkEndpoint { .init("127.0.0.1", on: port) }
+
+
+
+    // MARK: System Endpoints
+
+    // TODO: Migrate from deprecated `Host.current().addresses` to an up-to-date method.
+    /// - Returns: Collection of addresses available on the machine.
+    ///
+    /// - SeeAlso: ``systemEndpoints(on:)``.
+    public static var systemAddresses: AnySequence<String> { .init(Host.current().addresses) }
+
+
+    /// - Returns: Collection of endpoints with available addresses on the machine.
+    ///
+    /// - SeeAlso: ``systemAddresses``.
+    @inlinable
+    public static func systemEndpoints(on port: Port) -> AnySequence<KvNetworkEndpoint> {
+        .init(systemAddresses.lazy.map { .init($0, on: port) })
     }
 
 }

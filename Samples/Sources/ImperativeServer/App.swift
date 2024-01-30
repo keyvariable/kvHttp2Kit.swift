@@ -42,7 +42,7 @@ struct App {
         /// Besides, real hosting providers usually provide specific address and port for internet connections.
         ///
         /// - Note: Host names can be used as addresses.
-        let configurations = Host.current().addresses
+        let configurations = KvNetworkEndpoint.systemAddresses
             .lazy.map { address in KvHttpChannel.Configuration(endpoint: .init(address, on: 8080), http: .v2(ssl: ssl)) }
 
         let server = ImperativeServer(with: configurations)
