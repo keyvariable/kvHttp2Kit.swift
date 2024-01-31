@@ -818,11 +818,10 @@ open class KvHttpChannel {
             set { withLock { _httpChannel = newValue } }
         }
 
-        public var userInfo: Any? {
-            get { withLock { _userInfo } }
-            set { withLock { _userInfo = newValue } }
-        }
+        /// This property is not thread-safe. The receiver's locking methods can be used if needed.
+        public var userInfo: Any?
 
+        /// This property is thread-safe.
         public var requestLimit: UInt {
             get { withLock { _requestLimit } }
             set { withLock { _requestLimit = newValue } }
@@ -841,8 +840,6 @@ open class KvHttpChannel {
 
         /// - Warning: Access to this property must be protected with .mutationLock.
         private weak var _httpChannel: KvHttpChannel?
-        /// - Warning: Access to this property must be protected with .mutationLock.
-        private var _userInfo: Any?
         /// - Warning: Access to this property must be protected with .mutationLock.
         fileprivate var _requestLimit: UInt
 
