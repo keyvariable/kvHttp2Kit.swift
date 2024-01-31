@@ -28,7 +28,7 @@ import Foundation
 /// Information required to establish network connection to the server.
 ///
 /// It holds network address and port. Address can be a string representation of an IP address or the host name.
-public struct KvNetworkEndpoint : Hashable {
+public struct KvNetworkEndpoint : Hashable, CustomStringConvertible {
 
     /// Type of network address.
     public typealias Address = String
@@ -95,5 +95,11 @@ public struct KvNetworkEndpoint : Hashable {
     public static func systemEndpoints(on port: Port) -> AnySequence<KvNetworkEndpoint> {
         .init(systemAddresses.lazy.map { .init($0, on: port) })
     }
+
+
+
+    // MARK: : CustomStringConvertible
+
+    public var description: String { "\(address):\(port)" }
 
 }

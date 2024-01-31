@@ -79,7 +79,7 @@ public protocol KvHttpClientDelegate : AnyObject {
 // MARK: - KvHttpChannel
 
 /// HTTP channels listens for connections and handling connected clients.
-open class KvHttpChannel {
+open class KvHttpChannel : CustomStringConvertible {
 
     public let configuration: Configuration
 
@@ -177,10 +177,21 @@ open class KvHttpChannel {
         // MARK: .HTTP
 
         /// Configuration of HTTP protocol. E.g. version of HTTP protocol, sequrity settings.
-        public enum HTTP : Hashable {
+        public enum HTTP : Hashable, CustomStringConvertible {
 
             case v1_1(ssl: SSL? = nil)
             case v2(ssl: SSL)
+
+
+            // MARK: : CustomStringConvertible
+
+            public var description: String {
+                switch self {
+                case .v1_1(ssl: .none): "HTTP/1.1"
+                case .v1_1(ssl: .some): "HTTPs/1.1"
+                case .v2(ssl: _): "HTTP/2" // - NOTE: HTTP/2 is always secure, so no "s" suffix.
+                }
+            }
 
 
             // MARK: Operations
@@ -331,6 +342,14 @@ open class KvHttpChannel {
         /// Associated type is result of last stop operation.
         case stopped(Result<Void, Error>)
         case stopping
+    }
+
+
+
+    // MARK: : CustomStringConvertible
+
+    public var description: String {
+        "\(Self.self)(endpont: \(configuration.endpoint), http: \(configuration.http))"
     }
 
 
@@ -806,7 +825,7 @@ open class KvHttpChannel {
 
     // MARK: .Client
 
-    public class Client {
+    public class Client : CustomStringConvertible {
 
         public typealias RequestPart = HTTPServerRequestPart
 
@@ -864,6 +883,16 @@ open class KvHttpChannel {
         fileprivate func lock() { mutationLock.lock() }
 
         fileprivate func unlock() { mutationLock.unlock() }
+
+
+        // MARK: : CustomStringConvertible
+
+        public var description: String {
+            let httpChannelToken = "httpChannel: \(httpChannel.map { "\($0)" } ?? "nil")"
+            let unserInfoToken = userInfo.map { ", userInfo: \($0)" } ?? ""
+
+            return "\(Self.self)(\(httpChannelToken)\(unserInfoToken))"
+        }
 
     }
 
