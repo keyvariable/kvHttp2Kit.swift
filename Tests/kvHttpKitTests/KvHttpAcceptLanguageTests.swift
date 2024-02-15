@@ -78,18 +78,18 @@ final class KvHttpAcceptLanguageTests : XCTestCase {
         Assert("en", expecting: E("en", 1.0, 0))
         Assert("*", expecting: E(.wildcard, 1.0, 0))
 
-        Assert("en-US;q=1"    , expecting: E("en-us", 1.0  , 0))
-        Assert("en-US;q=1."   , expecting: E("en-us", 1.0  , 0))
-        Assert("en-US;q=1.0"  , expecting: E("en-us", 1.0  , 0))
-        Assert("en-US;q=0"    , expecting: E("en-us", 0.0  , 0))
-        Assert("en-US;q=0."   , expecting: E("en-us", 0.0  , 0))
-        Assert("en-US;q=0.0"  , expecting: E("en-us", 0.0  , 0))
-        Assert("en-US;q=0.833", expecting: E("en-us", 0.833, 0))
+        Assert("en-US;q=1"    , expecting: E("en-US", 1.0  , 0))
+        Assert("en-US;q=1."   , expecting: E("en-US", 1.0  , 0))
+        Assert("en-US;q=1.0"  , expecting: E("en-US", 1.0  , 0))
+        Assert("en-US;q=0"    , expecting: E("en-US", 0.0  , 0))
+        Assert("en-US;q=0."   , expecting: E("en-US", 0.0  , 0))
+        Assert("en-US;q=0.0"  , expecting: E("en-US", 0.0  , 0))
+        Assert("en-US;q=0.833", expecting: E("en-US", 0.833, 0))
 
         Assert("en-US,*;q=0.5,zh-Hans;q=0.833",
-               expecting: E("en-us", 1.0, 0), E(.wildcard, 0.5, 1), E("zh-hans", 0.833, 2))
+               expecting: E("en-US", 1.0, 0), E(.wildcard, 0.5, 1), E("zh-Hans", 0.833, 2))
         Assert("  en-US  ,  *;q=0.5   ,  zh-Hans;q=0.833   , en-GB   ",
-               expecting: E("en-us", 1.0, 0), E(.wildcard, 0.5, 1), E("zh-hans", 0.833, 2), E("en-gb", 1.0, 3))
+               expecting: E("en-US", 1.0, 0), E(.wildcard, 0.5, 1), E("zh-Hans", 0.833, 2), E("en-GB", 1.0, 3))
 
         // Errors
 
@@ -116,11 +116,11 @@ final class KvHttpAcceptLanguageTests : XCTestCase {
         Assert("q=0.123")
 
         Assert("en-US,* ;q=0.5,zh-Hans;q=0.833",
-               expecting: E("en-us", 1.0, 0))
+               expecting: E("en-US", 1.0, 0))
         Assert("en-US,*; q=0.5,zh-Hans;q=0.833",
-               expecting: E("en-us", 1.0, 0))
+               expecting: E("en-US", 1.0, 0))
         Assert("en-US,*;q=0.5,zh- Hans;q=0.833",
-               expecting: E("en-us", 1.0, 0), E(.wildcard, 0.5, 1))
+               expecting: E("en-US", 1.0, 0), E(.wildcard, 0.5, 1))
     }
 
 }

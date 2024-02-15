@@ -151,10 +151,7 @@ public struct KvHttpAcceptLanguage { private init() { }
                     else { return InvalidateAndReturnNil() }
 
                 case .tag:
-                    if c.isLetter {
-                        tag += c.lowercased()
-                    }
-                    else if c == "-" || c.isNumber {
+                    if c.isLetter || c == "-" || c.isNumber {
                         tag += String(c)
                     }
                     else if c.isWhitespace {
