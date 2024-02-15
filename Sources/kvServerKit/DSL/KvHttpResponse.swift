@@ -1028,11 +1028,23 @@ extension KvHttpResponse.ParameterizedResponse where QueryItemGroup : KvUrlQuery
 
 extension KvHttpResponse.ParameterizedResponse where RequestHeaders == KvHttpRequestIgnoredHeaders {
 
+    /// Adds raw HTTP headers into the input passed to the response callback.
+    ///
+    /// See ``requestHeadersMap(_:)-4ceet`` and ``requestHeadersFlatMap(_:)-3mu63`` to perform custom processing of or filtering by raw HTTP headers.
+    /// Consider these methods to reduce performance costs and memory usage.
+    @inlinable
+    public var requestHeaders: HandlingRequestHeaders<KvHttpServer.RequestHeaders> {
+        requestHeadersFlatMap { .success($0) }
+    }
+
+
     /// Adds transformation of HTTP request headers.
     ///
     /// The result of transformation is available in the input passed to the callback. Use this method to collect some data from HTTP request headers and then use it in the callback.
     ///
     /// See ``requestHeadersFlatMap(_:)-3mu63`` to reject HTTP requests by their headers.
+    ///
+    /// - SeeAlso: ``requestHeaders``.
     @inlinable
     public func requestHeadersMap<H>(_ transform: @escaping (KvHttpServer.RequestHeaders) -> H) -> HandlingRequestHeaders<H> {
         requestHeadersFlatMap { .success(transform($0)) }
@@ -1044,6 +1056,8 @@ extension KvHttpResponse.ParameterizedResponse where RequestHeaders == KvHttpReq
     /// The result of succeeded transformation is available in the input passed to the callback. Use this method to collect some data from HTTP request headers and then use it in the callback.
     ///
     /// See ``requestHeadersMap(_:)-4ceet`` if there is no need to validate headers of HTTP requests.
+    ///
+    /// - SeeAlso: ``requestHeaders``.
     @inlinable
     public func requestHeadersFlatMap<H>(_ transform: @escaping (KvHttpServer.RequestHeaders) -> Result<H, Error>) -> HandlingRequestHeaders<H> {
         map { .init(
