@@ -33,7 +33,7 @@ import Foundation
 /// @main
 /// struct ExampleServer : KvServer {
 ///     var body: some KvResponseRootGroup {
-///         KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
+///         KvGroup(http: .v2(ssl: ssl), at: KvNetworkEndpoint.systemEndpoints(on: 8080)) {
 ///             KvGroup(hosts: "example.com", optionalSubdomains: "www") {
 ///                 URL(string: "file:///var/www/example.com/")
 ///

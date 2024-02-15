@@ -55,7 +55,7 @@ struct DeclarativeServer : KvServer {
         /// ```swift
         /// KvGroup(http: .v2(ssl: ssl), at: Host.current().names, on: [ 8080 ])
         /// ```
-        KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
+        KvGroup(http: .v2(ssl: ssl), at: KvNetworkEndpoint.systemAddresses, on: [ 8080 ]) {
             /// A hierarchy of files at some URL can be declared with just URL.
             /// It's a good way to declare frontends and resource directories.
             /// This directory is declared at the root of server's response hierarchy, so entire URL paths in requests are appended to the directory's root URL.

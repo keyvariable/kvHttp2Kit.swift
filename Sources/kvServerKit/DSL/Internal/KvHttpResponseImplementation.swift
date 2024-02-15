@@ -88,7 +88,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
     typealias Input = KvHttpResponseInput<QueryParser.Value, Headers, BodyValue, SubpathValue>
     typealias ResponseContext = KvHttpResponseContext
 
-    typealias ResponseProvider = (Input) throws -> KvHttpResponseContent
+    typealias ResponseProvider = (Input) throws -> KvHttpResponseContent?
 
 
 
@@ -256,7 +256,7 @@ where QueryParser == KvEmptyUrlQueryParser,
     /// Initializes implementation for emptry URL query, requiring head-only request, providing no analysis of request headers.
     ///
     /// - Parameter clientCallbacks: The response's (unresolved) client callbacks.
-    init(clientCallbacks: ClientCallbacks?, responseProvider: @escaping () throws -> KvHttpResponseContent) {
+    init(clientCallbacks: ClientCallbacks?, responseProvider: @escaping () throws -> KvHttpResponseContent?) {
         self.init(subpathFilter: { _ in .accepted(()) },
                   urlQueryParser: .init(),
                   headCallback: { _ in .success(()) },

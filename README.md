@@ -56,7 +56,7 @@ struct ExampleServer : KvServer {
     var body: some KvResponseRootGroup {
         let ssl: KvHttpChannel.Configuration.SSL = loadHttpsCertificate()
 
-        KvGroup(http: .v2(ssl: ssl), at: Host.current().addresses, on: [ 8080 ]) {
+        KvGroup(http: .v2(ssl: ssl), at: KvNetworkEndpoint.systemAddresses, on: [ 8080 ]) {
             KvGroup(hosts: "example.com",
                     hostAliases: "example.org", "example.net",
                     optionalSubdomains: "www")

@@ -44,7 +44,7 @@ protocol KvHttpRequestBodyInternal : KvHttpRequestBody {
 
     typealias Configuration = KvHttpRequestBodyConfiguration
 
-    typealias ResponseBlock = (Value) throws -> KvHttpResponseContent
+    typealias ResponseBlock = (Value) throws -> KvHttpResponseContent?
 
 
     func with(baseConfiguration: Configuration) -> Self
