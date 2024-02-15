@@ -136,7 +136,7 @@ public struct KvHttpResponse : KvResponse {
     /// ```
     ///
     /// - SeeAlso: ``with``.
-    public init(content: @escaping () throws -> KvHttpResponseContent) {
+    public init(content: @escaping () throws -> KvHttpResponseContent?) {
         self.init(implementationBlock: { implementationConfiguration in
             KvHttpResponseImplementation(clientCallbacks: implementationConfiguration.clientCallbacks,
                                          responseProvider: content)
@@ -436,7 +436,7 @@ extension KvHttpResponse {
         private func makeImplementation<QueryParser>(
             _ queryParser: QueryParser,
             _ implementationConfiguration: ImplementationConfiguration,
-            _ callback: @escaping (Input) throws -> KvHttpResponseContent
+            _ callback: @escaping (Input) throws -> KvHttpResponseContent?
         ) -> KvHttpResponseImplementation<QueryParser, RequestHeaders, RequestBodyValue, Subpath, SubpathValue>
         where QueryParser : KvUrlQueryParserProtocol, QueryParser.Value == QueryItemGroup.Value
         {
@@ -466,7 +466,7 @@ extension KvHttpResponse.ParameterizedResponse where QueryItemGroup == KvEmptyUr
     /// - Parameter callback: Function to be called for each request with a request input.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
-    public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent) -> KvHttpResponse {
+    public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent?) -> KvHttpResponse {
         return .init { implementationConfiguration in
             makeImplementation(KvEmptyUrlQueryParser(), implementationConfiguration, callback)
         }
@@ -482,7 +482,7 @@ extension KvHttpResponse.ParameterizedResponse where QueryItemGroup : KvRawUrlQu
     /// - Parameter callback: Function to be called for each request with a request input.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
-    public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent) -> KvHttpResponse {
+    public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent?) -> KvHttpResponse {
         return .init { implementationConfiguration in
             makeImplementation(KvRawUrlQueryParser(for: configuration.queryItemGroup), implementationConfiguration, callback)
         }
@@ -498,7 +498,7 @@ extension KvHttpResponse.ParameterizedResponse where QueryItemGroup : KvUrlQuery
     /// - Parameter callback: Function to be called for each request with a request input.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
-    public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent) -> KvHttpResponse {
+    public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent?) -> KvHttpResponse {
         return .init { implementationConfiguration in
             makeImplementation(KvUrlQueryParser(for: configuration.queryItemGroup), implementationConfiguration, callback)
         }
