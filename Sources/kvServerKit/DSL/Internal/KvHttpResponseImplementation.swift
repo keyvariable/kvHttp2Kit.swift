@@ -212,7 +212,8 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
             let responseProvider = responseProvider
 
             return .success(body.makeRequestHandler(requestContext, responseContext.clientCallbacks) { bodyValue in
-                try responseProvider(.init(query: queryValue,
+                try responseProvider(.init(requestContext: requestContext,
+                                           query: queryValue,
                                            requestHeaders: headers,
                                            requestBody: bodyValue as! BodyValue,
                                            subpath: subpathValue))

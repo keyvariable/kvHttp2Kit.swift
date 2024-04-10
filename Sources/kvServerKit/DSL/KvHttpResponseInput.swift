@@ -24,6 +24,9 @@
 /// Type representing processed content of an HTTP request declared as ``KvHttpResponse``. It's passed to the response's content callback.
 public struct KvHttpResponseInput<QueryValue, RequestHeaders, RequestBodyValue, SubpathValue> {
 
+    /// Context the request is being processed in. E.g. it provides HTTP method and URL components.
+    public let requestContext: KvHttpRequestContext
+
     /// Result of URL query processing. Use related modifiers of ``KvHttpResponse/ParameterizedResponse`` to enable processing of URL query.
     public let query: QueryValue
 
