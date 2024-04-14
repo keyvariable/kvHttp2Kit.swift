@@ -32,7 +32,7 @@ import kvHttpKit
 /// See: ``init(bodyLengthLimit:initial:nextPartialResult:responseBlock:)``, ``init(bodyLengthLimit:into:updateAccumulatingResult:responseBlock:)``.
 open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = (PartialResult) throws -> KvHttpResponseContent?
+    public typealias ResponseBlock = (PartialResult, KvHttpResponseProvider) -> Void
 
 
 
@@ -45,7 +45,7 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     let bodyCallback: (UnsafeRawBufferPointer) throws -> Void
 
     @usableFromInline
-    let responseBlock: () throws -> KvHttpResponseContent?
+    let responseBlock: (KvHttpResponseProvider) -> Void
 
 
 
@@ -67,8 +67,8 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
         self.bodyCallback = { bytes in
             partialResult = try nextPartialResult(partialResult, bytes)
         }
-        self.responseBlock = {
-            try responseBlock(partialResult)
+        self.responseBlock = { completion in
+            responseBlock(partialResult, completion)
         }
     }
 
@@ -91,8 +91,8 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
         self.bodyCallback = { bytes in
             try updateAccumulatingResult(&partialResult, bytes)
         }
-        self.responseBlock = {
-            try responseBlock(partialResult)
+        self.responseBlock = { completion in
+            responseBlock(partialResult, completion)
         }
     }
 
@@ -113,8 +113,8 @@ open class KvHttpReducingRequestHandler<PartialResult> : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseContent? {
-        return try responseBlock()
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client, completion: KvHttpResponseProvider) {
+        responseBlock(completion)
     }
 
 

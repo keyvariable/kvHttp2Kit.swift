@@ -32,7 +32,7 @@ import kvHttpKit
 /// - Note: Requests having no body are ignored and `nil` response are returned.
 open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = (T) throws -> KvHttpResponseContent?
+    public typealias ResponseBlock = (T, KvHttpResponseProvider) -> Void
 
 
 
@@ -40,11 +40,15 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     /// - Parameter responseBlock: Block passed with result of decoding collected request body data and returning response to be send to a client.
     @inlinable
     public init(bodyLengthLimit: UInt = KvHttpRequest.Constants.bodyLengthLimit, responseBlock: @escaping ResponseBlock) {
-        underlying = .init(bodyLengthLimit: bodyLengthLimit, responseBlock: { data in
-            guard let data = data else { return nil }
+        underlying = .init(bodyLengthLimit: bodyLengthLimit, responseBlock: { data, completion in
+            guard let data = data else { return }
 
-            let value = try JSONDecoder().decode(T.self, from: data)
-            return try responseBlock(value)
+            let value: T
+
+            do { value = try JSONDecoder().decode(T.self, from: data) }
+            catch { return completion(error) }
+
+            responseBlock(value, completion)
         })
     }
 
@@ -74,8 +78,8 @@ open class KvHttpJsonRequestHandler<T : Decodable> : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseContent? {
-        return try underlying.httpClientDidReceiveEnd(httpClient)
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client, completion: KvHttpResponseProvider) {
+        underlying.httpClientDidReceiveEnd(httpClient, completion: completion)
     }
 
 

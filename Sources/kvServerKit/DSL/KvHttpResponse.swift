@@ -125,9 +125,19 @@ public struct KvHttpResponse : KvResponse {
 
     // MARK: Simple Response
 
+    private init(callback: @escaping (KvHttpResponseProvider) -> Void) {
+        self.init(implementationBlock: { implementationConfiguration in
+            KvHttpResponseImplementation(
+                clientCallbacks: implementationConfiguration.clientCallbacks,
+                responseProvider: callback
+            )
+        })
+    }
+
+
     /// Initializes simple HTTP response those content is provided by *content* callback.
     ///
-    /// Content of simple HTTP responses don't depend on a request content.
+    /// Content of simple HTTP responses doesn't depend on a request.
     ///
     /// Below is an example of a simple HTTP response with standard text representation of a generated UUID:
     ///
@@ -135,12 +145,29 @@ public struct KvHttpResponse : KvResponse {
     /// KvHttpResponse { .string { UUID().uuidString } }
     /// ```
     ///
+    /// There are overloads of this initializer with `async`, `throws` and `async throws` content blocks.
+    ///
     /// - SeeAlso: ``with``.
+    public init(content: @escaping () -> KvHttpResponseContent?) {
+        self.init(callback: { $0.invoke(with: content) })
+    }
+
+
+    /// An overload of ``init(content:)`` with throwing callback argument.
     public init(content: @escaping () throws -> KvHttpResponseContent?) {
-        self.init(implementationBlock: { implementationConfiguration in
-            KvHttpResponseImplementation(clientCallbacks: implementationConfiguration.clientCallbacks,
-                                         responseProvider: content)
-        })
+        self.init(callback: { $0.invoke(with: content) })
+    }
+
+
+    /// An overload of ``init(content:)`` with asynchronous callback argument.
+    public init(content: @escaping () async -> KvHttpResponseContent?) {
+        self.init(callback: { $0.invoke(with: content) })
+    }
+
+
+    /// An overload of ``init(content:)`` with asynchronous throwing callback argument.
+    public init(content: @escaping () async throws -> KvHttpResponseContent?) {
+        self.init(callback: { $0.invoke(with: content) })
     }
 
 
@@ -211,7 +238,7 @@ public struct KvHttpResponse : KvResponse {
     /// }
     /// ```
     ///
-    /// - SeeAlso: ``init(content:)``.
+    /// - SeeAlso: ``init(content:)-5zj38``.
     @inlinable
     public static var with: InitialParameterizedResponse { .init() }
 
@@ -432,26 +459,29 @@ extension KvHttpResponse {
 
         // MARK: Completion
 
-        /// Shorthand auxiliary method.
-        private func makeImplementation<QueryParser>(
+        /// A template method for the public overloads.
+        private func content<QueryParser>(
             _ queryParser: QueryParser,
-            _ implementationConfiguration: ImplementationConfiguration,
-            _ callback: @escaping (Input) throws -> KvHttpResponseContent?
-        ) -> KvHttpResponseImplementation<QueryParser, RequestHeaders, RequestBodyValue, Subpath, SubpathValue>
-        where QueryParser : KvUrlQueryParserProtocol, QueryParser.Value == QueryItemGroup.Value
+            _ callback: @escaping (Input, KvHttpResponseProvider) -> Void
+        ) -> KvHttpResponse
+        where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider, QueryParser.Value == QueryItemGroup.Value
         {
-            var body = configuration.requestBody
+            return .init { implementationConfiguration in
+                var body = configuration.requestBody
 
-            if let baseBodyConfiguration = implementationConfiguration.httpRequestBody {
-                body = body.with(baseConfiguration: baseBodyConfiguration)
+                if let baseBodyConfiguration = implementationConfiguration.httpRequestBody {
+                    body = body.with(baseConfiguration: baseBodyConfiguration)
+                }
+
+                return KvHttpResponseImplementation(
+                    subpathFilter: configuration.subpathFilter,
+                    urlQueryParser: queryParser,
+                    headCallback: configuration.requestHeadCallback,
+                    body: body,
+                    clientCallbacks: implementationConfiguration.clientCallbacks,
+                    responseProvider: callback
+                )
             }
-
-            return KvHttpResponseImplementation(subpathFilter: configuration.subpathFilter,
-                                                urlQueryParser: queryParser,
-                                                headCallback: configuration.requestHeadCallback,
-                                                body: body,
-                                                clientCallbacks: implementationConfiguration.clientCallbacks,
-                                                responseProvider: callback)
         }
 
     }
@@ -463,12 +493,47 @@ extension KvHttpResponse {
 
 extension KvHttpResponse.ParameterizedResponse where QueryItemGroup == KvEmptyUrlQueryItemGroup {
 
+    private func content(_ callback: @escaping (Input, KvHttpResponseProvider) -> Void) -> KvHttpResponse {
+        content(KvEmptyUrlQueryParser(), callback)
+    }
+
+
+    /// Call this method to finalize configuration of an HTTP response.
+    ///
     /// - Parameter callback: Function to be called for each request with a request input.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
+    ///
+    /// There are overloads of this method with `async`, `throws` and `async throws` callback blocks.
+    ///
+    /// See ``KvHttpResponse`` for examples.
+    public func content(_ callback: @escaping (Input) -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
     public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent?) -> KvHttpResponse {
-        return .init { implementationConfiguration in
-            makeImplementation(KvEmptyUrlQueryParser(), implementationConfiguration, callback)
+        content { input, completion in
+            completion.invoke(with: { try callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
+    public func content(_ callback: @escaping (Input) async -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { await callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
+    public func content(_ callback: @escaping (Input) async throws -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { try await callback(input) })
         }
     }
 
@@ -479,12 +544,47 @@ extension KvHttpResponse.ParameterizedResponse where QueryItemGroup == KvEmptyUr
 
 extension KvHttpResponse.ParameterizedResponse where QueryItemGroup : KvRawUrlQueryItemGroupProtocol {
 
+    private func content(_ callback: @escaping (Input, KvHttpResponseProvider) -> Void) -> KvHttpResponse {
+        content(KvRawUrlQueryParser(for: configuration.queryItemGroup), callback)
+    }
+
+
+    /// Call this method to finalize configuration of an HTTP response.
+    ///
     /// - Parameter callback: Function to be called for each request with a request input.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
+    ///
+    /// There are overloads of this method with `async`, `throws` and `async throws` callback blocks.
+    ///
+    /// See ``KvHttpResponse`` for examples.
+    public func content(_ callback: @escaping (Input) -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
     public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent?) -> KvHttpResponse {
-        return .init { implementationConfiguration in
-            makeImplementation(KvRawUrlQueryParser(for: configuration.queryItemGroup), implementationConfiguration, callback)
+        content { input, completion in
+            completion.invoke(with: { try callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
+    public func content(_ callback: @escaping (Input) async -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { await callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
+    public func content(_ callback: @escaping (Input) async throws -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { try await callback(input) })
         }
     }
 
@@ -495,12 +595,47 @@ extension KvHttpResponse.ParameterizedResponse where QueryItemGroup : KvRawUrlQu
 
 extension KvHttpResponse.ParameterizedResponse where QueryItemGroup : KvUrlQueryItemImplementationProvider {
 
+    private func content(_ callback: @escaping (Input, KvHttpResponseProvider) -> Void) -> KvHttpResponse {
+        content(KvUrlQueryParser(for: configuration.queryItemGroup), callback)
+    }
+
+
+    /// Call this method to finalize configuration of an HTTP response.
+    ///
     /// - Parameter callback: Function to be called for each request with a request input.
     ///
     /// - Returns: Configured instance of ``KvHttpResponse``.
+    ///
+    /// There are overloads of this method with `async`, `throws` and `async throws` callback blocks.
+    ///
+    /// See ``KvHttpResponse`` for examples.
+    public func content(_ callback: @escaping (Input) -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
     public func content(_ callback: @escaping (Input) throws -> KvHttpResponseContent?) -> KvHttpResponse {
-        return .init { implementationConfiguration in
-            makeImplementation(KvUrlQueryParser(for: configuration.queryItemGroup), implementationConfiguration, callback)
+        content { input, completion in
+            completion.invoke(with: { try callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
+    public func content(_ callback: @escaping (Input) async -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { await callback(input) })
+        }
+    }
+
+
+    /// An overload of ``content(_:)`` with throwing callback argument.
+    public func content(_ callback: @escaping (Input) async throws -> KvHttpResponseContent?) -> KvHttpResponse {
+        content { input, completion in
+            completion.invoke(with: { try await callback(input) })
         }
     }
 

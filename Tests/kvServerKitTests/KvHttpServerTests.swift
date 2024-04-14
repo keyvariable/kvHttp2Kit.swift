@@ -408,11 +408,13 @@ extension KvHttpServerTests {
         fileprivate class EchoRequestHandler : KvHttpRequest.CollectingBodyHandler {
 
             init() {
-                super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body in
-                    guard let body = body else { return nil }
+                super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body, completion in
+                    guard let body = body else { return }
 
-                    return .binary { body }
-                        .contentLength(body.count)
+                    completion(
+                        .binary { body }
+                            .contentLength(body.count)
+                    )
                 }
             }
 

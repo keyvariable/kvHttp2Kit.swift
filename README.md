@@ -4,7 +4,7 @@
 
 - secure connections over HTTP/1.1 and HTTP/2.0;
 - imperative and declarative APIs;
-- multithreaded request processing;
+- multithreaded and asynchronous request processing;
 - validation of requests and various automatic customizable context-dependent responses, e.g. 400, 404, 413;
 - automatic Content-Type, Last-Modified and ETag headers for file responses;
 - automatic 304 and 412 responses for preconditions on ETag and modification date;
