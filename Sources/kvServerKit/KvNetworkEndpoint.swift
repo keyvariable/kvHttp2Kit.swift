@@ -81,11 +81,57 @@ public struct KvNetworkEndpoint : Hashable, CustomStringConvertible {
 
     // MARK: System Endpoints
 
-    // TODO: Migrate from deprecated `Host.current().addresses` to an up-to-date method.
     /// - Returns: Collection of addresses available on the machine.
     ///
     /// - SeeAlso: ``systemEndpoints(on:)``.
-    public static var systemAddresses: AnySequence<String> { .init(Host.current().addresses) }
+    public static var systemAddresses: AnySequence<String> {
+        
+        func GetAddress(pointer: UnsafeMutablePointer<sockaddr>, length: socklen_t, limit: Int32) -> String? {
+            var name = [CChar](repeating: 0, count: numericCast(limit))
+
+            guard getnameinfo(pointer, length, &name, socklen_t(name.count), nil, 0, NI_NUMERICHOST | NI_NUMERICSERV) == 0
+            else { return nil }
+
+            return String(cString: name)
+        }
+
+
+        var interfaces: UnsafeMutablePointer<ifaddrs>? = nil
+
+        guard getifaddrs(&interfaces) == 0 else { return .init(EmptyCollection()) }
+
+        defer { freeifaddrs(interfaces) }
+
+        var ipAddresses = Set<String>()
+
+        var next = interfaces
+        while let interface = next?.pointee {
+            defer { next = interface.ifa_next }
+
+            guard let ptr = interface.ifa_addr else { continue }
+
+            let length: Int
+            let limit: Int32
+
+            switch Int32(ptr.pointee.sa_family) {
+            case AF_INET:
+                (length, limit) = (MemoryLayout<sockaddr_in>.size, INET_ADDRSTRLEN)
+            case AF_INET6:
+                (length, limit) = (MemoryLayout<sockaddr_in6>.size, INET6_ADDRSTRLEN)
+            default:
+                continue
+            }
+
+            var name = [CChar](repeating: 0, count: numericCast(limit))
+
+            guard getnameinfo(ptr, socklen_t(length), &name, socklen_t(name.count), nil, 0, NI_NUMERICHOST | NI_NUMERICSERV) == 0
+            else { break }
+
+            ipAddresses.insert(String(cString: name))
+        }
+
+        return .init(ipAddresses)
+    }
 
 
     /// - Returns: Collection of endpoints with available addresses on the machine.
