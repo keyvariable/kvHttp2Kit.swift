@@ -35,6 +35,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     // MARK: - testMultichannelServer()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testMultichannelServer() async throws {
 
         /// A server provifing a simple response at the root receiving requests on several channels.
@@ -72,6 +73,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     // MARK: - testResponseHierarchy()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testResponseHierarchy() async throws {
 
         /// A server providing non-trivial hierarchy of various responses.
@@ -173,6 +175,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     // MARK: - testResponseGroupModifiers()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testResponseGroupModifiers() async throws {
 
         struct ModifiedResponseGroupServer : KvServer {
@@ -207,6 +210,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     // MARK: - testQueryOverloads()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testQueryOverloads() async throws {
 
         struct OverloadedQueryServer : KvServer {
@@ -472,6 +476,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     // MARK: - testCascadeNetworkModifiers()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testCascadeNetworkModifiers() async throws {
 
         struct CascadeNetworkModifierServer : KvServer {
@@ -503,6 +508,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     // MARK: - testCascadeHttpMethodModifiers()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testCascadeHttpMethodModifiers() async throws {
 
         struct CascadeHttpMethodModifierServer : KvServer {
@@ -644,6 +650,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     // MARK: - testOnHttpIncident()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testOnHttpIncident() async throws {
 
         struct IncidentServer : KvServer {
@@ -754,6 +761,7 @@ final class KvResponseGroupTests : XCTestCase {
 
     // MARK: - testUrlDeclarations()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testUrlDeclarations() async throws {
 
         struct UrlDeclarationServer : KvServer {

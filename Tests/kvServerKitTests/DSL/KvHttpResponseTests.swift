@@ -35,6 +35,7 @@ final class KvHttpResponseTests : XCTestCase {
 
     // MARK: - testRequestBody()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testRequestBody() async throws {
 
         struct RequestBodyServer : KvServer {
@@ -82,6 +83,7 @@ final class KvHttpResponseTests : XCTestCase {
 
     // MARK: - testJsonRequestBody()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testJsonRequestBody() async throws {
 
         struct JsonDateServer : KvServer {
@@ -130,6 +132,7 @@ final class KvHttpResponseTests : XCTestCase {
     // MARK: - testQueryItems()
 
     /// Tests special kinds of query items. Common query items are tested in other tests.
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testQueryItems() async throws {
 
         struct QueryItemServer : KvServer {
@@ -170,6 +173,7 @@ final class KvHttpResponseTests : XCTestCase {
     // MARK: - testRequestBodyLimit()
 
     /// Tests request body limit modifiers in groups and responses.
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testRequestBodyLimit() async throws {
 
         struct BodyLimitServer : KvServer {
@@ -282,6 +286,7 @@ final class KvHttpResponseTests : XCTestCase {
 
     // MARK: - testSubpathResponse()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testSubpathResponse() async throws {
 
         struct SubpathResponseServer : KvServer {
@@ -353,6 +358,7 @@ final class KvHttpResponseTests : XCTestCase {
 
     // MARK: - testSubpathFilter()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testSubpathFilter() async throws {
 
         struct SubpathFilterServer : KvServer {
@@ -406,6 +412,7 @@ final class KvHttpResponseTests : XCTestCase {
 
     // MARK: - testBodyCallbackResponse()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testBodyCallbackResponse() async throws {
         typealias Value = Int
 
@@ -497,6 +504,7 @@ final class KvHttpResponseTests : XCTestCase {
 
     // MARK: - testFileStreamResponse()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testFileStreamResponse() async throws {
 
         struct FileStreamServer : KvServer {
@@ -530,6 +538,7 @@ final class KvHttpResponseTests : XCTestCase {
 
     // MARK: - testFileResponse()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testFileResponse() async throws {
 
         struct FileServer : KvServer {
