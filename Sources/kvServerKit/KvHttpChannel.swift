@@ -416,6 +416,7 @@ open class KvHttpChannel : CustomStringConvertible {
         }
 
 
+        @Sendable
         func ConfigureHttp1(_ controller: KvHttpChannel?, channel: Channel, channelHandler: InternalChannelHandler) -> EventLoopFuture<Void> {
             channelHandler.httpVersion = .http1_1
 
@@ -428,6 +429,7 @@ open class KvHttpChannel : CustomStringConvertible {
         }
 
 
+        @Sendable
         func ConfigureHttp2(_ controller: KvHttpChannel?, channel: Channel, channelHandler: InternalChannelHandler) -> EventLoopFuture<Void> {
             channelHandler.httpVersion = .http2
 
