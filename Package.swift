@@ -26,7 +26,7 @@ let swiftSettings: [SwiftSetting]? = nil
 let package = Package(
     name: "kvServerKit.swift",
 
-    platforms: [ .iOS(.v11), .macOS(.v10_15), ],
+    platforms: [ .macOS(.v10_15), .iOS(.v13), ],
 
     products: [
         .library(name: "kvServerKit", targets: [ "kvServerKit" ]),

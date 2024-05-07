@@ -88,7 +88,7 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
     typealias Input = KvHttpResponseInput<QueryParser.Value, Headers, BodyValue, SubpathValue>
     typealias ResponseContext = KvHttpResponseContext
 
-    typealias ResponseProvider = (Input) throws -> KvHttpResponseContent?
+    typealias ResponseProvider = (Input, KvHttpResponseProvider) -> Void
 
 
 
@@ -211,11 +211,14 @@ where QueryParser : KvUrlQueryParserProtocol & KvUrlQueryParseResultProvider,
 
             let responseProvider = responseProvider
 
-            return .success(body.makeRequestHandler(requestContext, responseContext.clientCallbacks) { bodyValue in
-                try responseProvider(.init(query: queryValue,
-                                           requestHeaders: headers,
-                                           requestBody: bodyValue as! BodyValue,
-                                           subpath: subpathValue))
+            return .success(body.makeRequestHandler(requestContext, responseContext.clientCallbacks) { bodyValue, completion in
+                let input = Input(requestContext: requestContext,
+                                  query: queryValue,
+                                  requestHeaders: headers,
+                                  requestBody: bodyValue as! BodyValue,
+                                  subpath: subpathValue)
+
+                responseProvider(input, completion)
             })
         }
 
@@ -256,13 +259,13 @@ where QueryParser == KvEmptyUrlQueryParser,
     /// Initializes implementation for emptry URL query, requiring head-only request, providing no analysis of request headers.
     ///
     /// - Parameter clientCallbacks: The response's (unresolved) client callbacks.
-    init(clientCallbacks: ClientCallbacks?, responseProvider: @escaping () throws -> KvHttpResponseContent?) {
+    init(clientCallbacks: ClientCallbacks?, responseProvider: @escaping (KvHttpResponseProvider) -> Void) {
         self.init(subpathFilter: { _ in .accepted(()) },
                   urlQueryParser: .init(),
                   headCallback: { _ in .success(()) },
                   body: KvHttpRequestProhibitedBody(),
                   clientCallbacks: clientCallbacks,
-                  responseProvider: { _ in try responseProvider() })
+                  responseProvider: { input, completion in responseProvider(completion) })
     }
 
 }

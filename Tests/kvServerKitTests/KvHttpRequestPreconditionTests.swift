@@ -118,6 +118,7 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
     // MARK: - testETagPrecondition()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testETagPrecondition() async throws {
         typealias ETag = KvHttpEntityTag
 
@@ -196,6 +197,7 @@ final class KvHttpRequestPreconditionTests : XCTestCase {
 
     // MARK: - testModificationDatePrecondition()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testModificationDatePrecondition() async throws {
 
         struct ModificationDateServer : KvServer {

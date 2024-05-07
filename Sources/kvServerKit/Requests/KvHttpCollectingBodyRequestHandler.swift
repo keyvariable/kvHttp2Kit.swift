@@ -30,7 +30,7 @@ import kvHttpKit
 /// Request handler collecting body fragments and then handling entire body.
 open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
 
-    public typealias ResponseBlock = (Data?) throws -> KvHttpResponseContent?
+    public typealias ResponseBlock = (Data?, KvHttpResponseProvider) -> Void
 
 
 
@@ -73,8 +73,8 @@ open class KvHttpCollectingBodyRequestHandler : KvHttpRequestHandler {
     ///
     /// - SeeAlso ``KvHttpRequestHandler``.
     @inlinable
-    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client) throws -> KvHttpResponseContent? {
-        return try responseBlock(bodyData)
+    open func httpClientDidReceiveEnd(_ httpClient: KvHttpChannel.Client, completion: KvHttpResponseProvider) {
+        responseBlock(bodyData, completion)
     }
 
 

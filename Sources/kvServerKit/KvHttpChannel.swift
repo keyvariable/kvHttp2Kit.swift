@@ -416,6 +416,7 @@ open class KvHttpChannel : CustomStringConvertible {
         }
 
 
+        @Sendable
         func ConfigureHttp1(_ controller: KvHttpChannel?, channel: Channel, channelHandler: InternalChannelHandler) -> EventLoopFuture<Void> {
             channelHandler.httpVersion = .http1_1
 
@@ -428,6 +429,7 @@ open class KvHttpChannel : CustomStringConvertible {
         }
 
 
+        @Sendable
         func ConfigureHttp2(_ controller: KvHttpChannel?, channel: Channel, channelHandler: InternalChannelHandler) -> EventLoopFuture<Void> {
             channelHandler.httpVersion = .http2
 
@@ -784,7 +786,7 @@ open class KvHttpChannel : CustomStringConvertible {
         /// Failed to process a request header. Details are in *message* associated value.
         /// By default `.badRequest` (400) status is returned.
         case invalidHeader(_ message: String)
-        /// This incident is emitted when request handler returns `nil` response from ``KvHttpRequestHandler/httpClientDidReceiveEnd(_:)`` method.
+        /// This incident is emitted when request handler returns `nil` response from ``KvHttpRequestHandler/httpClientDidReceiveEnd(_:completion:)`` method.
         /// By default `.notFound` (404) status is returned.
         case noResponse
         /// This incident is emitted when error occurs while processing request body bytes or request end.
@@ -1367,13 +1369,18 @@ open class KvHttpChannel : CustomStringConvertible {
             switch requestProcessingState {
             case .processing(let requestContext):
                 dispatchQueue.async {
-                    let response: KvHttpResponseContent?
-                    do { response = try requestContext.handler.httpClientDidReceiveEnd(self) }
-                    catch { return self.processIncident(.requestProcessingError(error), isResponseComplete: true, in: context, requestContext) }
+                    let completion = KvHttpResponseProvider { result in
+                        switch result {
+                        case .success(.some(let response)):
+                            self.channelWrite(response, in: context, requestContext)
+                        case .success(.none):
+                            self.processIncident(.noResponse, isResponseComplete: true, in: context, requestContext)
+                        case .failure(let error):
+                            self.processIncident(.requestProcessingError(error), isResponseComplete: true, in: context, requestContext)
+                        }
+                    }
 
-                    guard let response = response else { return self.processIncident(.noResponse, isResponseComplete: true, in: context, requestContext) }
-
-                    self.channelWrite(response, in: context, requestContext)
+                    requestContext.handler.httpClientDidReceiveEnd(self, completion: completion)
                 }
 
                 requestProcessingState = .idle

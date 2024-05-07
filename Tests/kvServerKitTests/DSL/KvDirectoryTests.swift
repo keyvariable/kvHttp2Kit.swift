@@ -35,6 +35,7 @@ final class KvDirectoryTests : XCTestCase {
 
     // MARK: - testDefaultDirectory()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testDefaultDirectory() async throws {
 
         struct DefaultDirectoryServer : KvServer {
@@ -160,6 +161,7 @@ final class KvDirectoryTests : XCTestCase {
 
     // MARK: - testBlackAndWhiteLists()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testBlackAndWhiteLists() async throws {
 
         struct AccessListServer : KvServer {
@@ -230,6 +232,7 @@ final class KvDirectoryTests : XCTestCase {
 
     // MARK: - testHttpMethodConstraint()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testHttpMethodConstraint() async throws {
 
         struct TestServer : KvServer {
@@ -257,6 +260,7 @@ final class KvDirectoryTests : XCTestCase {
 
     // MARK: - testStatusURL()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testStatusDirectory() async throws {
 
         struct StatusDirectoryServer : KvServer {
@@ -343,6 +347,7 @@ final class KvDirectoryTests : XCTestCase {
 
     // MARK: - testMixedDirectory()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testMixedDirectory() async throws {
 
         struct MixedServer : KvServer {
@@ -410,6 +415,7 @@ final class KvDirectoryTests : XCTestCase {
 
     // MARK: - testIndexFiles()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testIndexFiles() async throws {
 
         struct IndexServer : KvServer {

@@ -44,7 +44,7 @@ protocol KvHttpRequestBodyInternal : KvHttpRequestBody {
 
     typealias Configuration = KvHttpRequestBodyConfiguration
 
-    typealias ResponseBlock = (Value) throws -> KvHttpResponseContent?
+    typealias ResponseBlock = (Value, KvHttpResponseProvider) -> Void
 
 
     func with(baseConfiguration: Configuration) -> Self
@@ -131,8 +131,8 @@ public struct KvHttpRequestProhibitedBody : KvHttpRequestBodyInternal {
         _ clientCallbacks: KvClientCallbacks?,
         responseBlock: @escaping ResponseBlock
     ) -> KvHttpRequestHandler {
-        RequestHandler(requestContext, clientCallbacks) {
-            try responseBlock(.init())
+        RequestHandler(requestContext, clientCallbacks) { completion in
+            responseBlock(.init(), completion)
         }
     }
 

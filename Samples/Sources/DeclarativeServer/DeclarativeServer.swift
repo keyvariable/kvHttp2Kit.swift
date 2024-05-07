@@ -25,6 +25,10 @@ import kvHttpKit
 import kvServerKit
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking         // It's for `URLSession.shared` on non-Apple platforms.
+#endif // canImport(FoundationNetworking)
+import kvKit        // It's imported, e.g. for cross-platform implementation of async `URLSession.data(from:)` method.
 
 
 
@@ -126,6 +130,17 @@ struct DeclarativeServer : KvServer {
                     return .notFound.string { "Usage:\n  - \(prefix)/int[?from=1[&through=5]];\n  - \(prefix)/int?count=10;\n  - \(prefix)/uuid[?string]." }
                 default:
                     return nil
+                }
+            }
+
+            KvGroup("seeip.org") {
+                /// Response content providers can be asynchronnous and/or throwing.
+                /// Below is an example of asynchronous throwing content block returning the resut of response to "https://api.seeip.org".
+                /// This service responds with the internet IP address the request has been sent from.
+                KvHttpResponse {
+                    let (data, _) = try await URLSession.shared.data(from: URL(string: "https://api.seeip.org")!)
+
+                    return .string { "The server's internet IP address: \(String(data: data, encoding: .utf8) ?? "—")" }
                 }
             }
 

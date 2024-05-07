@@ -131,11 +131,13 @@ class KvServerTestKit {
 
     // MARK: Response Execution
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     static func queryDataIgnoringCertificate(from url: URL, in urlSession: URLSession? = nil) async throws -> (Data, URLResponse) {
         try await (urlSession ?? URLSession.init(configuration: .ephemeral)).data(from: url, delegate: IgnoringCertificateTaskDelegate())
     }
 
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     static func queryDataIgnoringCertificate(for request: URLRequest, in urlSession: URLSession? = nil) async throws -> (Data, URLResponse) {
         try await (urlSession ?? URLSession.init(configuration: .ephemeral)).data(for: request, delegate: IgnoringCertificateTaskDelegate())
     }
@@ -145,6 +147,7 @@ class KvServerTestKit {
     // MARK: Validation Auxiliaries
 
     /// - Parameter contentType: If `nil` then it's ignored.
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     static func assertResponse(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
@@ -200,6 +203,7 @@ class KvServerTestKit {
     }
 
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     static func assertResponse(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
@@ -216,6 +220,7 @@ class KvServerTestKit {
     }
 
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     static func assertResponse(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,
@@ -231,6 +236,7 @@ class KvServerTestKit {
     }
 
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     static func assertResponseJSON<T : Decodable & Equatable>(
         urlSession: URLSession? = nil,
         _ baseURL: URL, method: String? = nil, path: String? = nil, query: Query? = nil, body: Data? = nil,

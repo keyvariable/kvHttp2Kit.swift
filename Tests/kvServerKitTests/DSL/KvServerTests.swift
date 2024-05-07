@@ -33,6 +33,7 @@ final class KvServerTests : XCTestCase {
 
     // MARK: - testHeadMethod()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testHeadMethod() async throws {
 
         struct HeadMethodServer : KvServer {

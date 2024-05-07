@@ -34,12 +34,15 @@ let package = Package(
     products: [ .executable(name: "DeclarativeServer", targets: [ "DeclarativeServer" ]),
                 .executable(name: "ImperativeServer", targets: [ "ImperativeServer" ]) ],
 
-    dependencies: [ .package(path: "../") ],
+    dependencies: [ .package(path: "../"),
+                    .package(url: "https://github.com/keyvariable/kvKit.swift.git", from: "4.12.1"),
+    ],
 
     targets: [
         .executableTarget(
             name: "DeclarativeServer",
-            dependencies: [ .product(name: "kvServerKit", package: "kvServerKit.swift") ],
+            dependencies: [ .product(name: "kvKit", package: "kvKit.swift"),
+                            .product(name: "kvServerKit", package: "kvServerKit.swift") ],
             resources: [ .copy("Resources/Frontend"),
                          .copy("Resources/blue.png"),
                          .copy("Resources/orange.png"),

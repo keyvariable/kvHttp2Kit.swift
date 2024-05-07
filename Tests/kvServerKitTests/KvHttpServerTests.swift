@@ -35,6 +35,7 @@ final class KvHttpServerTests : XCTestCase {
 
     // MARK: - testHttpServer()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testHttpServer() async throws {
         try await onImperativeHttpServer(with: KvServerTestKit.testConfigurations) { channel in
             let configuration = channel.configuration
@@ -92,6 +93,7 @@ final class KvHttpServerTests : XCTestCase {
 
     // MARK: - testByteLimitExceededIncident()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testByteLimitExceededIncident() async throws {
         try await onImperativeHttpServer(with: KvServerTestKit.secureHttpConfiguration(), { channel in
             let baseURL = KvServerTestKit.baseURL(for: channel.configuration)
@@ -110,6 +112,7 @@ final class KvHttpServerTests : XCTestCase {
 
     // MARK: - testHeadMethod()
 
+    @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
     func testHeadMethod() async throws {
         try await onImperativeHttpServer(with: KvServerTestKit.secureHttpConfiguration(), { channel in
             let baseURL = KvServerTestKit.baseURL(for: channel.configuration)
@@ -408,11 +411,13 @@ extension KvHttpServerTests {
         fileprivate class EchoRequestHandler : KvHttpRequest.CollectingBodyHandler {
 
             init() {
-                super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body in
-                    guard let body = body else { return nil }
+                super.init(bodyLengthLimit: Constants.Echo.bodyLimit) { body, completion in
+                    guard let body = body else { return }
 
-                    return .binary { body }
-                        .contentLength(body.count)
+                    completion(
+                        .binary { body }
+                            .contentLength(body.count)
+                    )
                 }
             }
 

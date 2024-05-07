@@ -575,7 +575,7 @@ extension KvServerImplementation.HttpServer {
 
         func httpClient(_ httpClient: KvHttpChannel.Client, requestHandlerFor requestHead: KvHttpServer.RequestHead) -> KvHttpRequestHandler? {
             guard let requestContext = KvHttpRequestContext(httpClient, requestHead)
-            else { return KvHttpHeadOnlyRequestHandler { .badRequest } }
+            else { return KvHttpHeadOnlyRequestHandler(response: .badRequest) }
 
             let requestProcessor: KvHttpRequestProcessorProtocol
 
@@ -585,7 +585,10 @@ extension KvServerImplementation.HttpServer {
 
 
             func RequestHandler(for incident: KvHttpResponse.Incident, callback: KvClientCallbacks.IncidentCallback?) -> KvHttpRequestHandler {
-                return KvHttpHeadOnlyRequestHandler { callback?(incident, requestContext) ?? .status(incident.defaultStatus) }
+                return KvHttpHeadOnlyRequestHandler { completion in
+                    let response = callback?(incident, requestContext) ?? .status(incident.defaultStatus)
+                    completion(response)
+                }
             }
 
 
